@@ -623,6 +623,10 @@ class OrganismObject:
         best = max(last_row)
         
         # BACKTRACKING
+        
+        node_pos_ends = None
+        cols_of_0_gaps = None
+        
         if traceback or print_out or out_file != None:
             # Position of best (where backtracking starts from)
             best_i = m  # it always comes from the last row by definition
