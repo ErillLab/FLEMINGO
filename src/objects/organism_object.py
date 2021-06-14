@@ -673,41 +673,17 @@ class OrganismObject:
             connectors_scores = []            
             
         # Return output dictionary
-        output_dict = {"energy": best,
-                       "recognizers_scores": recognizers_scores,
-                       "connectors_scores": connectors_scores}
-        
-        return output_dict
-
-    def get_seq_fitness(self, s_dna: str, traceback=False, print_out = False) -> dict:
-        """Return the fitness of the organism for a given DNA sequence
-
-        Args:
-            s_dna: DNA sequence to analize
-
-        Returns:
-           score, blocked and blockers
-
-        Description:
-            This function implements the placement behavior for organism.
-            The placement problem is defined as who to best position an
-            organism on a sequence (i.e. how to maximize its fitness given
-        """
-        #invoke placement function
-        placement=self.get_placement(s_dna, traceback, print_out)
-        
-        # Set energy threshold method and value
-        E_threshold_method = self.energy_threshold_method
-        E_threshold_value = self.energy_threshold_value
+        placement = {"energy": best,
+                     "recognizers_scores": recognizers_scores,
+                     "connectors_scores": connectors_scores}
         
         # Apply lower bound to energy if required
-        if E_threshold_method == "organism":
+        if self.energy_threshold_method == "organism":
+            E_threshold_value = self.energy_threshold_value
             if placement["energy"] < E_threshold_value:
                 placement["energy"] = E_threshold_value
         
-        # return score, blocks and blockers and PSSMs scores in that sequence
         return placement
-    
     
     def get_additive_fitness(self, a_dna: list, traceback=False, 
                              print_out = False, use_gini=False) -> dict:
@@ -729,11 +705,11 @@ class OrganismObject:
             #do traceback only if Gini is requested
             if use_gini:
     			# get the energy and pssm scores
-                sfit = self.get_seq_fitness(s_dna, traceback=True)
+                placement = self.get_placement(s_dna, traceback=True)
             else:
-                sfit = self.get_seq_fitness(s_dna)
-            energy = sfit["energy"]  # energy
-            pssm_scores = sfit["recognizers_scores"]  # PSSMs scores
+                placement = self.get_placement(s_dna)
+            energy = placement["energy"]  # energy
+            pssm_scores = placement["recognizers_scores"]  # PSSMs scores
 
             if use_gini:
     			# compute and append the Gini coefficient
@@ -776,14 +752,14 @@ class OrganismObject:
             list of binding eneregies
         """
 
-        scores = []
+        binding_energies = []
 		# for each sequence in the provided sequence set
         for s_dna in a_dna:
-            sfit = self.get_seq_fitness(s_dna)
-            energy = sfit["energy"]
-            scores.append(energy)
+            placement = self.get_placement(s_dna)
+            energy = placement["energy"]
+            binding_energies.append(energy)
         
-        return scores
+        return binding_energies
 
     def get_kolmogorov_fitness(self, pos_dataset: list, neg_dataset: list,
                                traceback=False, print_out = False, 
@@ -807,12 +783,12 @@ class OrganismObject:
             #do traceback only if Gini is requested
             if use_gini:
     			# get the energy and pssm scores
-                sfit = self.get_seq_fitness(s_dna, traceback=True)
+                placement = self.get_placement(s_dna, traceback=True)
             else:      
-                sfit = self.get_seq_fitness(s_dna)
+                placement = self.get_placement(s_dna)
             
-            pos_values.append(sfit["energy"])  # get sequence energy score
-            pssm_scores = sfit["recognizers_scores"]  # PSSMs scores
+            pos_values.append(placement["energy"])  # get sequence energy score
+            pssm_scores = placement["recognizers_scores"]  # PSSMs scores
             if use_gini:
     			# compute and append the Gini coefficient
                 if len(pssm_scores) > 0:
@@ -828,8 +804,8 @@ class OrganismObject:
         # Values on the negative set
         neg_values = []
         for s_dna in neg_dataset:
-            sfit = self.get_seq_fitness(s_dna)
-            neg_values.append(sfit["energy"])  # get sequence energy score
+            placement = self.get_placement(s_dna)
+            neg_values.append(placement["energy"])  # get sequence energy score
         
         # Compute fitness score as a Boltzmannian probability
         kolmogorov_fitness = ks_2samp(pos_values, neg_values).statistic
@@ -865,11 +841,11 @@ class OrganismObject:
             #do traceback only if Gini is requested
             if use_gini:
     			# get the energy and pssm scores
-                sfit = self.get_seq_fitness(s_dna, traceback=True)
+                placement = self.get_placement(s_dna, traceback=True)
             else:      
-                sfit = self.get_seq_fitness(s_dna)
-            boltz_exp = np.e**sfit["energy"]  # exp(energy)
-            pssm_scores = sfit["recognizers_scores"]  # PSSMs scores
+                placement = self.get_placement(s_dna)
+            boltz_exp = np.e**placement["energy"]  # exp(energy)
+            pssm_scores = placement["recognizers_scores"]  # PSSMs scores
             if use_gini:
     			# compute and append the Gini coefficient
                 if len(pssm_scores) > 0:
@@ -888,8 +864,8 @@ class OrganismObject:
         neg_values = []
         neg_lengths = []
         for s_dna in neg_dataset:
-            sfit = self.get_seq_fitness(s_dna)
-            boltz_exp = np.e**sfit["energy"]  # exp(energy)
+            placement = self.get_placement(s_dna)
+            boltz_exp = np.e**placement["energy"]  # exp(energy)
             neg_values.append(boltz_exp)
             neg_lengths.append(len(s_dna))
         
@@ -1356,7 +1332,7 @@ class OrganismObject:
         # for every DNA sequence
         for s_dna in a_dna:
             # call fitness evaluation for sequence with file printing option
-            sfit = self.get_placement(s_dna.lower(), traceback=True,
+            placement = self.get_placement(s_dna.lower(), traceback=True,
                                       print_out = False, out_file = ofile)
         ofile.close()
 
@@ -1375,8 +1351,8 @@ class OrganismObject:
         s_dna = s_dna.lower()
 
         # call fitness evaluation for sequence
-        sfit = self.get_placement(s_dna.lower(), traceback=True,
-                                  print_out = True)
+        placement = self.get_placement(s_dna.lower(), traceback=True,
+                                       print_out = True)
 
 
 
