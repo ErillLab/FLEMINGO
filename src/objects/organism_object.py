@@ -639,18 +639,18 @@ class OrganismObject:
             alignment_path.reverse()  # Top-down instead of bottom-up
             
             # Get scores and positions of all the nodes of the organism
-            node_scores, node_positions, cols_of_0_gaps = self.get_node_positions_and_energies(
+            node_scores, node_pos_ends, cols_of_0_gaps = self.get_node_positions_and_energies(
                 alignment_path, scores_matrix, pointers_matrix, dna_sequence
             )
             
             # Print placement
             if print_out == True:
-                self.print_placement(node_positions, node_scores,
+                self.print_placement(node_pos_ends, node_scores,
                                      cols_of_0_gaps, dna_sequence, 
                                      print_out=True)
             # Print to file
             if out_file != None:
-                self.print_placement(node_positions, node_scores,
+                self.print_placement(node_pos_ends, node_scores,
                                      cols_of_0_gaps, dna_sequence, 
                                      print_out=False, out_file=out_file)
 
@@ -670,12 +670,14 @@ class OrganismObject:
         # connector_scores
         else:
             recognizers_scores = []
-            connectors_scores = []            
-            
+            connectors_scores = []
+        
         # Return output dictionary
         placement = {"energy": best,
                      "recognizers_scores": recognizers_scores,
-                     "connectors_scores": connectors_scores}
+                     "connectors_scores": connectors_scores,
+                     "nodes_placement_right_ends": node_pos_ends,
+                     "null_gaps": cols_of_0_gaps}
         
         # Apply lower bound to energy if required
         if self.energy_threshold_method == "organism":
@@ -1142,9 +1144,9 @@ class OrganismObject:
            node on the sequence.
         """
         n = len(dna_seq)
-        dashed_line = ["-"] * n
-        dotted_line_1 = ["_"] * n
-        dotted_line_2 = ["_"] * n
+        recog_positions_line = ["-"] * n
+        recog_scores_line = ["_"] * n
+        conn_scores_line = ["_"] * n
         
         # for each node start
         for i in range(len(node_right_ends) - 1):
@@ -1166,12 +1168,12 @@ class OrganismObject:
                 
                 # write recognizer placement
                 for pos in range(start, stop):
-                    dashed_line[pos] = str(i)
+                    recog_positions_line[pos] = str(i)
                 
                 # write recognizer score
                 for c in range(len(node_score_str)):
-                    if start + c < len(dotted_line_1):  # avoid going out of the seq
-                        dotted_line_1[start + c] = node_score_str[c]
+                    if start + c < len(recog_scores_line):  # avoid going out of the seq
+                        recog_scores_line[start + c] = node_score_str[c]
             
             # if this is a connector
             else:
@@ -1189,23 +1191,23 @@ class OrganismObject:
                 
                 # write connector score
                 for c in range(len(node_score_str)):
-                    if start + c < len(dotted_line_1):  # avoid goin out of the seq
-                        dotted_line_2[start + c] = node_score_str[c]
+                    if start + c < len(recog_scores_line):  # avoid goin out of the seq
+                        conn_scores_line[start + c] = node_score_str[c]
         
         # print to stdout if required
         if print_out:
             print(dna_seq)
-            print("".join(dashed_line))
-            print("".join(dotted_line_1))
-            print("".join(dotted_line_2))
+            print("".join(recog_positions_line))
+            print("".join(recog_scores_line))
+            print("".join(conn_scores_line))
         
         # print to file if required
         if out_file != None:
                 print(dna_seq, file=out_file)
-                print("".join(dashed_line), file=out_file)
-                print("".join(dotted_line_1), file=out_file)
-                print("".join(dotted_line_2), file=out_file)
-                
+                print("".join(recog_positions_line), file=out_file)
+                print("".join(recog_scores_line), file=out_file)
+                print("".join(conn_scores_line), file=out_file)
+    
     
     def get_random_connector(self) -> int:
         """Returns the index of a random connector of the organism
