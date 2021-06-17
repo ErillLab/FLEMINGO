@@ -1287,16 +1287,28 @@ class OrganismObject:
         """Set the connectors of the organism to be those provided in the input
         list.
         """
-        
         self.connectors = connectors_list
         
     def set_recognizers(self, recognizers_list):
         """Set the recognizers of the organism to be those provided in the
         input list.
         """
-        
         self.recognizers = recognizers_list
+    
+    def append_connector(self, connector_obj):
+        """ Adds the given connector to the organism, by appending it to the
+        organism.connectors list.
+        """
+        connector = copy.deepcopy(connector_obj)
+        self.connectors.append(connector)
 
+    def append_recognizer(self, recognizer_obj):
+        """ Adds the given recognizer to the organism, by appending it to the
+        organism.recognizers list.
+        """
+        recognizer = copy.deepcopy(recognizer_obj)
+        self.connectors.append(recognizer)
+        
     def print(self) -> None:
         """Prints the whole tree data structure
         """
