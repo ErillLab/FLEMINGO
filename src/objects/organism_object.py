@@ -1294,6 +1294,8 @@ class OrganismObject:
         input list.
         """
         self.recognizers = recognizers_list
+        # Set/update the row_to_pssm attribute, used for the placement
+        self.set_row_to_pssm()
     
     def append_connector(self, connector_obj):
         """ Adds a copy of the given connector to the organism, by appending
@@ -1308,6 +1310,8 @@ class OrganismObject:
         """
         recognizer = copy.deepcopy(recognizer_obj)
         self.recognizers.append(recognizer)
+        # Set/update the row_to_pssm attribute, used for the placement
+        self.set_row_to_pssm()
         
     def print(self) -> None:
         """Prints the whole tree data structure
