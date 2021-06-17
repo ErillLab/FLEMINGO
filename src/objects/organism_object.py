@@ -1296,18 +1296,18 @@ class OrganismObject:
         self.recognizers = recognizers_list
     
     def append_connector(self, connector_obj):
-        """ Adds the given connector to the organism, by appending it to the
-        organism.connectors list.
+        """ Adds a copy of the given connector to the organism, by appending
+        it to the  organism.connectors  list.
         """
         connector = copy.deepcopy(connector_obj)
         self.connectors.append(connector)
 
     def append_recognizer(self, recognizer_obj):
-        """ Adds the given recognizer to the organism, by appending it to the
-        organism.recognizers list.
+        """ Adds a copy of the given recognizer to the organism, by appending
+        it to the  organism.recognizers  list.
         """
         recognizer = copy.deepcopy(recognizer_obj)
-        self.connectors.append(recognizer)
+        self.recognizers.append(recognizer)
         
     def print(self) -> None:
         """Prints the whole tree data structure
