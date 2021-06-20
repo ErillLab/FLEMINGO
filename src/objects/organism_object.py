@@ -121,11 +121,11 @@ class OrganismObject:
         self.mutate_probability_node_mutation = conf[
             "MUTATE_PROBABILITY_NODE_MUTATION"
         ]
-	
+        
         # min and maximum number of nodes allowed
         self.min_nodes = conf["MIN_NODES"]
         self.max_nodes = conf["MAX_NODES"]
-	
+        
         # maximum length of PSSMs allowed
         self.max_pssm_length = max_pssm_length
         
@@ -133,7 +133,128 @@ class OrganismObject:
         # The list maps each row of the matrix of the placement scores onto a
         # column of a PSSM: each row is assigned a [pssm_idx, column_idx]
         self.row_to_pssm = []
- 
+        
+        # !!!
+        # Dictionary storing information about how the organism has to be
+        # assembled by the recombination process. All the values are
+        # initialized as None.
+        # The "recognizers" key maps to the list of required recognizers, from
+        # left to right. Same thing for the "connectors" key. The "p1" and "p2"
+        # keys map to the ID number of parent 1 and parent 2, respectively.
+        self.assembly_instructions = {'p1': None,  # ID number of the first parent
+                                      'p2': None,  # ID number of the second parent
+                                      'recognizers': None,
+                                      'connectors': None}
+    
+    # !!!
+    def set_assembly_instructions(self, aligned_repres, connectors_table, p1_id, p2_id):
+        '''
+        Sets the self.assembly_instructions attribute.
+        '''
+        self.assembly_instructions['p1'] = p1_id
+        self.assembly_instructions['p2'] = p2_id
+        self.set_recogs_assembly_instructions(aligned_repres)
+        self.set_connectors_assembly_instructions(aligned_repres, connectors_table)
+    
+    # !!!
+    def set_recogs_assembly_instructions(self, aligned_repres):
+        '''
+        Compiles the list of recognizers in the self.assembly_instructions
+        attribute.
+        '''
+        child_recog_names = [item for item in aligned_repres if item != '-']
+        recogs_list = []
+        for item in child_recog_names:
+            if item not in recogs_list:
+                recogs_list.append(item)
+        self.assembly_instructions['recognizers'] = recogs_list
+    
+    # !!!
+    def set_connectors_assembly_instructions(self, aligned_repres, connectors_table):
+        '''
+        Compiles the list of connectors in the self.assembly_instructions
+        attribute.
+        '''
+        required_connectors = self.annotate_required_connectors(aligned_repres)
+        connectors_list = []
+        for (left, right) in required_connectors:
+            # What suitable connectors are available to cover that span
+            available_connectors = connectors_table[left][right]
+            
+            # If there's already a suitable connector
+            if len(available_connectors) > 0:
+                # There can be one or two (from the two parents) equivalent
+                # connectors available. Randomly pick one.
+                connector_name = available_connectors.pop(
+                    random.randint(0, len(available_connectors)-1)
+                )
+            
+            # If no connector is available to cover that span, make an appropriate one
+            else:
+                connector_name = 'synth_' + str(left) + '_' + str(right)
+            
+            connectors_list.append(connector_name)
+        self.assembly_instructions['connectors'] = connectors_list
+    
+    # !!!
+    def annotate_required_connectors(self, child_repres):
+        '''
+        Returns the list of the connectors' spans required to join the
+        recognizers, given the representation of the organism (a newly
+        generated child). Each element of the list is a tuple of two element,
+        where the first one is the index position of the recognizer to the left,
+        while the secind one is the index position of the recognizer to the right.
+        
+        EXAMPLE:
+        In this representation
+        
+            p1_0    p2_0    -       p1_2
+        
+        A connector is needed to link 'p1_0', which is at index position 0, to
+        'p2_0', which is at index position 1. Another connector is needed to
+        link 'p2_0' with 'p1_2', which is at index position 3. Therefore, the
+        returned list of required connectors would be
+        
+            [ (0, 1), (1, 3) ]
+        
+        In case of repetitions (due to a recognizer overlapping with more than
+        one recog in the alignment of the organisms), no recognizer is needed.
+        
+        EXAMPLE:
+        In this representation
+        
+            p1_0    -       p1_1    p1_1    p2_3
+        
+        The returned list of required connectors would be
+        
+            [ (0, 2), (2, 3) ]
+        
+        No connector is needed for index 2 to index 3: positions that are both
+        occupied by the same recognizer ('p1_1').
+        
+        '''
+        # Indexes where there is a recognizer
+        recogs_indexes = []
+        for idx in range(len(child_repres)):
+            if child_repres[idx] != '-':
+                recogs_indexes.append(idx)
+        
+        required_connectors = []
+        for i in range(len(recogs_indexes)-1):
+            
+            left_recog_index = recogs_indexes[i]
+            right_recog_index = recogs_indexes[i+1]
+            
+            left_recog_name = child_repres[left_recog_index]
+            right_recog_name = child_repres[right_recog_index]
+            
+            # No connector is needed to link a recognizer with itself (see
+            # function's docstring).
+            if left_recog_name != right_recog_name:
+                connector_span = (left_recog_index, right_recog_index)
+                required_connectors.append(connector_span)
+        
+        return required_connectors
     
     def set_row_to_pssm(self):
         """row_to_pssm is an attribute that maps each row of the alignment

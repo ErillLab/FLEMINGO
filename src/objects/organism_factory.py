@@ -242,218 +242,6 @@ class OrganismFactory:
             "t": round(probabilities[3], decimals),
         }
     
-    def get_children(self, parent1, parent2):
-        """Implements the recombination operator
-           Inputs:
-           - parent1, parent2 - two parent organisms
-           Returns:
-               A dictionary with 2 children:
-               "child1": child derived from organism1
-               "child2": child derived from organism1
-           
-           For recombination, organisms are split at a connector.
-           Four recombination possibilities are then allowed, depending
-           on which side of the connector's link to the chain is preserved.
-           
-           This is a conservative approach to recombination, where the
-           parent organisms' connectors are preserved, rather than generating
-           new connectors randomly to stich the two split sub-chains.
-           
-           Given two organisms 1 and 2, and two split points (connectors),
-           we obtain L1 and R1 as the subchains in 1, and L2 and R2 in 2.
-           
-           Recombination cases:
-           - Left-left
-             This preserves the left link for both connectors, meaning that
-             - L1 contains the full connector for the split [linking right]
-             - L2 contains the full connector for the split [linking right]
-             - R1 is connectorless at the split
-             - R2 is connectorless at the split
-             This results in the following offspring:
-             - organism L2-R1
-             - organism L1-R2
-             
-           - Left-right
-             - L1 contains the full connector for the split [linking right]
-             - R2 contains the full connector for the split [linking left]
-             - R1 is connectorless at the split
-             - L2 is connectorless at the split
-             This results in the following offspring:
-             - organism R1-R2
-             - organism L1-L2
-             
-           - Right-left
-             - R1 contains the full connector for the split [linking left]
-             - L2 contains the full connector for the split [linking right]
-             - R2 is connectorless at the split
-             - L1 is connectorless at the split
-             This results in the following offspring:
-             - organism R2-R1
-             - organism L2-L1
-             
-           - Right-left
-             - R1 contains the full connector for the split [linking left]
-             - L2 contains the full connector for the split [linking right]
-             - R2 is connectorless at the split
-             - L1 is connectorless at the split
-             This results in the following offspring:
-             - organism R2-R1
-             - organism L2-L1
-             
-           - Right-right
-             - R1 contains the full connector for the split [linking left]
-             - R2 contains the full connector for the split [linking left]
-             - L2 is connectorless at the split
-             - L1 is connectorless at the split
-             This results in the following offspring:
-             - organism L2-R1
-             - organism L1-R2
-             
-        The function also computes, for each possible case, the "closest" 
-        parent, which will be associated to the child for recombination, based
-        on the fraction of parent that is assigned to the child.
-        """
-
-        # Combine parents with probability p
-        if random.random() < self.recombination_probability:
-            parent1recogs = parent1.count_recognizers()
-            parent2recogs = parent2.count_recognizers()
-            
-            # if none of the organisms are single-recognizer organisms
-            if parent1recogs != 1 and parent2recogs != 1:
-                # Select one connector in each parent for the split
-                index_1 = parent1.get_random_connector()
-                index_2 = parent2.get_random_connector()
-                
-                # Instantiate children organisms
-                child1 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
-                child2 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
-             
-                # decide how the split is handled
-                if random.random() < 0.5:
-                    # First parent keeps the broken connector in the LEFT chunk
-                    L1, R1 = parent1.break_chain(index_1, "left")
-        
-                    if random.random() < 0.5:
-                        # Second parent keeps the broken connector in the LEFT chunk
-                        L2, R2 = parent2.break_chain(index_2, "left")
-                    
-                        # Recombination: case 1 (left, left)
-                        # Child 1 is (L1 + R2)
-                        child1_reco = L1["recognizers"] + R2["recognizers"]
-                        child1_conn = L1["connectors"] + R2["connectors"]
-            
-                       # Child 2 is (L2 + R1)
-                        child2_reco = L2["recognizers"] + R1["recognizers"]
-                        child2_conn = L2["connectors"] + R1["connectors"]
-                    
-                    else:
-                        # Second parent keeps the broken connector in the RIGHT chunk
-                        L2, R2 = parent2.break_chain(index_2, "right")
-                    
-                        # Recombination: case 2 (left, right)
-                        # Child 1 is (L1 + L2)
-                        child1_reco = L1["recognizers"] + L2["recognizers"]
-                        child1_conn = L1["connectors"] + L2["connectors"]
-                        # Child 2 is (R1 + R2)
-                        child2_reco = R1["recognizers"] + R2["recognizers"]
-                        child2_conn = R1["connectors"] + R2["connectors"]
-                else:
-                    # First parent keeps the broken connector in the RIGHT chunk
-                    L1, R1 = parent1.break_chain(index_1, "right")
-                    
-                    if random.random() < 0.5:
-                        # Second parent keeps the broken connector in the LEFT chunk
-                        L2, R2 = parent2.break_chain(index_2, "left")
-                    
-                        # Recombination: case 3 (right, left)
-                        # Child 1 is (L2 + L1)
-                        child1_reco = L2["recognizers"] + L1["recognizers"]
-                        child1_conn = L2["connectors"] + L1["connectors"]
-                        # Child 2 is (R2 + R1)
-                        child2_reco = R2["recognizers"] + R1["recognizers"]
-                        child2_conn = R2["connectors"] + R1["connectors"]
-                    
-                    else:
-                        # Second parent keeps the broken connector in the RIGHT chunk
-                        L2, R2 = parent2.break_chain(index_2, "right")
-                    
-                        # Recombination: case 4 (right, right)
-                        # Child 1 is (L1 + R2)
-                        child1_reco = L1["recognizers"] + R2["recognizers"]
-                        child1_conn = L1["connectors"] + R2["connectors"]
-                        # Child 2 is (L2 + R1)
-                        child2_reco = L2["recognizers"] + R1["recognizers"]
-                        child2_conn = L2["connectors"] + R1["connectors"]
- 
-                # Set child1 recognizers and connectors
-                child1.set_recognizers(child1_reco)
-                child1.set_connectors(child1_conn)
-                
-                # Set child2 recognizers and connectors
-                child2.set_recognizers(child2_reco)
-                child2.set_connectors(child2_conn)
-                
-                # Set attribute that will map organism nodes to alignment matrix rows
-                child1.set_row_to_pssm()
-                child2.set_row_to_pssm()
-            
-            # if at least one of the two organisms is a single-recognizer organism
-            # (if they both are, swapping them doesn't make any difference)
-            else:
-                # Create the 2 children and assign new IDs
-                child1 = copy.deepcopy(parent1)
-                child2 = copy.deepcopy(parent2)
-                # Assign IDs to organisms and increase factory counter
-                child1.set_id(self.get_id())
-                child2.set_id(self.get_id())
-
-                # parent 1 is a single-recognizer organism
-                if parent1recogs == 1:
-                    ''' Then swap the only recognizer in child 1 (which is
-                    currently a copy of parent 1) with a random recognizer of
-                    child 2 (which is currently a copy of parent 2).
-                    '''
-                    # get random RECOGNIZER index from other child
-                    index_2 = child2.get_random_recognizer()
-                    # get recognizer at that position
-                    temp = child2.recognizers[index_2]
-                    # assign single node to that position in parent 1
-                    child2.recognizers[index_2] = child1.recognizers[0]
-                    # child 1 takes the random child2 recognizer
-                    child1.recognizers[0] = temp
-               
-                # parent 2 is a single-recognizer organism
-                else:
-                    ''' Then swap the only recognizer in child 2 (which is
-                    currently a copy of parent 2) with a random recognizer of
-                    child 1 (which is currently a copy of parent 1).
-                    '''
-                    # get random RECOGNIZER index from other child
-                    index_1 = child1.get_random_recognizer()
-                    # get recognizer at that position
-                    temp = child1.recognizers[index_1]
-                    # assign single node to that position in parent 1
-                    child1.recognizers[index_1] = child2.recognizers[0]
-                    # child 1 takes the random child2 recognizer
-                    child2.recognizers[0] = temp
-                   
-                # Set attribute that will map organism nodes to alignment matrix rows
-                child1.set_row_to_pssm()
-                child2.set_row_to_pssm()
-        
-        # no recombination case                  
-        else:
-            # Create the 2 children and assign new IDs
-            child1 = copy.deepcopy(parent1)
-            child2 = copy.deepcopy(parent2)
-            # Assign IDs to organisms and increase factory counter
-            child1.set_id(self.get_id())
-            child2.set_id(self.get_id())
-
-        # return {"child1": child_1_plus_sims, "child2": child_2_plus_sims}
-        return [child1, child2]
-
     def import_organisms(self, file_name: str) -> list:
         """Import Organisms from file
 
@@ -574,3 +362,581 @@ class OrganismFactory:
         return pssm
     
     
+    def get_children(self, par1, par2, reference_dna_seq, pos_dna_sample):
+        '''
+        Implements the recombination operator.
+        Fisrt, an abstract representation of the aligned parents is produced.
+        Then, the symbols of these representations are swapped, generating the
+        representations of the children. In this way we define which nodes will
+        go in each child.
+        Finally, the actual children organism objects are compiled accordingly.
+        
+        Parameters
+        ----------
+        par1 : OrganismObject
+            First parent.
+        par2 : OrganismObject
+            Second parent.
+        reference_dna_seq : string
+            The DNA sequence on which the parents are placed, so that they
+            become 'aligned' one against the other.
+        pos_dna_sample : list
+            A random subset of the positive set. It's used in case it's
+            necessary to make some synthetic connectors (for the children). The
+            average distance and the standard deviation will be estimated using
+            this sample.
+
+        Returns
+        -------
+        child1 : OrganismObject
+            First child.
+        child2 : OrganismObject
+            Second child.
+
+        '''
+        
+        # Place the parents on all the sequences in the sample of the positive set
+        par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample)
+        
+        # Representations of the two parents
+        par1_repr, par2_repr = self.get_aligned_parents_repr(par1, par2, reference_dna_seq)
+        
+        # Table storing info about what connectors are available to cover the possible spans
+        connectors_table = self.annotate_available_connectors(par1_repr, par2_repr)
+        
+        # Representations of the two recombined children
+        child1_repr, child2_repr = self.get_aligned_children_repr(par1_repr, par2_repr)
+        
+        # Initialize child 1 as an empty organism
+        child1 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
+        # Write the assembly instructions
+        child1.set_assembly_instructions(child1_repr, connectors_table, par1._id, par2._id)
+        # Now compile child 1
+        self.compile_recognizers(child1, par1, par2)
+        self.compile_connectors(child1, par1, par2, par1_repr, par2_repr,
+                                par1_placements, par2_placements)
+        
+        # Initialize child 2 as an empty organism
+        child2 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
+        # Write the assembly instructions
+        child2.set_assembly_instructions(child2_repr, connectors_table, par1._id, par2._id)
+        # Now compile child 2
+        self.compile_recognizers(child2, par1, par2)
+        self.compile_connectors(child2, par1, par2, par1_repr, par2_repr,
+                                par1_placements, par2_placements)
+        
+        return child1, child2
+    
+    def store_parents_placemnts(self, parent1, parent2, dna_seq_set):
+        '''
+        Places each parent on each DNA sequence in the given list of sequences.
+        Returns all the placements in a list, for each organism.
+        '''
+        p1_placements = []
+        p2_placements = []
+        
+        for dna_seq in dna_seq_set:
+            p1_placements.append(parent1.get_placement(dna_seq, traceback=True))
+            p2_placements.append(parent2.get_placement(dna_seq, traceback=True))
+        
+        return p1_placements, p2_placements
+    
+    def get_aligned_parents_repr(self, parent1, parent2, dna_seq):
+        '''
+        Places both the parents on the given DNA sequence, in order to 'align'
+        them, one against the other. An abstract representation of the two
+        aligned parents is returned as lists of symbols.
+        
+        EXAMPLE:
+        This scheme
+        
+            p1_0    p1_1    -
+            -       p2_0    p2_1
+        
+        says that recognizer 1 of parent1 ('p1') overlaps with recognizer 0 of
+        parent2 ('p2'). Instead, recognizer 0 of parent 1 is unpaired, placing
+        to the left of where parent2 is placed. Recognizer 1 of parent2 is also
+        unpaired, placing to the right of where parent1 is placed.
+        This scheme would be returned as a couple of lists:
+        
+            (
+                ['p1_0', 'p1_1', '-'],
+                ['-', 'p2_0', 'p2_1']
+            )
+        
+        '''
+        # These dictionaries say which recognizer of an organism is occupying a
+        # certain DNA position
+        pos_to_recog_dict1 = self.get_pos_to_recog_idx_dict(parent1, dna_seq, 'p1')
+        pos_to_recog_dict2 = self.get_pos_to_recog_idx_dict(parent2, dna_seq, 'p2')
+        
+        # Initialize the representation of the aligned parents
+        p1_repres = []
+        p2_repres = []
+        
+        # All the encountered pairs (each pair is made of one element from parent1,
+        # and the other from parent2) are stored in this set
+        pairs = set([])
+        
+        for i in range(len(dna_seq)):
+            p1, p2 = '-', '-'
+            
+            if i in pos_to_recog_dict1.keys():
+                p1 = pos_to_recog_dict1[i]
+            
+            if i in pos_to_recog_dict2.keys():
+                p2 = pos_to_recog_dict2[i]
+            
+            pair = (p1, p2)
+            # ignore DNA regions where there aren't recogs
+            if pair != ('-','-'):
+                
+                # avoid repeating the match for all the DNA positions where the
+                # match occurs
+                if pair not in pairs:
+                    pairs.add(pair)
+                    # Compile parents representations
+                    p1_repres.append(p1)
+                    p2_repres.append(p2)
+        
+        # Remove protrusions
+        '''
+        A 1-bp overlap between recognizers is enough for them to get 'paired'.
+        This means that the overlap can be imperfect, with flanking parts of
+        the recognizers being unpaired. Those will be ignored.
+        
+        EXAMPLE:
+        If two recognizers are placed on DNA in this way
+            -----AAAA-------
+            -------BBBB-----
+        the desired representation is
+            A
+            B
+        and not
+            AA-
+            -BB
+        Therefore, the two positions to the left and to the right of the
+        A-B match will be called 'protrusions', and they will be removed
+        '''
+        matches_p1 = set([])  # recogs of parent1 that overlap with a recog
+        matches_p2 = set([])  # recogs of parent1 that overlap with a recog
+        
+        for i in range(len(p1_repres)):
+            p1_node, p2_node = p1_repres[i], p2_repres[i]
+            if p1_node != '-' and p2_node != '-':
+                matches_p1.add(p1_node)
+                matches_p2.add(p2_node)
+        
+        
+        # If recognizer X is in matches_p1 or matches_p2 (menaing that it
+        # overlaps at least once with another recognizer) all the other
+        # eventual pairings of X with "-" are protrusions.
+        
+        # Here we store the indexes of the positions where there's a 'protrusion'
+        protrusions = []        
+        
+        for i in range(len(p1_repres)):
+            if p1_repres[i] in matches_p1:
+                if p2_repres[i] == '-':
+                    protrusions.append(i)
+        
+        for i in range(len(p2_repres)):
+            if p2_repres[i] in matches_p2:
+                if p1_repres[i] == '-':
+                    protrusions.append(i)
+        
+        '''
+        for matching_recog in matches_p1:
+            # 
+            for i in range(len(p1_repres)):
+                if p1_repres[i] == matching_recog:
+                    if p2_repres[i] == '-':
+                        protrusions.append(i)
+        
+        for matching_recog in matches_p2:
+            # 
+            for i in range(len(p2_repres)):
+                if p2_repres[i] == matching_recog:
+                    if p1_repres[i] == '-':
+                        protrusions.append(i)
+        '''
+        
+        # Skip the protrusions and return the desired representations
+        p1_repres = [p1_repres[i] for i in range(len(p1_repres)) if i not in protrusions]
+        p2_repres = [p2_repres[i] for i in range(len(p2_repres)) if i not in protrusions]
+        
+        return (p1_repres, p2_repres)
+    
+    def get_pos_to_recog_idx_dict(self, org, dna_seq, org_tag):
+        '''
+        The given organism is placed on the given DNA sequence.
+        Each DNA position covered by some recognizer is mapped to a string,
+        saying what recognizer is placed there. The string will contain a tag
+        for the organism (org_tag argument), joint with the recog index by an
+        underscore.
+        
+        EXAMPLE:
+        This dictionary
+            {112: 'p1_0', 113: 'p1_0', 114: 'p1_0', 115: 'p1_0'}
+        will be used to know that position 114 is covered by recognizer 0.
+        In this case, 'p1' was the org_tag value specified as input.
+        
+        Parameters
+        ----------
+        org : OrganismObject
+        dna_seq : string
+        org_tag : string
+
+        Returns
+        -------
+        pos_to_recog_dict : dictionary
+
+        '''
+        org_placement = org.get_placement(dna_seq, traceback=True)
+        node_right_ends = org_placement["nodes_placement_right_ends"]
+        null_gaps = org_placement["null_gaps"]
+        
+        pos_to_recog_dict = {}
+        
+        # for each recognizer (node that have an index which is even)
+        for i in range(0, len(node_right_ends)-1, 2):  # even indexes
+            
+            # get sequence coordinates for the recognizer
+            start = node_right_ends[i]
+            stop = node_right_ends[i+1]
+            
+            # Detect a post 0-bp gap recognizer (special case)
+            if start in null_gaps:
+                start -= 1
+            
+            # Node i is recognizer i/2 (e.g., node 4 is the third recognizer, i.e.
+            # the recognizer with index 2 in the organism.recognizer list)
+            recog_idx = int(i/2)
+            
+            # DNA positions occupied by this recognizer
+            for pos in range(start, stop):
+                pos_to_recog_dict[pos] = org_tag + '_' + str(recog_idx)
+        
+        return pos_to_recog_dict
+    
+    def annotate_available_connectors(self, parent1_repres, parent2_repres):
+        '''
+        The representations of the aligned parents are lists of symbols.
+        For each possible couple of positions in the representation, this
+        function annotates whether the parents have a connector that connects
+        them.
+        
+        EXAMPLE:
+        In this representations
+        
+            p1_0    p1_1    -       p1_2
+            -       p2_0    p2_1    -   
+        
+        index 0 is liked to index 1 by the first connector of p1 (parent1): the
+        connector that connects recognizer p1_0 with recognizer p1_1.
+        
+        Index 1 is liked to index 3 by the second connector of p1: the
+        connector that connects recognizer p1_1 with recognizer p1_2.
+        
+        Index 2 is liked to index 3 by the only connector of p2: the
+        connector that connects recognizer p2_0 with recognizer p2_1.
+        
+        Parameters
+        ----------
+        parent1_repres : list
+            Representation of parent1 (aligned against parent2).
+        parent2_repres : list
+            Representation of parent2 (aligned against parent1).
+
+        Returns
+        -------
+        connectors_table : 2D list
+            This table stores at row i, column j the connector(s) available to
+            link index i to index j.
+
+        '''
+        
+        n = len(parent1_repres)
+        
+        # 2D list where each item is an emtpy list
+        connectors_table = [[ [] for i in range(n)] for j in range(n)]
+        
+        # Each parent representation is coupled with a tag ('p1' or 'p2')
+        parents = [(parent1_repres, 'p1'), (parent2_repres, 'p2')]
+        
+        for (org_repr, org_tag) in parents:
+            
+            # Indexes where a recognizer of this parent is present        
+            recogs_indexes = []
+            for idx in range(len(org_repr)):
+                if org_repr[idx] != '-':
+                    recogs_indexes.append(idx)
+            
+            connector_idx = 0
+            for i in range(len(recogs_indexes)-1):
+                
+                left_recog_idx = recogs_indexes[i]
+                right_recog_idx = recogs_indexes[i+1]
+                
+                left_recog_name = org_repr[left_recog_idx]
+                right_recog_name = org_repr[right_recog_idx]
+                
+                if left_recog_name != right_recog_name:                
+                    connector_name = org_tag + '_' + str(connector_idx)
+                    connector_idx += 1
+                    connectors_table[left_recog_idx][right_recog_idx].append(connector_name)
+        # Return the table storing info about available connectors
+        return connectors_table
+    
+    def get_aligned_children_repr(self, parent1_repres, parent2_repres):
+        '''
+        This function swaps parts of the representations of the two parents, in
+        order to get the representations of the two children.
+        '''
+        # Define the chunks of the aligned representations that will work as
+        # independent units of the recombination process
+        units = self.define_independent_units(parent1_repres, parent2_repres)
+        
+        # Initialize representation of the children as identical copies of the parents
+        c1_repr = copy.deepcopy(parent1_repres)  # child1
+        c2_repr = copy.deepcopy(parent2_repres)  # child2
+        
+        # Within each unit, perform a swap with 50% probability
+        for (start, stop) in units:
+            if random.random() < 0.5:
+                # Perform the swapping, which means that the part from parent1 will
+                # end up into child2, and the part from parent2 will end up into child1
+                tmp = c1_repr[start: stop]
+                c1_repr[start: stop] = c2_repr[start: stop]
+                c2_repr[start: stop] = tmp
+        
+        return (c1_repr, c2_repr)
+    
+    def define_independent_units(self, org1_repr, org2_repr):
+        '''
+        This function is used to define what chunks of the organisms'
+        representation are going to work as independent units in the
+        recombination process. Within each unit, the part from parent1 can be
+        swapped with the part from parent2 (by get_aligned_children_repr function)
+        with 50% probability.
+        This function returns a list of units' spans, where each element is a
+        (start, stop) tuple.
+        
+        EXAMPLE
+        In this representations
+        
+            p1_0    p1_1    -       p1_2
+            p2_0    p2_0    p2_1    -   
+        
+        p2_0 is partially overlapping with p1_0, and partially with p1_1. In
+        this scenario, the first two positions of the representations work as a
+        single unit. Therefore, the returned list of independent units will be
+        
+            [ (0, 2), (2, 3), (3, 4) ]
+        
+        '''
+        # Initialize list about where each unit starts
+        unit_starts = [0]
+        
+        for i in range(1, len(org1_repr)):
+            
+            # If in org1_repr at position i there is the same recognizer as the one
+            # at position i-1
+            if org1_repr[i] != '-' and org1_repr[i] == org1_repr[i-1]:
+                # Then this is not yet the start of the next unit
+                continue
+        
+            # If in org2_repr at position i there is the same recognizer as the one
+            # at position i-1
+            if org2_repr[i] != '-' and org2_repr[i] == org2_repr[i-1]:
+                # Then this is not yet the start of the next unit
+                continue
+            
+            unit_starts.append(i)  # i is the start position of a new unit
+        
+        # Each unit stops where the next unit starts (or when the list ends in the
+        # case of the last unit)
+        unit_stops = unit_starts[1:] + [len(org1_repr)]
+        
+        # Make a list of units. Each unit is a tuple: (start, stop)
+        units = list(zip(unit_starts, unit_stops))
+        return units
+    
+    def compile_recognizers(self, child_obj, parent1, parent2):
+        '''
+        It appends to the given organism (child_obj) the required recognizers
+        from the two parents, in the right order, according to the
+        assembly_instructions attribute of the organism.
+        '''
+        
+        for recog_name in child_obj.assembly_instructions['recognizers']:
+            parent, recog_idx = recog_name.split('_')
+            
+            if parent == 'p1':
+                recog = parent1.recognizers[int(recog_idx)]
+            elif parent == 'p2':
+                recog = parent2.recognizers[int(recog_idx)]
+            
+            # Add recognizer to organism
+            child_obj.append_recognizer(recog)
+    
+    def compile_connectors(self, child_obj, par1, par2, par1_repres, par2_repres,
+                           par1_placements, par2_placements):
+        '''
+        It appends to the given organism (child_obj) the required connectors
+        from the two parents, in the right order, according to the
+        assembly_instructions attribute of the organism.
+        
+        When a required connector was not available in the parents,
+        assembly_instructions requires to synthesize a new connector. This is
+        done by calling the make_synthetic_connector method.
+        '''
+        for connector_name in child_obj.assembly_instructions['connectors']:
+            
+            # "synth" means that the connector needs to be synthesized, because
+            # it was not available in any of the two parents
+            if connector_name[:5] == 'synth':
+                left_idx, right_idx = connector_name.split('_')[1:]
+                
+                # mu and sigma will be estimated for the gap between a left and a
+                # right recognizers (on a small sample from the positive dataset).
+                # Chose the left and right recognizers
+                p1_left = par1_repres[int(left_idx)]
+                p2_left = par2_repres[int(left_idx)]
+                p1_right = par1_repres[int(right_idx)]
+                p2_right = par2_repres[int(right_idx)]
+                
+                # When possible, chose them from the same parent
+                if p1_left != '-' and p1_right != '-':
+                    recog_L_name, recog_R_name = p1_left, p1_right
+                elif p2_left != '-' and p2_right != '-':
+                    recog_L_name, recog_R_name = p2_left, p2_right
+                else:
+                    if p1_left != '-':
+                        recog_L_name, recog_R_name = p1_left, p2_right
+                    else:
+                        recog_L_name, recog_R_name = p2_left, p1_right
+                # Make an appropriate connector
+                conn = self.make_synthetic_connector(recog_L_name, recog_R_name,
+                                                par1_placements, par2_placements)
+            
+            # Else, the connector can be grabbed from one of the parents
+            else:
+                parent, connector_idx = connector_name.split('_')
+                
+                if parent == 'p1':
+                    # Re-use connector from parent 1
+                    conn = par1.connectors[int(connector_idx)]
+                elif parent == 'p2':
+                    # Re-use connector from parent 2
+                    conn = par2.connectors[int(connector_idx)]
+            
+            # Add connector to organism
+            child_obj.append_connector(conn)
+    
+    def make_synthetic_connector(self, recog_left_name, recog_right_name,
+                                 p1_placements, p2_placements):
+        '''
+        This function is used to generate an appropriate connector to link two
+        recognizers of a child, when no one of the connectors of the parents
+        is appropriate.
+
+        Parameters
+        ----------
+        recog_left_name : string
+            It identifies the recognizer to the left.
+        recog_right_name : string
+            It identifies the recognizer to the right.
+        p1_placements : list
+            List of placements for parent 1.
+        p2_placements : list
+            List of placements for parent 2.
+
+        Returns
+        -------
+        synthetic_connector : ConnectorObject
+            A new connector, whose mu is the average distance between the left
+            and the right recognizers specified, observed in the provided
+            placements, and whose sigma is the standard deviation of the
+            observed distance in those same placements.
+
+        '''
+        # Get parent and node index that specify the left recognizer
+        recog_left_parent, recog_left_idx = recog_left_name.split('_')
+        recog_left_node_idx = 2 * int(recog_left_idx)
+        # Get parent and node index that specify the right recognizer
+        recog_right_parent, recog_right_idx = recog_right_name.split('_')
+        recog_right_node_idx = 2 * int(recog_right_idx)
+        
+        gap_values = []
+        for i in range(len(p1_placements)):
+            
+            # Placement of the left recognizer
+            if recog_left_parent == 'p1':
+                placement = p1_placements[i]
+            elif recog_left_parent == 'p2':
+                placement = p2_placements[i]
+            L_first_bp, L_last_bp = self.get_recog_pos_on_DNA_seq(placement, recog_left_node_idx)
+            
+            # Placement of the right recognizer
+            if recog_right_parent == 'p1':
+                placement = p1_placements[i]
+            elif recog_right_parent == 'p2':
+                placement = p2_placements[i]
+            R_first_bp, R_last_bp = self.get_recog_pos_on_DNA_seq(placement, recog_right_node_idx)
+            
+            # Gap between the left and the right recognizers
+            distance = R_first_bp - L_last_bp
+            gap = distance - 1
+            gap_values.append(gap)
+        
+        # Estimate mu and sigma
+        avg_gap = sum(gap_values)/len(gap_values)
+        # Avoid negative mu values
+        if avg_gap < 0:  # !!! temporarily hard-coded lower-bound
+            avg_gap = 0
+        stdev_gap = np.std(gap_values)
+        # Avoid setting sigma to 0
+        if stdev_gap < 0.1:  # !!! temporarily hard-coded lower-bound
+            stdev_gap = 0.1
+        
+        synthetic_connector = ConnectorObject(avg_gap, stdev_gap, self.conf_con)
+        return synthetic_connector
+    
+    def get_recog_pos_on_DNA_seq(self, org_placement, node_idx):
+        '''
+        For a given placement and a given node index, it returns the first and
+        last bp positions occupied by that node.
+
+        Parameters
+        ----------
+        org_placement : dictionary
+            The placement of an organism on a DNA sequence.
+        node_idx : int
+            Index of the desired node.
+
+        Returns
+        -------
+        first_bp : int
+            First DNA position occupied by the specified node.
+        last_bp : int
+            Last DNA position occupied by the specified node.
+
+        '''
+        node_right_ends = org_placement["nodes_placement_right_ends"]
+        null_gaps = org_placement["null_gaps"]
+        
+        # get sequence coordinates for the recognizer
+        start = node_right_ends[node_idx]
+        stop = node_right_ends[node_idx+1]
+        
+        # Detect a post 0-bp gap recognizer (special case)
+        if start in null_gaps:
+            start -= 1
+        
+        first_bp = start  # First bp occupied
+        last_bp = stop -1  # Last bp occupied
+        return (first_bp, last_bp)
+
+
+
