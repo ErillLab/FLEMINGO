@@ -193,6 +193,40 @@ class OrganismObject:
             connectors_list.append(connector_name)
         self.assembly_instructions['connectors'] = connectors_list
     
+    def get_parent1_parent2_ratio(self):
+        '''
+        This function is used on newly assembled children, obtained by
+        recombination between two parent organisms. The assembly_instructions
+        attribute reveals how many nodes came from each parent. This method
+        counts how many nodes come from parent1, and how many from parent2.
+        Then it returns the ratio between these two counts.
+        '''
+        
+        from_p1 = 0  # How many nodes from parent1
+        from_p2 = 0  # How many nodes from parent2
+        
+        # Count recognizers from each parent
+        for node_name in self.assembly_instructions['recognizers']:
+            if node_name[:3] == 'p1_':
+                from_p1 += 1
+            elif node_name[:3] == 'p2_':
+                from_p2 += 1
+                
+        # Count connectors from each parent
+        for node_name in self.assembly_instructions['connectors']:
+            if node_name[:3] == 'p1_':
+                from_p1 += 1
+            elif node_name[:3] == 'p2_':
+                from_p2 += 1
+        
+        # Compute parent1 / parent2 ratio
+        if from_p2 == 0:  # Avoid 0-division error
+            p1_p2_ratio = np.inf
+        else:
+            p1_p2_ratio = from_p1 / from_p2
+        
+        return p1_p2_ratio
+    
     def annotate_required_connectors(self, child_repres):
         '''
         Returns the list of the connectors' spans required to join the

@@ -76,7 +76,6 @@ def main():
     )
 
     mean_nodes = 0
-    mean_recognizers = 0
     mean_fitness = 0
 
     print("Instantiating population...")
@@ -139,14 +138,14 @@ def main():
     # Organism with highest fitness in the simulation
     best_organism = (
         None,  # the organism object
-        0.0,  # its fitness
+        -np.inf,  # its fitness
         0,  # number of nodes it is made of
         0.0  # the penalty it gets
     )
     # Organism with highest fitness in the iteration
     max_organism = (
         None,  # the organism object
-        0.0,  # its fitness
+        -np.inf,  # its fitness
         0,  # number of nodes it is made of
         0.0  # the penalty it gets
     )
@@ -184,15 +183,15 @@ def main():
         for i in range(0, len(organism_population) - 1, 2):
             org1 = organism_population[i]
             org2 = organism_population[i + 1]
-
+            
+            pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
+            ref_seq = random.choice(pos_set_sample)
+            
             # Cross parents to get children
-            # Returns two children. Each child contains:
-            #   - Child object itself
-            #   - Similarity to organism 1
-            #   - Similarity to organism 2
-            #
             # Recombination process
-            child1, child2 = organism_factory.get_children(org1, org2)
+            child1, child2 = organism_factory.get_children(
+                org1, org2, ref_seq, pos_set_sample
+            )
 
             # Mutate children
             child1.mutate(organism_factory)
@@ -238,32 +237,40 @@ def main():
                   other child
             '''
             
-            # get lengths for all organisms (parents and children)
-            lorg1 = org1.count_nodes()
-            lorg2 = org2.count_nodes()
-            lchld1 = child1.count_nodes()
-            lchld2 = child2.count_nodes()
+            # get parent1/parent2 ratio for the children
+            child1_p1p2_ratio = child1.get_parent1_parent2_ratio()
+            child2_p1p2_ratio = child2.get_parent1_parent2_ratio()
             
-            # make pairs based on size (each parent is paired with the child
-            # that is more similar in terms of size)
-            if lorg1 > lorg2:
-                if lchld1 > lchld2:
-                    pair_children.append((org1, child1))
-                    pair_children.append((org2, child2))
+            # Make two pairs: each parent is paired with the more similar child
+            # (the child with higher ratio of nodes from that parent).
+            # If a parent gets paired with an empty child, the empty child is
+            # substituted by a deepcopy of the parent, i.e. the parent escapes
+            # competition
+            if child1_p1p2_ratio > child2_p1p2_ratio:
+                # org1 with child1
+                if child1.count_nodes() > 0:
+                    pair_children.append( (org1, child1) )
                 else:
-                    pair_children.append((org1, child2))
-                    pair_children.append((org2, child1))                    
+                    pair_children.append( (org1, copy.deepcopy(org1)) )
+                # org2 with child2
+                if child2.count_nodes() > 0:
+                    pair_children.append( (org2, child2) )
+                else:
+                    pair_children.append( (org2, copy.deepcopy(org2)) )
             else:
-                if lchld1 > lchld2:
-                    pair_children.append((org1, child2))
-                    pair_children.append((org2, child1))
+                # org1 with child2
+                if child2.count_nodes() > 0:
+                    pair_children.append( (org1, child2) )
                 else:
-                    pair_children.append((org1, child1))
-                    pair_children.append((org2, child2))
+                    pair_children.append( (org1, copy.deepcopy(org1)) )
+                # org2 with child1
+                if child1.count_nodes() > 0:
+                    pair_children.append( (org2, child1) )
+                else:
+                    pair_children.append( (org2, copy.deepcopy(org2)) )
             
-            # Make two organisms compete
-            # j index is used to re insert winning organism
-            # into the population
+            # Make the two organisms in each pair compete
+            # j index is used to re insert winning organism into the population
             for j in range(len(pair_children)):
                 '''
                 when j is 0 we are dealing with organism i
@@ -274,7 +281,7 @@ def main():
                 '''
 
                 first_organism = pair_children[j][0]  # Parent Organism
-                second_organism = pair_children[j][1]  # Chid Organism
+                second_organism = pair_children[j][1]  # Child Organism
                 
                 # Boltzmannian fitness
                 if FITNESS_FUNCTION == "boltzmannian":
