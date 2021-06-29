@@ -9,6 +9,7 @@ import random
 import numpy as np
 from scipy.stats import ks_2samp
 import copy
+from .placement_object import PlacementObject
 
 def gini_RSV(values_for_each_class):
     '''
@@ -134,7 +135,6 @@ class OrganismObject:
         # column of a PSSM: each row is assigned a [pssm_idx, column_idx]
         self.row_to_pssm = []
         
-        # !!!
         # Dictionary storing information about how the organism has to be
         # assembled by the recombination process. All the values are
         # initialized as None.
@@ -146,7 +146,6 @@ class OrganismObject:
                                       'recognizers': None,
                                       'connectors': None}
     
-    # !!!
     def set_assembly_instructions(self, aligned_repres, connectors_table, p1_id, p2_id):
         '''
         Sets the self.assembly_instructions attribute.
@@ -156,7 +155,6 @@ class OrganismObject:
         self.set_recogs_assembly_instructions(aligned_repres)
         self.set_connectors_assembly_instructions(aligned_repres, connectors_table)
     
-    # !!!
     def set_recogs_assembly_instructions(self, aligned_repres):
         '''
         Compiles the list of recognizers in the self.assembly_instructions
@@ -169,7 +167,6 @@ class OrganismObject:
                 recogs_list.append(item)
         self.assembly_instructions['recognizers'] = recogs_list
     
-    # !!!
     def set_connectors_assembly_instructions(self, aligned_repres, connectors_table):
         '''
         Compiles the list of connectors in the self.assembly_instructions
@@ -196,7 +193,6 @@ class OrganismObject:
             connectors_list.append(connector_name)
         self.assembly_instructions['connectors'] = connectors_list
     
-    # !!!
     def annotate_required_connectors(self, child_repres):
         '''
         Returns the list of the connectors' spans required to join the
@@ -619,8 +615,7 @@ class OrganismObject:
         # on the alignment matrix anew
         self.set_row_to_pssm()
     
-    def get_placement(self, dna_sequence, traceback=False, 
-                      print_out = False, out_file = None) -> dict:
+    def get_placement(self, dna_sequence, traceback=False) -> dict:
         """Places the organism elements (recognizers and connectors) on a sequence
 		   in an optimal way, maximizing the energy (i.e. cumulative scores) obtained.
 		   
@@ -745,10 +740,20 @@ class OrganismObject:
         
         # BACKTRACKING
         
-        node_pos_ends = None
-        cols_of_0_gaps = None
+        # Initialize placement object
+        placement = PlacementObject(self._id, dna_sequence)
         
-        if traceback or print_out or out_file != None:
+        # Set the total binding energy in the placement object
+        # Applying lower bound to energy if required
+        if self.energy_threshold_method == "organism":
+            E_threshold_value = self.energy_threshold_value
+            if best < E_threshold_value:
+                placement.set_energy(E_threshold_value)
+            else:
+                placement.set_energy(best)
+        
+        
+        if traceback:
             # Position of best (where backtracking starts from)
             best_i = m  # it always comes from the last row by definition
             # if multiple positions in last row have best value, pick first
@@ -767,17 +772,6 @@ class OrganismObject:
             node_scores, node_pos_ends, cols_of_0_gaps = self.get_node_positions_and_energies(
                 alignment_path, scores_matrix, pointers_matrix, dna_sequence
             )
-            
-            # Print placement
-            if print_out == True:
-                self.print_placement(node_pos_ends, node_scores,
-                                     cols_of_0_gaps, dna_sequence, 
-                                     print_out=True)
-            # Print to file
-            if out_file != None:
-                self.print_placement(node_pos_ends, node_scores,
-                                     cols_of_0_gaps, dna_sequence, 
-                                     print_out=False, out_file=out_file)
 
             # Split node-scores into recognizers-scores and connectors-scores
             # Remove token node [first row is treated as a node, to provide
@@ -791,29 +785,35 @@ class OrganismObject:
                     recognizers_scores.append(node_scores[i])
                 else:
                     connectors_scores.append(node_scores[i])
-        # if no backtracking, return empty lists for recognizer_scores and
-        # connector_scores
-        else:
-            recognizers_scores = []
-            connectors_scores = []
-        
-        # Return output dictionary
-        placement = {"energy": best,
-                     "recognizers_scores": recognizers_scores,
-                     "connectors_scores": connectors_scores,
-                     "nodes_placement_right_ends": node_pos_ends,
-                     "null_gaps": cols_of_0_gaps}
-        
-        # Apply lower bound to energy if required
-        if self.energy_threshold_method == "organism":
-            E_threshold_value = self.energy_threshold_value
-            if placement["energy"] < E_threshold_value:
-                placement["energy"] = E_threshold_value
+            
+            # Set the individual node energies in the placement object
+            placement.set_recognizer_scores(recognizers_scores)
+            placement.set_connectors_scores(connectors_scores)
+            
+            # Annotate where each node is placed (start and stop position on DNA)
+            # in the placement object
+            
+            for i in range(0, len(node_pos_ends)-1):  # even indexes
+                
+                # get sequence coordinates for the recognizer
+                start = node_pos_ends[i]
+                stop = node_pos_ends[i+1]
+                
+                # Detect a post 0-bp gap recognizer (special case)
+                if start in cols_of_0_gaps:
+                    start -= 1
+                
+                # Define position of the node on DNA as a tuple
+                node_position = (start, stop)
+                
+                if i % 2 == 0:
+                    placement.append_recognizer_position(node_position)
+                else:
+                    placement.append_connector_position(node_position)
         
         return placement
     
-    def get_additive_fitness(self, a_dna: list, traceback=False, 
-                             print_out = False, use_gini=False) -> dict:
+    def get_additive_fitness(self, a_dna: list, use_gini=False) -> dict:
         """Return the total Fitness for an array of DNA sequences and the
            chosen fitness method
 
@@ -835,8 +835,8 @@ class OrganismObject:
                 placement = self.get_placement(s_dna, traceback=True)
             else:
                 placement = self.get_placement(s_dna)
-            energy = placement["energy"]  # energy
-            pssm_scores = placement["recognizers_scores"]  # PSSMs scores
+            energy = placement.energy  # energy
+            pssm_scores = placement.recognizers_scores  # PSSMs scores
 
             if use_gini:
     			# compute and append the Gini coefficient
@@ -868,8 +868,8 @@ class OrganismObject:
         
         return {"score": score, "stdev" : score_stdev, "avg_gini": avg_gini}
     
-    def get_binding_energies(self, a_dna: list, traceback=False, 
-                             print_out = False, use_gini=False) -> list:
+    def get_binding_energies(self, a_dna: list, traceback=False,
+                             use_gini=False) -> list:
         """Return the binding energies for an array of DNA sequences.
 
         Args:
@@ -883,14 +883,13 @@ class OrganismObject:
 		# for each sequence in the provided sequence set
         for s_dna in a_dna:
             placement = self.get_placement(s_dna)
-            energy = placement["energy"]
+            energy = placement.energy
             binding_energies.append(energy)
         
         return binding_energies
 
     def get_kolmogorov_fitness(self, pos_dataset: list, neg_dataset: list,
-                               traceback=False, print_out = False, 
-                               use_gini=False) -> float:
+                               traceback=False, use_gini=False) -> float:
         """Returns the organism's fitness, defined as the Kolmogorov-Smirnov
            test statistic. This is bounded in [0,1].
            Test null assumes the samples are drawn from the same (continuous)
@@ -914,8 +913,8 @@ class OrganismObject:
             else:      
                 placement = self.get_placement(s_dna)
             
-            pos_values.append(placement["energy"])  # get sequence energy score
-            pssm_scores = placement["recognizers_scores"]  # PSSMs scores
+            pos_values.append(placement.energy)  # get sequence energy score
+            pssm_scores = placement.recognizers_scores  # PSSMs scores
             if use_gini:
     			# compute and append the Gini coefficient
                 if len(pssm_scores) > 0:
@@ -932,7 +931,7 @@ class OrganismObject:
         neg_values = []
         for s_dna in neg_dataset:
             placement = self.get_placement(s_dna)
-            neg_values.append(placement["energy"])  # get sequence energy score
+            neg_values.append(placement.energy)  # get sequence energy score
         
         # Compute fitness score as a Boltzmannian probability
         kolmogorov_fitness = ks_2samp(pos_values, neg_values).statistic
@@ -940,8 +939,7 @@ class OrganismObject:
         return {"score": kolmogorov_fitness, "avg_gini": avg_gini}        
         
     def get_boltz_fitness(self, pos_dataset: list, neg_dataset: list,
-                          genome_length: int, traceback=False, 
-                          print_out = False, use_gini=False) -> float:
+                          genome_length: int, use_gini=False) -> float:
         """Returns the organism's fitness, defined as the probability that the regulator binds a
         positive sequence. All the binding energies are turned into probabilities according to a
         Boltzmannian distribution. The probability of binding a particular sequence, given the binding
@@ -971,8 +969,8 @@ class OrganismObject:
                 placement = self.get_placement(s_dna, traceback=True)
             else:      
                 placement = self.get_placement(s_dna)
-            boltz_exp = np.e**placement["energy"]  # exp(energy)
-            pssm_scores = placement["recognizers_scores"]  # PSSMs scores
+            boltz_exp = np.e**placement.energy  # exp(energy)
+            pssm_scores = placement.recognizers_scores  # PSSMs scores
             if use_gini:
     			# compute and append the Gini coefficient
                 if len(pssm_scores) > 0:
@@ -992,7 +990,7 @@ class OrganismObject:
         neg_lengths = []
         for s_dna in neg_dataset:
             placement = self.get_placement(s_dna)
-            boltz_exp = np.e**placement["energy"]  # exp(energy)
+            boltz_exp = np.e**placement.energy  # exp(energy)
             neg_values.append(boltz_exp)
             neg_lengths.append(len(s_dna))
         
@@ -1252,86 +1250,86 @@ class OrganismObject:
         
         return [node_scores, node_placements_right_ends, columns_of_0_bp_gaps]
     
-    def print_placement(self, node_right_ends, node_scores,
-                        cols_of_0_gaps, dna_seq, 
-                        print_out = True, out_file = None):
-        """For a dna_seq, it prints out the placement of the node on text or file.
+    # def print_placement(self, node_right_ends, node_scores,
+    #                     cols_of_0_gaps, dna_seq, 
+    #                     print_out = True, out_file = None):
+    #     """For a dna_seq, it prints out the placement of the node on text or file.
            
-           Gets:
-           - node_right_ends: last position [col] of nodes in alignment matrix
-           - node_scores: scores of nodes
+    #        Gets:
+    #        - node_right_ends: last position [col] of nodes in alignment matrix
+    #        - node_scores: scores of nodes
         
-           In the alignment matrix we have an extra column (-infs).
-           We also have an extra row, which we are modeling as a "virtual" node,
-           with its associated "right_end".
-           Once we remove the extra column, the position of the previous node
-           "right end" on the matrix turn out to be the position of the current
-           node on the sequence.
-        """
-        n = len(dna_seq)
-        recog_positions_line = ["-"] * n
-        recog_scores_line = ["_"] * n
-        conn_scores_line = ["_"] * n
+    #        In the alignment matrix we have an extra column (-infs).
+    #        We also have an extra row, which we are modeling as a "virtual" node,
+    #        with its associated "right_end".
+    #        Once we remove the extra column, the position of the previous node
+    #        "right end" on the matrix turn out to be the position of the current
+    #        node on the sequence.
+    #     """
+    #     n = len(dna_seq)
+    #     recog_positions_line = ["-"] * n
+    #     recog_scores_line = ["_"] * n
+    #     conn_scores_line = ["_"] * n
         
-        # for each node start
-        for i in range(len(node_right_ends) - 1):
+    #     # for each node start
+    #     for i in range(len(node_right_ends) - 1):
             
-            # get sequence coordinates for the node
-            start = node_right_ends[i]
-            stop = node_right_ends[i+1]
+    #         # get sequence coordinates for the node
+    #         start = node_right_ends[i]
+    #         stop = node_right_ends[i+1]
             
-            # get the node score and format it
-            node_score = node_scores[i+1]
-            node_score_str = "{:.2f}".format(node_score)
+    #         # get the node score and format it
+    #         node_score = node_scores[i+1]
+    #         node_score_str = "{:.2f}".format(node_score)
             
-            # if this is a recognizer (even numbers on chain)
-            if i % 2 == 0:
+    #         # if this is a recognizer (even numbers on chain)
+    #         if i % 2 == 0:
                 
-                # Detect a post 0-bp gap recognizer (special case)
-                if start in cols_of_0_gaps:
-                    start -= 1
+    #             # Detect a post 0-bp gap recognizer (special case)
+    #             if start in cols_of_0_gaps:
+    #                 start -= 1
                 
-                # write recognizer placement
-                for pos in range(start, stop):
-                    recog_positions_line[pos] = str(i)
+    #             # write recognizer placement
+    #             for pos in range(start, stop):
+    #                 recog_positions_line[pos] = str(i)
                 
-                # write recognizer score
-                for c in range(len(node_score_str)):
-                    if start + c < len(recog_scores_line):  # avoid going out of the seq
-                        recog_scores_line[start + c] = node_score_str[c]
+    #             # write recognizer score
+    #             for c in range(len(node_score_str)):
+    #                 if start + c < len(recog_scores_line):  # avoid going out of the seq
+    #                     recog_scores_line[start + c] = node_score_str[c]
             
-            # if this is a connector
-            else:
-                # get size of gap
-                gap_size = stop - start
+    #         # if this is a connector
+    #         else:
+    #             # get size of gap
+    #             gap_size = stop - start
                 
-                # if the gap is large, the connector score is written in the middle
-                if gap_size > len(node_score_str) + 1:
-                    right_shift = int(np.ceil((gap_size - len(node_score_str))/2))
-                    start += right_shift
+    #             # if the gap is large, the connector score is written in the middle
+    #             if gap_size > len(node_score_str) + 1:
+    #                 right_shift = int(np.ceil((gap_size - len(node_score_str))/2))
+    #                 start += right_shift
                 
-                # More centered printing for small gaps
-                else:
-                    start -= 2
+    #             # More centered printing for small gaps
+    #             else:
+    #                 start -= 2
                 
-                # write connector score
-                for c in range(len(node_score_str)):
-                    if start + c < len(recog_scores_line):  # avoid goin out of the seq
-                        conn_scores_line[start + c] = node_score_str[c]
+    #             # write connector score
+    #             for c in range(len(node_score_str)):
+    #                 if start + c < len(recog_scores_line):  # avoid goin out of the seq
+    #                     conn_scores_line[start + c] = node_score_str[c]
         
-        # print to stdout if required
-        if print_out:
-            print(dna_seq)
-            print("".join(recog_positions_line))
-            print("".join(recog_scores_line))
-            print("".join(conn_scores_line))
+    #     # print to stdout if required
+    #     if print_out:
+    #         print(dna_seq)
+    #         print("".join(recog_positions_line))
+    #         print("".join(recog_scores_line))
+    #         print("".join(conn_scores_line))
         
-        # print to file if required
-        if out_file != None:
-                print(dna_seq, file=out_file)
-                print("".join(recog_positions_line), file=out_file)
-                print("".join(recog_scores_line), file=out_file)
-                print("".join(conn_scores_line), file=out_file)
+    #     # print to file if required
+    #     if out_file != None:
+    #             print(dna_seq, file=out_file)
+    #             print("".join(recog_positions_line), file=out_file)
+    #             print("".join(recog_scores_line), file=out_file)
+    #             print("".join(conn_scores_line), file=out_file)
     
     
     def get_random_connector(self) -> int:
@@ -1472,13 +1470,11 @@ class OrganismObject:
         """
         
         ofile = open(filename, "w")
-        # for every DNA sequence
+        # for each DNA sequence
         for s_dna in a_dna:
-            # call fitness evaluation for sequence with file printing option
-            placement = self.get_placement(s_dna.lower(), traceback=True,
-                                      print_out = False, out_file = ofile)
+            placement = self.get_placement(s_dna.lower(), traceback=True)
+            placement.print_placement(outfile = ofile)
         ofile.close()
-
 
     def print_result(self, s_dna: str) -> None:
         """Prints the binding profile of the organism against the 
@@ -1492,10 +1488,8 @@ class OrganismObject:
         """
 
         s_dna = s_dna.lower()
-
-        # call fitness evaluation for sequence
-        placement = self.get_placement(s_dna.lower(), traceback=True,
-                                       print_out = True)
+        placement = self.get_placement(s_dna.lower(), traceback=True)
+        placement.print_placement(stdout = True)
 
 
 

@@ -579,7 +579,8 @@ class OrganismFactory:
         This dictionary
             {112: 'p1_0', 113: 'p1_0', 114: 'p1_0', 115: 'p1_0'}
         will be used to know that position 114 is covered by recognizer 0.
-        In this case, 'p1' was the org_tag value specified as input.
+        In this case, 'p1' was the org_tag value specified as input, used to
+        identify an organism.
         
         Parameters
         ----------
@@ -592,30 +593,19 @@ class OrganismFactory:
         pos_to_recog_dict : dictionary
 
         '''
-        org_placement = org.get_placement(dna_seq, traceback=True)
-        node_right_ends = org_placement["nodes_placement_right_ends"]
-        null_gaps = org_placement["null_gaps"]
+        org_placement = org.get_placement(dna_seq, traceback=True)        
+        recog_positions = org_placement.recognizers_positions
         
         pos_to_recog_dict = {}
         
-        # for each recognizer (node that have an index which is even)
-        for i in range(0, len(node_right_ends)-1, 2):  # even indexes
-            
-            # get sequence coordinates for the recognizer
-            start = node_right_ends[i]
-            stop = node_right_ends[i+1]
-            
-            # Detect a post 0-bp gap recognizer (special case)
-            if start in null_gaps:
-                start -= 1
-            
-            # Node i is recognizer i/2 (e.g., node 4 is the third recognizer, i.e.
-            # the recognizer with index 2 in the organism.recognizer list)
-            recog_idx = int(i/2)
+        # for each recognizer
+        for i in range(len(recog_positions)):
+            # start and stop DNA positions of recognizer i
+            start, stop = recog_positions[i]
             
             # DNA positions occupied by this recognizer
             for pos in range(start, stop):
-                pos_to_recog_dict[pos] = org_tag + '_' + str(recog_idx)
+                pos_to_recog_dict[pos] = org_tag + '_' + str(i)  # i is the recog idx
         
         return pos_to_recog_dict
     
@@ -863,10 +853,10 @@ class OrganismFactory:
         '''
         # Get parent and node index that specify the left recognizer
         recog_left_parent, recog_left_idx = recog_left_name.split('_')
-        recog_left_node_idx = 2 * int(recog_left_idx)
+        recog_left_idx = int(recog_left_idx)
         # Get parent and node index that specify the right recognizer
         recog_right_parent, recog_right_idx = recog_right_name.split('_')
-        recog_right_node_idx = 2 * int(recog_right_idx)
+        recog_right_idx = int(recog_right_idx)
         
         gap_values = []
         for i in range(len(p1_placements)):
@@ -876,14 +866,14 @@ class OrganismFactory:
                 placement = p1_placements[i]
             elif recog_left_parent == 'p2':
                 placement = p2_placements[i]
-            L_first_bp, L_last_bp = self.get_recog_pos_on_DNA_seq(placement, recog_left_node_idx)
+            L_first_bp, L_last_bp = self.get_recog_pos_on_DNA_seq(placement, recog_left_idx)
             
             # Placement of the right recognizer
             if recog_right_parent == 'p1':
                 placement = p1_placements[i]
             elif recog_right_parent == 'p2':
                 placement = p2_placements[i]
-            R_first_bp, R_last_bp = self.get_recog_pos_on_DNA_seq(placement, recog_right_node_idx)
+            R_first_bp, R_last_bp = self.get_recog_pos_on_DNA_seq(placement, recog_right_idx)
             
             # Gap between the left and the right recognizers
             distance = R_first_bp - L_last_bp
@@ -903,7 +893,7 @@ class OrganismFactory:
         synthetic_connector = ConnectorObject(avg_gap, stdev_gap, self.conf_con)
         return synthetic_connector
     
-    def get_recog_pos_on_DNA_seq(self, org_placement, node_idx):
+    def get_recog_pos_on_DNA_seq(self, org_placement, recog_idx):
         '''
         For a given placement and a given node index, it returns the first and
         last bp positions occupied by that node.
@@ -923,20 +913,19 @@ class OrganismFactory:
             Last DNA position occupied by the specified node.
 
         '''
-        node_right_ends = org_placement["nodes_placement_right_ends"]
-        null_gaps = org_placement["null_gaps"]
         
-        # get sequence coordinates for the recognizer
-        start = node_right_ends[node_idx]
-        stop = node_right_ends[node_idx+1]
-        
-        # Detect a post 0-bp gap recognizer (special case)
-        if start in null_gaps:
-            start -= 1
+        start, stop = org_placement.recognizers_positions[recog_idx]
         
         first_bp = start  # First bp occupied
         last_bp = stop -1  # Last bp occupied
+        
         return (first_bp, last_bp)
+
+
+
+
+
+
 
 
 
