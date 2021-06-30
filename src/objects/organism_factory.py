@@ -396,39 +396,50 @@ class OrganismFactory:
 
         '''
         
-        # Initialize child 1 as an empty organism
-        child1 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
+        # Recombine parents with the chosen probability
+        if random.random() < self.recombination_probability:
+            
+            # Initialize child 1 as an empty organism
+            child1 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
+            
+            # Initialize child 2 as an empty organism
+            child2 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
+            
+            # Place the parents on all the sequences in the sample of the positive set
+            par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample)
+            
+            # Representation of the two parents aligned
+            parents_repres = self.get_aligned_parents_repr(par1, par2, reference_dna_seq)
+            
+            # Table storing info about what connectors are available to cover the possible spans
+            connectors_table = self.annotate_available_connectors(parents_repres)
+            
+            # Representation of the two recombined children aligned
+            children_repres = self.get_aligned_children_repr(parents_repres, child1._id, child2._id)
+            
+            # Assemble child 1
+            # Write the assembly instructions
+            child1.set_assembly_instructions(children_repres.organism1, connectors_table, par1._id, par2._id)
+            # Now compile child 1
+            self.compile_recognizers(child1, par1, par2)
+            self.compile_connectors(child1, par1, par2, parents_repres,
+                                    par1_placements, par2_placements)
+            
+            # Assemble child 2
+            # Write the assembly instructions
+            child2.set_assembly_instructions(children_repres.organism2, connectors_table, par1._id, par2._id)
+            # Now compile child 2
+            self.compile_recognizers(child2, par1, par2)
+            self.compile_connectors(child2, par1, par2, parents_repres,
+                                    par1_placements, par2_placements)
         
-        # Initialize child 2 as an empty organism
-        child2 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
-        
-        # Place the parents on all the sequences in the sample of the positive set
-        par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample)
-        
-        # Representation of the two parents aligned
-        parents_repres = self.get_aligned_parents_repr(par1, par2, reference_dna_seq)
-        
-        # Table storing info about what connectors are available to cover the possible spans
-        connectors_table = self.annotate_available_connectors(parents_repres)
-        
-        # Representation of the two recombined children aligned
-        children_repres = self.get_aligned_children_repr(parents_repres, child1._id, child2._id)
-        
-        # Assemble child 1
-        # Write the assembly instructions
-        child1.set_assembly_instructions(children_repres.organism1, connectors_table, par1._id, par2._id)
-        # Now compile child 1
-        self.compile_recognizers(child1, par1, par2)
-        self.compile_connectors(child1, par1, par2, parents_repres,
-                                par1_placements, par2_placements)
-        
-        # Assemble child 2
-        # Write the assembly instructions
-        child2.set_assembly_instructions(children_repres.organism2, connectors_table, par1._id, par2._id)
-        # Now compile child 2
-        self.compile_recognizers(child2, par1, par2)
-        self.compile_connectors(child2, par1, par2, parents_repres,
-                                par1_placements, par2_placements)
+        # No recombination case
+        else:
+            child1 = copy.deepcopy(par1)
+            child2 = copy.deepcopy(par2)
+            # Assign IDs to organisms and increase factory counter
+            child1.set_id(self.get_id())
+            child2.set_id(self.get_id())
         
         return child1, child2
     
