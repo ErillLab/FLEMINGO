@@ -9,6 +9,7 @@ import numpy as np
 from .organism_object import OrganismObject
 from .connector_object import ConnectorObject
 from .pssm_object import PssmObject
+from .aligned_organisms_representation_object import AlignedOrganismsRepresentation
 import copy
 
 class OrganismFactory:
@@ -395,34 +396,38 @@ class OrganismFactory:
 
         '''
         
-        # Place the parents on all the sequences in the sample of the positive set
-        par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample)
-        
-        # Representations of the two parents
-        par1_repr, par2_repr = self.get_aligned_parents_repr(par1, par2, reference_dna_seq)
-        
-        # Table storing info about what connectors are available to cover the possible spans
-        connectors_table = self.annotate_available_connectors(par1_repr, par2_repr)
-        
-        # Representations of the two recombined children
-        child1_repr, child2_repr = self.get_aligned_children_repr(par1_repr, par2_repr)
-        
         # Initialize child 1 as an empty organism
         child1 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
-        # Write the assembly instructions
-        child1.set_assembly_instructions(child1_repr, connectors_table, par1._id, par2._id)
-        # Now compile child 1
-        self.compile_recognizers(child1, par1, par2)
-        self.compile_connectors(child1, par1, par2, par1_repr, par2_repr,
-                                par1_placements, par2_placements)
         
         # Initialize child 2 as an empty organism
         child2 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
+        
+        # Place the parents on all the sequences in the sample of the positive set
+        par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample)
+        
+        # Representation of the two parents aligned
+        parents_repres = self.get_aligned_parents_repr(par1, par2, reference_dna_seq)
+        
+        # Table storing info about what connectors are available to cover the possible spans
+        connectors_table = self.annotate_available_connectors(parents_repres)
+        
+        # Representation of the two recombined children aligned
+        children_repres = self.get_aligned_children_repr(parents_repres, child1._id, child2._id)
+        
+        # Assemble child 1
         # Write the assembly instructions
-        child2.set_assembly_instructions(child2_repr, connectors_table, par1._id, par2._id)
+        child1.set_assembly_instructions(children_repres.organism1, connectors_table, par1._id, par2._id)
+        # Now compile child 1
+        self.compile_recognizers(child1, par1, par2)
+        self.compile_connectors(child1, par1, par2, parents_repres,
+                                par1_placements, par2_placements)
+        
+        # Assemble child 2
+        # Write the assembly instructions
+        child2.set_assembly_instructions(children_repres.organism2, connectors_table, par1._id, par2._id)
         # Now compile child 2
         self.compile_recognizers(child2, par1, par2)
-        self.compile_connectors(child2, par1, par2, par1_repr, par2_repr,
+        self.compile_connectors(child2, par1, par2, parents_repres,
                                 par1_placements, par2_placements)
         
         return child1, child2
@@ -470,7 +475,10 @@ class OrganismFactory:
         pos_to_recog_dict1 = self.get_pos_to_recog_idx_dict(parent1, dna_seq, 'p1')
         pos_to_recog_dict2 = self.get_pos_to_recog_idx_dict(parent2, dna_seq, 'p2')
         
-        # Initialize the representation of the aligned parents
+        # !!!
+        # Initialize the representation object of the aligned parents
+        parents_repres = AlignedOrganismsRepresentation(parent1._id, parent2._id)
+        
         p1_repres = []
         p2_repres = []
         
@@ -545,27 +553,16 @@ class OrganismFactory:
                 if p1_repres[i] == '-':
                     protrusions.append(i)
         
-        '''
-        for matching_recog in matches_p1:
-            # 
-            for i in range(len(p1_repres)):
-                if p1_repres[i] == matching_recog:
-                    if p2_repres[i] == '-':
-                        protrusions.append(i)
-        
-        for matching_recog in matches_p2:
-            # 
-            for i in range(len(p2_repres)):
-                if p2_repres[i] == matching_recog:
-                    if p1_repres[i] == '-':
-                        protrusions.append(i)
-        '''
         
         # Skip the protrusions and return the desired representations
         p1_repres = [p1_repres[i] for i in range(len(p1_repres)) if i not in protrusions]
         p2_repres = [p2_repres[i] for i in range(len(p2_repres)) if i not in protrusions]
         
-        return (p1_repres, p2_repres)
+        parents_repres.set_organsism1(p1_repres)
+        parents_repres.set_organsism2(p2_repres)
+        
+        #return (p1_repres, p2_repres)
+        return parents_repres
     
     def get_pos_to_recog_idx_dict(self, org, dna_seq, org_tag):
         '''
@@ -609,10 +606,10 @@ class OrganismFactory:
         
         return pos_to_recog_dict
     
-    def annotate_available_connectors(self, parent1_repres, parent2_repres):
+    def annotate_available_connectors(self, parents_repres):
         '''
         The representations of the aligned parents are lists of symbols.
-        For each possible couple of positions in the representation, this
+        For each possible couple of positions in the representations, this
         function annotates whether the parents have a connector that connects
         them.
         
@@ -646,13 +643,14 @@ class OrganismFactory:
 
         '''
         
-        n = len(parent1_repres)
+        n = len(parents_repres.organism1)
         
         # 2D list where each item is an emtpy list
         connectors_table = [[ [] for i in range(n)] for j in range(n)]
         
         # Each parent representation is coupled with a tag ('p1' or 'p2')
-        parents = [(parent1_repres, 'p1'), (parent2_repres, 'p2')]
+        parents = [(parents_repres.organism1, 'p1'),
+                   (parents_repres.organism2, 'p2')]
         
         for (org_repr, org_tag) in parents:
             
@@ -678,31 +676,38 @@ class OrganismFactory:
         # Return the table storing info about available connectors
         return connectors_table
     
-    def get_aligned_children_repr(self, parent1_repres, parent2_repres):
+    def get_aligned_children_repr(self, parents_repres, child1_id, child2_id):
         '''
         This function swaps parts of the representations of the two parents, in
         order to get the representations of the two children.
         '''
         # Define the chunks of the aligned representations that will work as
         # independent units of the recombination process
-        units = self.define_independent_units(parent1_repres, parent2_repres)
+        units = self.define_independent_units(parents_repres)
         
         # Initialize representation of the children as identical copies of the parents
-        c1_repr = copy.deepcopy(parent1_repres)  # child1
-        c2_repr = copy.deepcopy(parent2_repres)  # child2
+        #c1_repr = copy.deepcopy(parent1_repres)  # child1
+        #c2_repr = copy.deepcopy(parent2_repres)  # child2
+        
+        # Initialize representation of the children as identical copies of the parents
+        children_repres = copy.deepcopy(parents_repres)
+        children_repres.set_children_IDs(child1_id, child2_id)
         
         # Within each unit, perform a swap with 50% probability
         for (start, stop) in units:
             if random.random() < 0.5:
                 # Perform the swapping, which means that the part from parent1 will
                 # end up into child2, and the part from parent2 will end up into child1
+                '''
                 tmp = c1_repr[start: stop]
                 c1_repr[start: stop] = c2_repr[start: stop]
                 c2_repr[start: stop] = tmp
+                '''
+                children_repres.swap_unit(start, stop)
         
-        return (c1_repr, c2_repr)
+        return children_repres
     
-    def define_independent_units(self, org1_repr, org2_repr):
+    def define_independent_units(self, parents_repres):
         '''
         This function is used to define what chunks of the organisms'
         representation are going to work as independent units in the
@@ -725,6 +730,10 @@ class OrganismFactory:
             [ (0, 2), (2, 3), (3, 4) ]
         
         '''
+        
+        org1_repr = parents_repres.organism1
+        org2_repr = parents_repres.organism2
+        
         # Initialize list about where each unit starts
         unit_starts = [0]
         
@@ -770,7 +779,7 @@ class OrganismFactory:
             # Add recognizer to organism
             child_obj.append_recognizer(recog)
     
-    def compile_connectors(self, child_obj, par1, par2, par1_repres, par2_repres,
+    def compile_connectors(self, child_obj, par1, par2, parents_repr,
                            par1_placements, par2_placements):
         '''
         It appends to the given organism (child_obj) the required connectors
@@ -791,10 +800,10 @@ class OrganismFactory:
                 # mu and sigma will be estimated for the gap between a left and a
                 # right recognizers (on a small sample from the positive dataset).
                 # Chose the left and right recognizers
-                p1_left = par1_repres[int(left_idx)]
-                p2_left = par2_repres[int(left_idx)]
-                p1_right = par1_repres[int(right_idx)]
-                p2_right = par2_repres[int(right_idx)]
+                p1_left = parents_repr.organism1[int(left_idx)]
+                p2_left = parents_repr.organism2[int(left_idx)]
+                p1_right = parents_repr.organism1[int(right_idx)]
+                p2_right = parents_repr.organism2[int(right_idx)]
                 
                 # When possible, chose them from the same parent
                 if p1_left != '-' and p1_right != '-':
