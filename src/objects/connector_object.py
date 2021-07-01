@@ -8,8 +8,6 @@
    placed on the sequence.
 """
 
-# pylint: disable=E0402
-# type: ignore
 import random
 import numpy as np
 import math
@@ -44,12 +42,10 @@ def norm_cdf(x, mu, sigma):
 
 
 
-# pylint: disable=R0902
 class ConnectorObject():
     """Connector Object is a node that connects two recognizer objects
     """
 
-    # pylint: disable=R0913
     def __init__(
             self,
             _mu: int,
@@ -67,8 +63,8 @@ class ConnectorObject():
 
         """
         # set mu and sigma
-        self._mu = _mu  # Mean discance
-        self._sigma = _sigma  # Variance between elements
+        self._mu = _mu  # Mean discance between the connected nodes
+        self._sigma = _sigma  # Standard deviation of the distance
         # set connector-specific configuration parameters
         self.mutate_probability_sigma = config["MUTATE_PROBABILITY_SIGMA"]
         self.mutate_probability_mu = config["MUTATE_PROBABILITY_MU"]
@@ -83,7 +79,6 @@ class ConnectorObject():
         self.stored_cdfs = []
         self.set_precomputed_pdfs_cdfs()
     
-    # pylint: enable=R0913
     # Setters
     def set_mu(self, _mu: int) -> None:
         """Set mu variable
@@ -125,7 +120,6 @@ class ConnectorObject():
                 else:
                     self.stored_cdfs.append(1.0)
     
-    # pylint: disable=W0613
     def mutate(self, org_factory) -> None:
         """mutation for a connector
 
@@ -170,8 +164,6 @@ class ConnectorObject():
         
         # Recompute PDF and CDF values
         self.set_precomputed_pdfs_cdfs()
-
-    # pylint: enable=W0613
 
        
     def get_score(self, d, s_dna_len) -> float:
@@ -263,7 +255,6 @@ class ConnectorObject():
         """
         export_file.write("\n m: {} s: {}".format(self._mu, self._sigma))
 
-    # pylint: disable=R0201
     def is_connector(self) -> bool:
         """node is connector
 

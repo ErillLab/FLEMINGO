@@ -130,14 +130,13 @@ class PssmObject():
             # Swaps two PSSM columns
             # col1 --> col2, col2 --> col1
             col1, col2 = random.sample(range(self.length), 2)
-            # Select two random columns and swap it
+            # Select two random columns and swap them
             tmp_col = self.pwm[col1]
             self.pwm[col1] = self.pwm[col2]
             self.pwm[col2] = tmp_col
 
         if random.random() < self.mutate_probability_flip_rows:
             # Swaps two PSSM rows
-            # Save values of two rows and swap them
             
             # Pick rows (A, C, T or G) to be swapped
             bases = ["a", "c", "g", "t"]
@@ -229,7 +228,7 @@ class PssmObject():
                     "a": round(tmp_bases[3], decimals),
                 }
             )
-        #assign re-computed PSSM
+        # Assign re-computed PSSM
         self.pssm = np.array(tmp_pssm)
 
 
