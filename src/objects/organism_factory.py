@@ -193,47 +193,6 @@ class OrganismFactory:
             * (1 / self.pwm_probability_base)
         )
         probabilities = np_probabilities.tolist()
-            
-        
-        # # Left probability is the amount of probability left
-        # left_probability = initial_probability
-        # # Minimum and maximum number of probabilities to be generated
-        # min_probability = 0
-        # max_probability = 4
-        # # Number of decimals on the probability
-        # decimals = 2
-        # # Generate 4 random probabilities out of initial_probability, one for
-        # # each base
-
-        # # Add a probability while we have less than 3 and and total probability
-        # # is not 1
-        # while (
-        #         left_probability > min_probability
-        #         and len(probabilities) < max_probability - 1
-        # ):
-        #     new_probability = random.randint(0, left_probability)
-        #     probabilities.append(float(new_probability))
-        #     left_probability -= new_probability
-        # # Add the last probability or fill with 0 probability
-        # if left_probability > 0:
-        #     probabilities.append(initial_probability - sum(probabilities))
-        # else:
-        #     while len(probabilities) < max_probability:
-        #         probabilities.append(0.0)
-
-        # # Shuffle the array is needed so high probability is not always on
-        # # first positions
-        # random.shuffle(probabilities)
-
-        # # Transform probabilities array from integer
-        # # [0-(BASE_PROBABILITY / STEP)] to complementary float
-        # # probabilities [0.0-1.0]
-        # np_probabilities = (
-        #     np.array(probabilities)
-        #     * self.pwm_probability_step
-        #     * (1 / self.pwm_probability_base)
-        # )
-        # probabilities = np_probabilities.tolist()
 
         # Return object with "decimals" decimals probability to each base
         return {
@@ -483,7 +442,6 @@ class OrganismFactory:
         pos_to_recog_dict1 = self.get_pos_to_recog_idx_dict(parent1, dna_seq, 'p1')
         pos_to_recog_dict2 = self.get_pos_to_recog_idx_dict(parent2, dna_seq, 'p2')
         
-        # !!!
         # Initialize the representation object of the aligned parents
         parents_repres = AlignedOrganismsRepresentation(parent1._id, parent2._id)
         
@@ -966,12 +924,6 @@ class OrganismFactory:
         
         return child1, child2
         
-
-
-
-
-
-
 
 
 
