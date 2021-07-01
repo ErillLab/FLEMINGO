@@ -139,15 +139,13 @@ def main():
     best_organism = (
         None,  # the organism object
         -np.inf,  # its fitness
-        0,  # number of nodes it is made of
-        0.0  # the penalty it gets
+        0  # number of nodes it is made of
     )
     # Organism with highest fitness in the iteration
     max_organism = (
         None,  # the organism object
         -np.inf,  # its fitness
-        0,  # number of nodes it is made of
-        0.0  # the penalty it gets
+        0  # number of nodes it is made of
     )
     timeformat = "%Y-%m-%d--%H-%M-%S"
     print("Starting execution...")
@@ -262,15 +260,13 @@ def main():
                 if FITNESS_FUNCTION == "boltzmannian":
                     performance1 = first_organism.get_boltz_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
                                                                     negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                                    GENOME_LENGTH, use_gini=False)
+                                                                    GENOME_LENGTH)
                     fitness1 = performance1["score"]
-                    gini1 = performance1["avg_gini"]
                     
                     performance2 = second_organism.get_boltz_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
                                                                      negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                                     GENOME_LENGTH, use_gini=False)
+                                                                     GENOME_LENGTH)
                     fitness2 = performance2["score"]
-                    gini2 = performance2["avg_gini"]
                     
                     fitness1 = round(fitness1, 8)
                     fitness2 = round(fitness2, 8)
@@ -279,47 +275,35 @@ def main():
                 # Computes Kolmogorov-Smirnov test on positive/negative set scores
                 elif FITNESS_FUNCTION == "kolmogorov":
                     performance1 = first_organism.get_kolmogorov_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                    negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                                    use_gini=False)
+                                                                    negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
                     fitness1 = performance1["score"]
-                    gini1 = performance1["avg_gini"]                   
                     
                     performance2 = second_organism.get_kolmogorov_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                    negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                                    use_gini=False)
+                                                                    negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
 
                     fitness2 = performance2["score"]
-                    gini2 = performance2["avg_gini"]
                     
                     fitness1 = round(fitness1, 8)
                     fitness2 = round(fitness2, 8)
 
                 # Discriminative fitness
                 elif FITNESS_FUNCTION == "discriminative":
-                    positive_performance1 = first_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                        use_gini=False)
-                    negative_performance1 = first_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                                        use_gini=False)
+                    positive_performance1 = first_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS])
+                    negative_performance1 = first_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
                     p_1 = positive_performance1["score"]
                     n_1 = negative_performance1["score"]
                     fitness1 =  p_1 - n_1
-                    gini1 = positive_performance1["avg_gini"]
                     
-                    positive_performance2 = second_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                        use_gini=False)
-                    negative_performance2 = second_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                                        use_gini=False)
+                    positive_performance2 = second_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS])
+                    negative_performance2 = second_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
                     p_2 = positive_performance2["score"]
                     n_2 = negative_performance2["score"]
                     fitness2 =  p_2 - n_2
-                    gini2 = positive_performance2["avg_gini"]
                 
                 elif FITNESS_FUNCTION == "welchs":
                     # First organism
-                    positive_performance1 = first_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                        use_gini=False)
-                    negative_performance1 = first_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                                        use_gini=False)
+                    positive_performance1 = first_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS])
+                    negative_performance1 = first_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
                     p_1 = positive_performance1["score"]
                     n_1 = negative_performance1["score"]
                     
@@ -342,13 +326,9 @@ def main():
                     # Welch's t score
                     fitness1 =  (p_1 - n_1) / (sterr_p_1**2 + sterr_n_1**2)**(1/2)
                     
-                    gini1 = positive_performance1["avg_gini"]
-                    
                     # Second organism
-                    positive_performance2 = second_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                        use_gini=False)
-                    negative_performance2 = second_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                                        use_gini=False)
+                    positive_performance2 = second_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS])
+                    negative_performance2 = second_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
                     p_2 = positive_performance2["score"]
                     n_2 = negative_performance2["score"]
                     
@@ -370,9 +350,7 @@ def main():
                     
                     # Welch's t score
                     fitness2 =  (p_2 - n_2) / (sterr_p_2**2 + sterr_n_2**2)**(1/2)
-                    
-                    gini2 = positive_performance2["avg_gini"]
-                
+                                    
                 else:
                     raise Exception("Not a valid fitness function name, "
                                     + "check the configuration file.")
@@ -396,22 +374,11 @@ def main():
                     
                     if second_organism.count_nodes() < MIN_NODES:
                         #print(second_organism.count_nodes(), "nodes")
-                        fitness2 = -1000 * int(second_organism.count_nodes())                
-                
-                if INEQUALITY_PENALTY_METHOD=="avg_gini":
-                    # INEQUALITY_PENALTY_PARAM acts as a penalty buffer
-                    # The higher this parameter, the less important is the effect of the Gini penalty
-                    # It's meant to work in the range [1, +inf)
-                    effective_fitness_1 = fitness1 * (INEQUALITY_PENALTY_PARAM - gini1)
-                    effective_fitness_2 = fitness2 * (INEQUALITY_PENALTY_PARAM - gini2)
-                else:
-                    effective_fitness_1 = fitness1
-                    effective_fitness_2 = fitness2
+                        fitness2 = -1000 * int(second_organism.count_nodes())
                 
                 
-                if (
-                        effective_fitness_1 > effective_fitness_2
-                ):  # The first organism wins
+                # Competition
+                if fitness1 > fitness2:  # The first organism wins (the parent wins)
                     # Set it back to the population and save fitness
                     # for next iteration
                     organism_population[i + j] = first_organism
@@ -420,13 +387,12 @@ def main():
                     a_nodes.append(first_organism.count_nodes())
 
                     # Check if its the max score in that iteration
-                    if effective_fitness_1 > max_score:
-                        max_score = effective_fitness_1
+                    if fitness1 > max_score:
+                        max_score = fitness1
                         max_organism = (
                             first_organism,
-                            effective_fitness_1,
-                            first_organism.count_nodes(),
-                            gini1,
+                            fitness1,
+                            first_organism.count_nodes()
                         )
 
                     # Check if its the max score so far and if it is set it as
@@ -436,7 +402,7 @@ def main():
                         best_organism = max_organism
                         changed_best_score = True
 
-                else:  # The second organism wins (child)
+                else:  # The second organism wins (the child wins)
                     # Set it back to the population and save fitness for next
                     # iteration
                     organism_population[i + j] = second_organism
@@ -448,18 +414,17 @@ def main():
                     a_nodes.append(second_organism.count_nodes())
 
                     # Check if its the max score in that iteration
-                    if effective_fitness_2 > max_score:
-                        max_score = effective_fitness_2
+                    if fitness2 > max_score:
+                        max_score = fitness2
                         max_organism = (
                             second_organism,
-                            effective_fitness_2,
-                            second_organism.count_nodes(),
-                            gini2,
+                            fitness2,
+                            second_organism.count_nodes()
                         )
 
                     # Check if its the max score so far and if it is set it as
                     # best organism
-                    if effective_fitness_2 > best_organism[1]:
+                    if fitness2 > best_organism[1]:
                         # ID, EF, Nodes, Penalty applied
                         best_organism = max_organism
                         changed_best_score = True
@@ -485,8 +450,8 @@ def main():
         print_ln(
             (
                 "Iter: {} AF:{:.2f} SDF:{:.2f} GF:{:.2f} AN:{:.2f}"
-                + " - MO: {} MF: {:.2f} MN: {} MP: {:.2f}"
-                + " -  BO: {} BF: {:.2f} BN: {} BP: {:.2f} Time: {}"
+                + " - MO: {} MF: {:.2f} MN: {}"
+                + " -  BO: {} BF: {:.2f} BN: {} Time: {}"
             ).format(
                 iterations,  # "Iter"
                 mean_fitness,  # "AF"
@@ -496,11 +461,9 @@ def main():
                 max_organism[0]._id,  # "MO"
                 max_organism[1],  # "MF" (fitness)
                 max_organism[2],  # "MN" (nodes)
-                max_organism[3],  # "MP" (penalty)
                 best_organism[0]._id,  # "BO"
                 best_organism[1],  # "BF" (fitness)
                 best_organism[2],  # "BN" (nodes)
-                best_organism[3],  # "BP" (penalty)
                 s_time,  # Time
             ),
             RESULT_BASE_PATH_DIR + OUTPUT_FILENAME,
@@ -615,10 +578,7 @@ def set_up():
     global RANDOM_SHUFFLE_SAMPLING_POS
     global RANDOM_SHUFFLE_SAMPLING_NEG
     global FITNESS_FUNCTION
-    global USE_GINI
     global GENOME_LENGTH
-    global INEQUALITY_PENALTY_METHOD
-    global INEQUALITY_PENALTY_PARAM
     global MIN_ITERATIONS
     global MIN_FITNESS
     global THRESHOLD
@@ -657,10 +617,7 @@ def set_up():
     RANDOM_SHUFFLE_SAMPLING_POS = config["main"]["RANDOM_SHUFFLE_SAMPLING_POS"]
     RANDOM_SHUFFLE_SAMPLING_NEG = config["main"]["RANDOM_SHUFFLE_SAMPLING_NEG"]
     FITNESS_FUNCTION = config["main"]["FITNESS_FUNCTION"]
-    USE_GINI = config["main"]["USE_GINI"]
     GENOME_LENGTH = config["main"]["GENOME_LENGTH"]
-    INEQUALITY_PENALTY_METHOD = config["main"]["INEQUALITY_PENALTY_METHOD"]
-    INEQUALITY_PENALTY_PARAM = config["main"]["INEQUALITY_PENALTY_PARAM"]
     MIN_ITERATIONS = config["main"]["MIN_ITERATIONS"]
     MIN_FITNESS = config["main"]["MIN_FITNESS"]
     THRESHOLD = config["main"]["THRESHOLD"]

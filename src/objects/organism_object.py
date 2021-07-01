@@ -11,55 +11,6 @@ from scipy.stats import ks_2samp
 import copy
 from .placement_object import PlacementObject
 
-def gini_RSV(values_for_each_class):
-    '''
-    Gini coefficient, modified in order to be able to deal with negative
-    values as in "Inequality measures and the issue of negative incomes"
-    (Raffinetti, Siletti, Vernizzi)
-
-    Parameters
-    ----------
-    values_for_each_class : array-like object
-        Values associated to each class.
-        They don't need to be already sorted and/or normalized.
-        They can also be negative.
-
-    Returns
-    -------
-    giniRSV : float
-        Ranges from 0 (perfect equality) to 1 (maximal inequality).
-
-    '''
-    
-    N = len(values_for_each_class)
-    
-    numerator = 0
-    for i in values_for_each_class:
-        for j in values_for_each_class:
-            numerator += abs(i - j)
-    
-    pos = 0  # sum over the positive values
-    neg = 0  # sum over the negative values (in absolute value)
-    for x in values_for_each_class:
-        if x >= 0:
-            pos += x
-        else:
-            neg += -x
-    
-    mu_RSV = (N - 1) * (pos + neg) / N**2  # modified mu parameter
-    
-    if mu_RSV == 0:
-        # Manage two special cases (avoiding 0-division error):
-        #   - when a single value is the input
-        #   - when all the values in the input are 0
-        # In both cases mu_RSV will be 0
-        # No inequality is measurable, and therefore 0 is returned
-        return 0
-    denominator = 2 * N**2 * mu_RSV
-    giniRSV = numerator / denominator
-    
-    return giniRSV
-
 
 class OrganismObject:
     """Organism object
@@ -101,8 +52,8 @@ class OrganismObject:
         ]
         
         # type of indel operator: 
-        # - blind (preserves connectors)
-        # - intelligent (merges connectors) 
+        # - blind (preserves connectors' mus and sigmas)
+        # - intelligent (preserves relative distances between recognizers) 
         self.insertion_method = conf[
             "INSERTION_METHOD"
         ]
@@ -454,7 +405,6 @@ class OrganismObject:
                     self.connectors = new_connectors
         
         
-        
         # Insert a recognizer (and one parent connector)
         if random.random() < self.mutate_probability_insert_recognizer:
             
@@ -621,6 +571,7 @@ class OrganismObject:
 				# assign new connector/recognizer vectors
                 self.recognizers = new_recognizers
                 self.connectors = new_connectors
+        
         
         # Mutate nodes
         # If MUTATE_PROBABILITY_NODE_MUTATION is set to real value, a single
@@ -847,38 +798,21 @@ class OrganismObject:
         
         return placement
     
-    def get_additive_fitness(self, a_dna: list, use_gini=False) -> dict:
-        """Return the total Fitness for an array of DNA sequences and the
-           chosen fitness method
+    def get_additive_fitness(self, a_dna: list) -> dict:
+        """
 
         Args:
             a_dna: list of dna sequences
 
         Returns:
-            average/sum of the energy of the organism on each sequence
-			average of the gini coefficient of the organism's recognizers on each sequence
+            average/sum of the energy of the organism on the sequences
         """
 
         scores = []
-        ginis = []
 		# for each sequence in the provided sequence set
         for s_dna in a_dna:
-            #do traceback only if Gini is requested
-            if use_gini:
-    			# get the energy and pssm scores
-                placement = self.get_placement(s_dna, traceback=True)
-            else:
-                placement = self.get_placement(s_dna)
-            energy = placement.energy  # energy
-            pssm_scores = placement.recognizers_scores  # PSSMs scores
-
-            if use_gini:
-    			# compute and append the Gini coefficient
-                if len(pssm_scores) > 0:
-                    gini = gini_RSV(pssm_scores)  # Gini coefficient
-                    ginis.append(gini)            
-			
-			# append energy
+            placement = self.get_placement(s_dna)
+            energy = placement.energy  # energy          
             scores.append(energy)
         
         score_stdev = np.std(scores)
@@ -894,16 +828,9 @@ class OrganismObject:
             # Compute fitness score as median positive score
             score = np.median(scores)
         
-        # Compute the average Gini coefficient as the geometric mean
-        if len(ginis) == 0:  # Case where no gini is requested
-            avg_gini = 0  # minimum penalty is arbitrarily assigned
-        else:
-            avg_gini = np.prod(ginis) ** (1/len(ginis))  # geometric mean
-        
-        return {"score": score, "stdev" : score_stdev, "avg_gini": avg_gini}
+        return {"score": score, "stdev" : score_stdev}
     
-    def get_binding_energies(self, a_dna: list, traceback=False,
-                             use_gini=False) -> list:
+    def get_binding_energies(self, a_dna: list, traceback=False) -> list:
         """Return the binding energies for an array of DNA sequences.
 
         Args:
@@ -923,7 +850,7 @@ class OrganismObject:
         return binding_energies
 
     def get_kolmogorov_fitness(self, pos_dataset: list, neg_dataset: list,
-                               traceback=False, use_gini=False) -> float:
+                               traceback=False) -> float:
         """Returns the organism's fitness, defined as the Kolmogorov-Smirnov
            test statistic. This is bounded in [0,1].
            Test null assumes the samples are drawn from the same (continuous)
@@ -938,28 +865,9 @@ class OrganismObject:
         """       
         # Values on the positive set
         pos_values = []
-        ginis = []
         for s_dna in pos_dataset:
-            #do traceback only if Gini is requested
-            if use_gini:
-    			# get the energy and pssm scores
-                placement = self.get_placement(s_dna, traceback=True)
-            else:      
-                placement = self.get_placement(s_dna)
-            
-            pos_values.append(placement.energy)  # get sequence energy score
-            pssm_scores = placement.recognizers_scores  # PSSMs scores
-            if use_gini:
-    			# compute and append the Gini coefficient
-                if len(pssm_scores) > 0:
-                    gini = gini_RSV(pssm_scores)  # Gini coefficient
-                    ginis.append(gini)
-        
-        # Compute the average Gini coefficient as the geometric mean
-        if len(ginis) == 0:  # Case where no Gini was requested
-            avg_gini = 0  # minimum penalty is arbitrarily assigned
-        else:
-            avg_gini = np.prod(ginis) ** (1/len(ginis))  # geometric mean
+            placement = self.get_placement(s_dna)
+            pos_values.append(placement.energy)  # append sequence energy score
         
         # Values on the negative set
         neg_values = []
@@ -970,10 +878,10 @@ class OrganismObject:
         # Compute fitness score as a Boltzmannian probability
         kolmogorov_fitness = ks_2samp(pos_values, neg_values).statistic
         
-        return {"score": kolmogorov_fitness, "avg_gini": avg_gini}        
-        
+        return {"score": kolmogorov_fitness}
+    
     def get_boltz_fitness(self, pos_dataset: list, neg_dataset: list,
-                          genome_length: int, use_gini=False) -> float:
+                          genome_length: int) -> float:
         """Returns the organism's fitness, defined as the probability that the regulator binds a
         positive sequence. All the binding energies are turned into probabilities according to a
         Boltzmannian distribution. The probability of binding a particular sequence, given the binding
@@ -995,29 +903,10 @@ class OrganismObject:
         
         # Values on the positive set
         pos_values = []
-        ginis = []
         for s_dna in pos_dataset:
-            #do traceback only if Gini is requested
-            if use_gini:
-    			# get the energy and pssm scores
-                placement = self.get_placement(s_dna, traceback=True)
-            else:      
-                placement = self.get_placement(s_dna)
+            placement = self.get_placement(s_dna)
             boltz_exp = np.e**placement.energy  # exp(energy)
-            pssm_scores = placement.recognizers_scores  # PSSMs scores
-            if use_gini:
-    			# compute and append the Gini coefficient
-                if len(pssm_scores) > 0:
-                    gini = gini_RSV(pssm_scores)  # Gini coefficient
-                    ginis.append(gini)
-
             pos_values.append(boltz_exp)
-        
-        # Compute the average Gini coefficient as the geometric mean
-        if len(ginis) == 0:  # Case where no Gini was requested
-            avg_gini = 0  # minimum penalty is arbitrarily assigned
-        else:
-            avg_gini = np.prod(ginis) ** (1/len(ginis))  # geometric mean
         
         # Values on the negative set
         neg_values = []
@@ -1038,7 +927,7 @@ class OrganismObject:
         # Compute fitness score as a Boltzmannian probability
         boltz_fitness = sum(pos_values) / Z
         
-        return {"score": boltz_fitness, "avg_gini": avg_gini}
+        return {"score": boltz_fitness}
 
     def count_nodes(self) -> int:
         """Returns the number of nodes of the organism
@@ -1284,87 +1173,6 @@ class OrganismObject:
         
         return [node_scores, node_placements_right_ends, columns_of_0_bp_gaps]
     
-    # def print_placement(self, node_right_ends, node_scores,
-    #                     cols_of_0_gaps, dna_seq, 
-    #                     print_out = True, out_file = None):
-    #     """For a dna_seq, it prints out the placement of the node on text or file.
-           
-    #        Gets:
-    #        - node_right_ends: last position [col] of nodes in alignment matrix
-    #        - node_scores: scores of nodes
-        
-    #        In the alignment matrix we have an extra column (-infs).
-    #        We also have an extra row, which we are modeling as a "virtual" node,
-    #        with its associated "right_end".
-    #        Once we remove the extra column, the position of the previous node
-    #        "right end" on the matrix turn out to be the position of the current
-    #        node on the sequence.
-    #     """
-    #     n = len(dna_seq)
-    #     recog_positions_line = ["-"] * n
-    #     recog_scores_line = ["_"] * n
-    #     conn_scores_line = ["_"] * n
-        
-    #     # for each node start
-    #     for i in range(len(node_right_ends) - 1):
-            
-    #         # get sequence coordinates for the node
-    #         start = node_right_ends[i]
-    #         stop = node_right_ends[i+1]
-            
-    #         # get the node score and format it
-    #         node_score = node_scores[i+1]
-    #         node_score_str = "{:.2f}".format(node_score)
-            
-    #         # if this is a recognizer (even numbers on chain)
-    #         if i % 2 == 0:
-                
-    #             # Detect a post 0-bp gap recognizer (special case)
-    #             if start in cols_of_0_gaps:
-    #                 start -= 1
-                
-    #             # write recognizer placement
-    #             for pos in range(start, stop):
-    #                 recog_positions_line[pos] = str(i)
-                
-    #             # write recognizer score
-    #             for c in range(len(node_score_str)):
-    #                 if start + c < len(recog_scores_line):  # avoid going out of the seq
-    #                     recog_scores_line[start + c] = node_score_str[c]
-            
-    #         # if this is a connector
-    #         else:
-    #             # get size of gap
-    #             gap_size = stop - start
-                
-    #             # if the gap is large, the connector score is written in the middle
-    #             if gap_size > len(node_score_str) + 1:
-    #                 right_shift = int(np.ceil((gap_size - len(node_score_str))/2))
-    #                 start += right_shift
-                
-    #             # More centered printing for small gaps
-    #             else:
-    #                 start -= 2
-                
-    #             # write connector score
-    #             for c in range(len(node_score_str)):
-    #                 if start + c < len(recog_scores_line):  # avoid goin out of the seq
-    #                     conn_scores_line[start + c] = node_score_str[c]
-        
-    #     # print to stdout if required
-    #     if print_out:
-    #         print(dna_seq)
-    #         print("".join(recog_positions_line))
-    #         print("".join(recog_scores_line))
-    #         print("".join(conn_scores_line))
-        
-    #     # print to file if required
-    #     if out_file != None:
-    #             print(dna_seq, file=out_file)
-    #             print("".join(recog_positions_line), file=out_file)
-    #             print("".join(recog_scores_line), file=out_file)
-    #             print("".join(conn_scores_line), file=out_file)
-    
     
     def get_random_connector(self) -> int:
         """Returns the index of a random connector of the organism
@@ -1389,52 +1197,6 @@ class OrganismObject:
         num_recognizers =  self.count_recognizers()
         
         return random.randint(0, num_recognizers - 1)
-    
-    def break_chain(self, connector_to_break, bond_to_keep):
-        """Brakes an organism at the specified link and returns the resulting
-        pair of chunks into a list. Each chunk is a dictionary with two keys:
-        "recognizers" and "connectors".
-
-        Parameters
-        ----------
-        connector_to_break : int
-            Index of the connector where the chain will be broken.
-        bond_to_keep : str
-            If "left" the connector where the split occurs will stay linked to
-            the left chunk, while its right bond will be broken (the opposite
-            happens if its value is "right".
-
-        Returns
-        -------
-        list
-            A list with two elements, which are the two chunks of the splitted
-            chain, both represented as a dictionary with two keys:
-            "recognizers" and "connectors" (which point to lists of recognizers
-            or connectors, respectively).
-
-        """
-        
-        # Recognizers of left and right chunks
-        L_recognizers = self.recognizers[:connector_to_break + 1]
-        R_recognizers = self.recognizers[connector_to_break + 1:]
-        
-        # Connectors of left and right chunks
-        if bond_to_keep=="left":
-            L_connectors = self.connectors[:connector_to_break + 1]
-            R_connectors = self.connectors[connector_to_break + 1:]
-        elif bond_to_keep=="right":
-            L_connectors = self.connectors[:connector_to_break]
-            R_connectors = self.connectors[connector_to_break:]
-        else:
-            raise Exception('bond_to_keep needs to be "left" or "right".')
-        
-        L_chunk = {"recognizers": L_recognizers, "connectors": L_connectors}
-        R_chunk = {"recognizers": R_recognizers, "connectors": R_connectors}
-        
-        L_chunk_copy = copy.deepcopy(L_chunk)
-        R_chunk_copy = copy.deepcopy(R_chunk)
-        
-        return [L_chunk_copy, R_chunk_copy]
     
     def set_connectors(self, connectors_list):
         """Set the connectors of the organism to be those provided in the input
@@ -1524,34 +1286,4 @@ class OrganismObject:
         s_dna = s_dna.lower()
         placement = self.get_placement(s_dna.lower(), traceback=True)
         placement.print_placement(stdout = True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
