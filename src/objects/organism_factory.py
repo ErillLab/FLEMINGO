@@ -761,6 +761,8 @@ class OrganismFactory:
             # "synth" means that the connector needs to be synthesized, because
             # it was not available in any of the two parents
             if connector_name[:5] == 'synth':
+                # temporarily commented out code for synthetic connectors
+                '''
                 left_idx, right_idx = connector_name.split('_')[1:]
                 
                 # mu and sigma will be estimated for the gap between a left and a
@@ -784,6 +786,12 @@ class OrganismFactory:
                 # Make an appropriate connector
                 conn = self.make_synthetic_connector(recog_L_name, recog_R_name,
                                                 par1_placements, par2_placements)
+                '''
+                # Put a random connector intead
+                # instantiate new connector and append it to organism's connector list
+                _mu = random.randint(self.min_mu, self.max_mu)
+                _sigma = random.randint(self.min_sigma, self.max_sigma)
+                conn = ConnectorObject(_mu, _sigma, self.conf_con)
             
             # Else, the connector can be grabbed from one of the parents
             else:
