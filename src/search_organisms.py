@@ -148,6 +148,10 @@ def main():
         0  # number of nodes it is made of
     )
     timeformat = "%Y-%m-%d--%H-%M-%S"
+    
+    # !!! Add comment here
+    random_seq_idx_for_pop_export = random.randint(0, len(positive_dataset)-1)
+    
     print("Starting execution...")
 
     # Main loop, it iterates until organisms do not get a significant change
@@ -175,6 +179,12 @@ def main():
         
         a_fitness = []
         a_nodes = []
+        
+        print('\n\nPOPULATION-----------------------------------')
+        for org in organism_population:
+            org.print()
+        print('\n---------------------------------------------\n')
+        
 
         # Deterministic crowding
         # Iterate over pairs of organisms
@@ -185,11 +195,19 @@ def main():
             pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
             ref_seq = random.choice(pos_set_sample)
             
+            
+            org1.print()
+            org2.print()
+            
             # Cross parents to get children
             # Recombination process
             child1, child2 = organism_factory.get_children(
                 org1, org2, ref_seq, pos_set_sample
             )
+            
+            child1.print()
+            child2.print()
+            print('\n---------------------------------------------\n')
             
             # Make two pairs: each parent is paired with the more similar child
             # (the child with higher ratio of nodes from that parent).
@@ -211,6 +229,12 @@ def main():
             # get parent1/parent2 ratio for the children
             child1_p1p2_ratio = child1.get_parent1_parent2_ratio()
             child2_p1p2_ratio = child2.get_parent1_parent2_ratio()
+            
+            print(child1_p1p2_ratio)
+            print(child2_p1p2_ratio)
+            
+            print(child1.assembly_instructions)
+            print(child2.assembly_instructions)
             
             # If a parent gets paired with an empty child, the empty child is
             # substituted by a deepcopy of the parent, i.e. the parent escapes
@@ -489,12 +513,19 @@ def main():
                 best_organism[0], positive_dataset, filename, organism_factory
             )
         # Periodic organism export
-        if iterations % PERIODIC_EXPORT == 0:
+        if iterations % PERIODIC_ORG_EXPORT == 0:
             filename = "{}_{}".format(
                 time.strftime(timeformat), max_organism[0]._id
             )
             export_organism(
                 max_organism[0], positive_dataset, filename, organism_factory
+            )
+        
+        # Periodic population export
+        if iterations % PERIODIC_POP_EXPORT == 0:
+            export_population(
+                organism_population, positive_dataset, organism_factory,
+                iterations, random_seq_idx_for_pop_export
             )
         
         iterations += 1
@@ -558,6 +589,45 @@ def export_organism(
     factory.export_organisms([organism], organism_file_json)
 
 
+
+def export_population(
+        population, dataset: list, factory: OrganismFactory,
+        generation: int, dna_seq_idx: int
+) -> None:
+    """Exports a single organism in json format, visual format and its
+    recognizers binding
+
+    Args:
+        organism (OrganismObject): organism to export
+        dataset: Sequences to check the organism binding
+        filename: Previous info to export filenames. Common in all filenames
+        factory: Used to export in json format
+    """
+    
+    population_dir = RESULT_BASE_PATH_DIR + "population"
+    
+    population_name = "{}_generation_{}".format(
+        time.strftime("%Y-%m-%d--%H-%M-%S"), generation
+    )
+    
+    population_txt_file = os.path.join(
+        population_dir, population_name + ".txt"
+    )
+    population_placements_file = os.path.join(
+        population_dir, population_name + "_placements.txt"
+    )
+    population_json_file = os.path.join(
+        population_dir, population_name + ".json"
+    )
+    
+    for organism in population:
+        organism.export(population_txt_file)
+        organism.export_results([dataset[dna_seq_idx]], population_placements_file)
+    
+    factory.export_organisms(population, population_json_file)
+
+
+
 def set_up():
     """Reads configuration file and sets up all program variables
 
@@ -586,7 +656,8 @@ def set_up():
     global POPULATION_FILL_TYPE
     global INPUT_FILENAME
     global OUTPUT_FILENAME
-    global PERIODIC_EXPORT
+    global PERIODIC_ORG_EXPORT
+    global PERIODIC_POP_EXPORT
     global MAX_NODES
     global MIN_NODES
 
@@ -626,12 +697,14 @@ def set_up():
     POPULATION_FILL_TYPE = config["main"]["POPULATION_FILL_TYPE"]
     INPUT_FILENAME = config["main"]["INPUT_FILENAME"]
     OUTPUT_FILENAME = config["main"]["OUTPUT_FILENAME"]
-    PERIODIC_EXPORT = config["main"]["PERIODIC_EXPORT"]
+    PERIODIC_ORG_EXPORT = config["main"]["PERIODIC_ORG_EXPORT"]
+    PERIODIC_POP_EXPORT = config["main"]["PERIODIC_POP_EXPORT"]
     MAX_NODES = config["organism"]["MAX_NODES"]
     MIN_NODES = config["organism"]["MIN_NODES"]
 
     # Create directory where the output and results will be stored
     os.mkdir(RESULT_BASE_PATH_DIR)
+    os.mkdir(RESULT_BASE_PATH_DIR + "population")
 
     # Store Config into variables to use later
     configOrganism = config["organism"]

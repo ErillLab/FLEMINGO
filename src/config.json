@@ -1,6 +1,6 @@
 {
   "main": {
-    "POPULATION_LENGTH": 30,
+    "POPULATION_LENGTH": 8,
     "POPULATION_ORIGIN":"random",
     "POPULATION_FILL_TYPE":"random",
     "DATASET_BASE_PATH_DIR":"datasets/",
@@ -20,7 +20,8 @@
     "MIN_ITERATIONS":10000,
     "MIN_FITNESS":100,
     "THRESHOLD":0.05,
-    "PERIODIC_EXPORT":5
+    "PERIODIC_ORG_EXPORT":5,
+    "PERIODIC_POP_EXPORT":1
    },
 
   "organism": {
@@ -37,7 +38,7 @@
     "MAX_NODES":7
   },
   "organismFactory": {
-    "RECOMBINATION_PROBABILITY":0.05,
+    "RECOMBINATION_PROBABILITY":0.0,
     "NUM_RECOGNIZERS_LAMBDA_PARAM":2.5,
     "MIN_MU":0,
     "MAX_MU":50,

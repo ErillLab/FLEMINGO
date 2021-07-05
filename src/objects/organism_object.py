@@ -1244,7 +1244,7 @@ class OrganismObject:
         Args:
             filename: Name of the file to export the organism
         """
-        organism_file = open(filename, "w+")
+        organism_file = open(filename, "a+")
         organism_file.write("***** Organism {} *****".format(self._id))
         
         for i in range(len(self.recognizers) - 1):
@@ -1252,7 +1252,7 @@ class OrganismObject:
             self.connectors[i].export(organism_file)
         self.recognizers[-1].export(organism_file)
 
-        organism_file.write("\n")
+        organism_file.write("\n\n")
         organism_file.close()
 
     def export_results(self, a_dna: list, filename: str) -> None:
@@ -1265,7 +1265,7 @@ class OrganismObject:
 
         """
         
-        ofile = open(filename, "w")
+        ofile = open(filename, "a+")
         # for each DNA sequence
         for s_dna in a_dna:
             placement = self.get_placement(s_dna.lower(), traceback=True)
