@@ -925,7 +925,7 @@ class OrganismFactory:
         child1.assembly_instructions['recognizers'] = recogs_tags
         child1.assembly_instructions['connectors'] = connectors_tags
         # child2 assembly_instructions
-        recogs_tags = ['p1_' + str(i) for i in range(child2.count_recognizers())]
+        recogs_tags = ['p2_' + str(i) for i in range(child2.count_recognizers())]
         connectors_tags = recogs_tags[1:]
         child2.assembly_instructions['recognizers'] = recogs_tags
         child2.assembly_instructions['connectors'] = connectors_tags
