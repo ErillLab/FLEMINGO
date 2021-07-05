@@ -179,12 +179,6 @@ def main():
         
         a_fitness = []
         a_nodes = []
-        
-        print('\n\nPOPULATION-----------------------------------')
-        for org in organism_population:
-            org.print()
-        print('\n---------------------------------------------\n')
-        
 
         # Deterministic crowding
         # Iterate over pairs of organisms
@@ -194,20 +188,12 @@ def main():
             
             pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
             ref_seq = random.choice(pos_set_sample)
-            
-            
-            org1.print()
-            org2.print()
-            
+                        
             # Cross parents to get children
             # Recombination process
             child1, child2 = organism_factory.get_children(
                 org1, org2, ref_seq, pos_set_sample
             )
-            
-            child1.print()
-            child2.print()
-            print('\n---------------------------------------------\n')
             
             # Make two pairs: each parent is paired with the more similar child
             # (the child with higher ratio of nodes from that parent).
@@ -229,12 +215,6 @@ def main():
             # get parent1/parent2 ratio for the children
             child1_p1p2_ratio = child1.get_parent1_parent2_ratio()
             child2_p1p2_ratio = child2.get_parent1_parent2_ratio()
-            
-            print(child1_p1p2_ratio)
-            print(child2_p1p2_ratio)
-            
-            print(child1.assembly_instructions)
-            print(child2.assembly_instructions)
             
             # If a parent gets paired with an empty child, the empty child is
             # substituted by a deepcopy of the parent, i.e. the parent escapes
