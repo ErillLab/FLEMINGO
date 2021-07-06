@@ -610,7 +610,14 @@ def export_population(
         # Compile the file with all the organisms of the population placed
         # Write organism ID
         placements_file = open(population_placements_file, "a+")
-        placements_file.write("***** Organism {} *****\n".format(organism._id))
+        placements_file.write("***** Organism {} *****\t".format(organism._id))
+        # Write who is parent 1
+        placements_file.write("p1:")
+        placements_file.write(str(organism.assembly_instructions['p1']))
+        # Write who is parent 2
+        placements_file.write(", p2:")
+        placements_file.write(str(organism.assembly_instructions['p2']))
+        placements_file.write("\n")
         placements_file.close()
         # Write organism placement on a single positive sequence
         organism.export_results([dataset[dna_seq_idx]], population_placements_file)
