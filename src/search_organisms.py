@@ -15,6 +15,7 @@ import cProfile
 import pstats
 import io
 import numpy as np
+import matplotlib.pyplot as plt
 from objects.organism_factory import OrganismFactory
 from Bio import SeqIO
 
@@ -507,6 +508,9 @@ def main():
                 organism_population, positive_dataset, organism_factory,
                 iterations, random_seq_idx_for_pop_export
             )
+            
+            # Export plot, too
+            export_plots()
         
         iterations += 1
         # END WHILE
@@ -569,7 +573,6 @@ def export_organism(
     factory.export_organisms([organism], organism_file_json)
 
 
-
 def export_population(
         population, dataset: list, factory: OrganismFactory,
         generation: int, dna_seq_idx: int
@@ -601,11 +604,59 @@ def export_population(
     )
     
     for organism in population:
+        # Compile the file with all the organisms of the population printed
         organism.export(population_txt_file)
+        
+        # Compile the file with all the organisms of the population placed
+        # Write organism placement on a single positive sequence
         organism.export_results([dataset[dna_seq_idx]], population_placements_file)
     
+    # Make a file with all the organisms exported in json format
     factory.export_organisms(population, population_json_file)
 
+
+def export_plots() -> None:
+    """
+    Exports:
+        A plot showing the trend in the fitness of the maximum organism and the
+        trend in the average fitness.
+    
+    Saved as png in the 'plots' subfolder in the simulation directory.
+    """
+    
+    plots_dir = RESULT_BASE_PATH_DIR + "plots"
+    
+    # The stats are taken from the 'output.txt' file in the simulation directory
+    output_file = RESULT_BASE_PATH_DIR + 'output.txt'
+    
+    # Read the output.txt file
+    f = open(output_file, 'r')
+    lines = f.readlines()
+    f.close()
+    
+    # Parse stats into lists
+    AF_list = []
+    MF_list = []
+    GF_list = []
+    for l in lines:
+        AF = l.split('AF:')[1].split(' ')[0]
+        AF_list.append(float(AF))
+        MF = l.split('MF: ')[1].split(' ')[0]
+        MF_list.append(float(MF))
+        GF = l.split('GF:')[1].split(' ')[0]
+        GF_list.append(float(GF))
+    
+    # Ignore negative values
+    AF_trunc_list = [x if x>=0 else None for x in AF_list]
+    MF_trunc_list = [x if x>=0 else None for x in MF_list]
+    
+    # Plot together AF and MF
+    plt.plot(AF_trunc_list, label="Average fitness")
+    plt.plot(MF_trunc_list, label="Fitness of max org")
+    plt.legend()
+    filepath = os.path.join(plots_dir, "AF-MF.png")
+    plt.savefig(filepath)
+    plt.close()
 
 
 def set_up():
@@ -685,6 +736,7 @@ def set_up():
     # Create directory where the output and results will be stored
     os.mkdir(RESULT_BASE_PATH_DIR)
     os.mkdir(RESULT_BASE_PATH_DIR + "population")
+    os.mkdir(RESULT_BASE_PATH_DIR + "plots")
 
     # Store Config into variables to use later
     configOrganism = config["organism"]
