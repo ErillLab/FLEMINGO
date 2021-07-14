@@ -189,12 +189,21 @@ def main():
             
             pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
             ref_seq = random.choice(pos_set_sample)
-                        
-            # Cross parents to get children
-            # Recombination process
-            child1, child2 = organism_factory.get_children(
-                org1, org2, ref_seq, pos_set_sample
-            )
+            
+            # Decide whether the parents are going to be recombined or mutated
+            if random.random() < organism_factory.recombination_probability:
+                # Recombination case; no mutation
+                child1, child2 = organism_factory.get_children(
+                    org1, org2, ref_seq, pos_set_sample
+                )
+            
+            else:
+                # Non-recomination case; the children get mutated
+                child1, child2 = organism_factory.clone_parents(org1, org2)
+                # Mutate the children: the children in this non-recombination
+                # case are just a mutated versions of the parents
+                child1.mutate(organism_factory)
+                child2.mutate(organism_factory)
             
             # Make two pairs: each parent is paired with the more similar child
             # (the child with higher ratio of nodes from that parent).
@@ -242,10 +251,6 @@ def main():
                     pair_children.append( (org2, child1) )
                 else:
                     pair_children.append( (org2, copy.deepcopy(org2)) )
-            
-            # Mutate the children
-            child1.mutate(organism_factory)
-            child2.mutate(organism_factory)
             
             # Make the two organisms in each pair compete
             # j index is used to re insert winning organism into the population
