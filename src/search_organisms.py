@@ -150,9 +150,6 @@ def main():
     )
     timeformat = "%Y-%m-%d--%H-%M-%S"
     
-    # !!! Add comment here
-    random_seq_idx_for_pop_export = random.randint(0, len(positive_dataset)-1)
-    
     print("Starting execution...")
 
     # Main loop, it iterates until organisms do not get a significant change
@@ -509,9 +506,12 @@ def main():
         
         # Periodic population export
         if iterations % PERIODIC_POP_EXPORT == 0:
+            # Select a random positive DNA sequence to use for the population export
+            seq_idx = random.randint(0, len(positive_dataset)-1)
+            
             export_population(
                 organism_population, positive_dataset, organism_factory,
-                iterations, random_seq_idx_for_pop_export
+                iterations, seq_idx
             )
             
             # Export plot, too
