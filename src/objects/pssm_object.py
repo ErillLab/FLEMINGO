@@ -108,23 +108,33 @@ class PssmObject():
             donor_base, acceptor_base = random.sample(['a','c','g','t'], 2)
             
             # Current values of the two bases
-            donor_current_value = self.pwm[idx_of_random_col][donor_base]
-            acceptor_current_value = self.pwm[idx_of_random_col][acceptor_base]
+            donor_current_prob = self.pwm[idx_of_random_col][donor_base]
+            acceptor_current_prob = self.pwm[idx_of_random_col][acceptor_base]
             
-            # Entity of the transfer
-            transfer = random.randint(0, int(donor_current_value*100) - 1) / 100  # !!! Make it dependent on the number of significant digits
+            no_BSs = org_factory.pwm_number_of_binding_sites
+            donor_current_count = donor_current_prob * no_BSs
+            acceptor_current_count = acceptor_current_prob * no_BSs
             
-            # New values for the two bases
-            donor_new_value = donor_current_value - transfer
-            acceptor_new_value = acceptor_current_value + transfer
+            # entity of the transfer of counts
+            transfer = random.randint(0, int(donor_current_count) - 1)
             
-            # To avoid extra decimals due to floating point errors
-            donor_new_value = round(donor_new_value, 2)
-            acceptor_new_value = round(acceptor_new_value, 2)
+            # New count values for the two bases
+            donor_new_count = donor_current_count - transfer
+            acceptor_new_count = acceptor_current_count + transfer
+            
+            # Back to probabilities
+            donor_new_prob = donor_new_count / no_BSs
+            acceptor_new_prob = acceptor_new_count / no_BSs
+            
+            # To avoid extra decimals due to floating point errors:
+            # Number of decimal digits actually required
+            no_decimals = len(str(1/no_BSs).split(".")[1])
+            donor_new_prob = round(donor_new_prob, no_decimals)
+            acceptor_new_prob = round(acceptor_new_prob, no_decimals)
             
             # Update pwm
-            self.pwm[idx_of_random_col][donor_base] = donor_new_value
-            self.pwm[idx_of_random_col][acceptor_base] = acceptor_new_value
+            self.pwm[idx_of_random_col][donor_base] = donor_new_prob
+            self.pwm[idx_of_random_col][acceptor_base] = acceptor_new_prob
 
         if random.random() < self.mutate_probability_flip_cols:
             # Swaps two PSSM columns

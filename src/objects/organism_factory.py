@@ -42,15 +42,9 @@ class OrganismFactory:
         # length of PSSM's
         self.pwm_length = conf_org_fac["PWM_LENGTH"]
         
-        # PSSM object probability parameters
-        self.pwm_probability_step = conf_org_fac[
-            "PWM_PROBABILITY_STEP"
-        ]  # It should be a BASE_PROBABILITY divisor Ex: 1, 2, 4, 5, 10, 25...
-        self.pwm_probability_base = conf_org_fac["PWM_PROBABILITY_BASE"]
-        self.pwm_probability_decimals = conf_org_fac[
-            "PWM_PROBABILITY_DECIMALS"
-        ]
-
+        # Number of binding sites used to generate the PWM
+        self.pwm_number_of_binding_sites = conf_org_fac["PWM_NUM_OF_BINDING_SITES"]
+        
         # assign organism, connector and pssm configurations
         self.conf_org = conf_org
         self.conf_con = conf_con
@@ -156,50 +150,37 @@ class OrganismFactory:
             a random probability for each base [a, c, g, t]
         """
         
-        # set initial probability to base/step
-        # e.g. 100/5 emulates a motif with 20 binding sites
-        initial_probability = (
-            self.pwm_probability_base / self.pwm_probability_step
-        )
-        probabilities: list = []
-
-        # Number of decimals on the probability
-        decimals = self.pwm_probability_decimals
-        # amount of probability left
-        probability_left = initial_probability
-        # we assign number of sites to each row, making sure that no row
-        # gets less than one site
-        for item in range(3,-1,-1):
-            if probability_left > item:
-                new_probability = random.randint(1, probability_left-item)
-                probability_left -= new_probability
+        number_of_BS_to_assign = self.pwm_number_of_binding_sites
+        
+        # we assign a number of sites (a count) to each row (to each base)
+        counts: list = []
+        
+        # First three count values
+        for item in range(3,0,-1):
+            # make sure that no row gets less than one site
+            if number_of_BS_to_assign > item:
+                count = random.randint(1, number_of_BS_to_assign-item)
+                number_of_BS_to_assign -= count
             else:
-                new_probability = 1
-                probability_left -= new_probability
-            probabilities.append(new_probability)
-        # if there is any remaining probability unassigned, assign to last
-        if probability_left>0:
-            probabilities[3] += probability_left
+                count = 1
+                number_of_BS_to_assign -= count
+            counts.append(count)
+        
+        # All the remaining unassigned counts go to the last base
+        counts.append(number_of_BS_to_assign)
 
-        # Shuffle list so high probability is not always on first positions
-        random.shuffle(probabilities)            
+        # Shuffle list so that highest count isn't always on first base ("A")
+        random.shuffle(counts)
 
-        # Transform probabilities array from integer
-        # [0-(BASE_PROBABILITY / STEP)] to complementary float
-        # probabilities [0.0-1.0]
-        np_probabilities = (
-            np.array(probabilities)
-            * self.pwm_probability_step
-            * (1 / self.pwm_probability_base)
-        )
+        # Convert counts to probabilities
+        np_probabilities = np.array(counts) / self.pwm_number_of_binding_sites
         probabilities = np_probabilities.tolist()
-
-        # Return object with "decimals" decimals probability to each base
+        
         return {
-            "a": round(probabilities[0], decimals),
-            "g": round(probabilities[1], decimals),
-            "c": round(probabilities[2], decimals),
-            "t": round(probabilities[3], decimals),
+            "a": probabilities[0],
+            "g": probabilities[1],
+            "c": probabilities[2],
+            "t": probabilities[3],
         }
     
     def import_organisms(self, file_name: str) -> list:
@@ -754,7 +735,7 @@ class OrganismFactory:
             # it was not available in any of the two parents
             if connector_name[:5] == 'synth':
                 # temporarily commented out code for synthetic connectors
-                '''
+                
                 left_idx, right_idx = connector_name.split('_')[1:]
                 
                 # mu and sigma will be estimated for the gap between a left and a
@@ -784,7 +765,7 @@ class OrganismFactory:
                 _mu = random.randint(self.min_mu, self.max_mu)
                 _sigma = random.randint(self.min_sigma, self.max_sigma)
                 conn = ConnectorObject(_mu, _sigma, self.conf_con)
-                
+                '''
             # Else, the connector can be grabbed from one of the parents
             else:
                 parent, connector_idx = connector_name.split('_')
