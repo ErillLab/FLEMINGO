@@ -11,6 +11,7 @@ from .connector_object import ConnectorObject
 from .pssm_object import PssmObject
 from .aligned_organisms_representation_object import AlignedOrganismsRepresentation
 import copy
+import decimal as dec
 
 class OrganismFactory:
     """Factory class
@@ -221,9 +222,45 @@ class OrganismFactory:
             #    new_organism.set_is_tracked(organism["isTracked"])
 
             organism_list.append(new_organism)
-
+        
+        # Check if the frequency values in the PWMs of the imported organisms
+        # are consistent with  PWM_NUM_OF_BINDING_SITES  set in the config file
+        self.check_pwm_frequencies_of_imported_organisms(organism_list)
+        
         return organism_list
-
+    
+    
+    def check_pwm_frequencies_of_imported_organisms(self, imported_organisms: list):
+        no_BSs = self.pwm_number_of_binding_sites
+        smallest_freq = dec.Decimal('1') / dec.Decimal(str(no_BSs))
+        
+        for idx in range(len(imported_organisms)):
+            org = imported_organisms[idx]
+            for i in range(len(org.recognizers)):
+                rec = org.recognizers[i]
+                for p in range(rec.length):
+                    for b in ['a','c','g','t']:
+                        freq = rec.pwm[p][b]
+                        if dec.Decimal(str(freq)) % smallest_freq != 0:
+                            raise Exception(
+                                ("Imported organism has PWM frequencies that are not "
+                                 "compatible with the required number of binding sites "
+                                 "(PWM_NUM_OF_BINDING_SITES parameter). The problem "
+                                 "occurred for the frequency of base " + b.upper() +
+                                 " at position " + str(p) + " of the recognizer with "
+                                 "index " + str(i) + " of the organism with "
+                                 "index " + str(idx) + " in the list of organisms "
+                                 "to be imported from the json file. "
+                                 "Indeed, " + str(freq) + " is not "
+                                 "k * " + str(smallest_freq) + " for any integer "
+                                 "value of k. "
+                                 "Please change the PWM_NUM_OF_BINDING_SITES parameter "
+                                 "in the config file, or modify the organism to be "
+                                 "imported, accordingly to the desired number of "
+                                 "binding sites. ")
+                            )
+    
+    
     def import_connector(self, connector: dict) -> ConnectorObject:
         """Import Connector from JSON object
 
@@ -637,11 +674,6 @@ class OrganismFactory:
             if random.random() < 0.5:
                 # Perform the swapping, which means that the part from parent1 will
                 # end up into child2, and the part from parent2 will end up into child1
-                '''
-                tmp = c1_repr[start: stop]
-                c1_repr[start: stop] = c2_repr[start: stop]
-                c2_repr[start: stop] = tmp
-                '''
                 children_repres.swap_unit(start, stop)
         
         return children_repres
@@ -735,7 +767,7 @@ class OrganismFactory:
             # it was not available in any of the two parents
             if connector_name[:5] == 'synth':
                 # temporarily commented out code for synthetic connectors
-                
+                '''
                 left_idx, right_idx = connector_name.split('_')[1:]
                 
                 # mu and sigma will be estimated for the gap between a left and a
@@ -765,7 +797,7 @@ class OrganismFactory:
                 _mu = random.randint(self.min_mu, self.max_mu)
                 _sigma = random.randint(self.min_sigma, self.max_sigma)
                 conn = ConnectorObject(_mu, _sigma, self.conf_con)
-                '''
+                
             # Else, the connector can be grabbed from one of the parents
             else:
                 parent, connector_idx = connector_name.split('_')
@@ -836,11 +868,13 @@ class OrganismFactory:
             gap = distance - 1
             gap_values.append(gap)
         
+        
         # Estimate mu and sigma
         avg_gap = sum(gap_values)/len(gap_values)
         # Avoid negative mu values
-        if avg_gap < 0:  # !!! temporarily hard-coded lower-bound
+        if avg_gap < 0:
             avg_gap = 0
+        
         stdev_gap = np.std(gap_values)
         # Avoid setting sigma to 0
         if stdev_gap < 0.1:  # !!! temporarily hard-coded lower-bound

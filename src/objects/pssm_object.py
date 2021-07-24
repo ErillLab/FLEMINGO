@@ -12,6 +12,7 @@
 """
 import random
 import numpy as np
+import decimal as dec
 
 
 class PssmObject():
@@ -108,11 +109,11 @@ class PssmObject():
             donor_base, acceptor_base = random.sample(['a','c','g','t'], 2)
             
             # Current values of the two bases
-            donor_current_prob = self.pwm[idx_of_random_col][donor_base]
+            donor_current_prob = self.pwm[idx_of_random_col][donor_base]            
             acceptor_current_prob = self.pwm[idx_of_random_col][acceptor_base]
             
             no_BSs = org_factory.pwm_number_of_binding_sites
-            donor_current_count = donor_current_prob * no_BSs
+            donor_current_count = donor_current_prob * no_BSs            
             acceptor_current_count = acceptor_current_prob * no_BSs
             
             # entity of the transfer of counts
@@ -127,11 +128,15 @@ class PssmObject():
             acceptor_new_prob = acceptor_new_count / no_BSs
             
             # To avoid extra decimals due to floating point errors:
-            # Number of decimal digits actually required
-            no_decimals = len(str(1/no_BSs).split(".")[1])
+            # Define the number of decimal digits actually required.
+            # All frequencies are multiples of 1/no_BSs
+            smallest_freq = dec.Decimal('1') / dec.Decimal(str(no_BSs))
+            # Number of decimals in the smallest frequency
+            no_decimals = len(str(smallest_freq).split(".")[1])
+            # No frequency value needs more decimal digits than  smallest_freq.
+            # Therefore we can round according to  no_decimals
             donor_new_prob = round(donor_new_prob, no_decimals)
             acceptor_new_prob = round(acceptor_new_prob, no_decimals)
-            
             # Update pwm
             self.pwm[idx_of_random_col][donor_base] = donor_new_prob
             self.pwm[idx_of_random_col][acceptor_base] = acceptor_new_prob

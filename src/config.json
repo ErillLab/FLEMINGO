@@ -6,12 +6,12 @@
     "DATASET_BASE_PATH_DIR":"datasets/",
     "RESULT_BASE_PATH_DIR":"results/",
     "RESULT_TEST_BASE_PATH_DIR": "resultsTEST/",
-    "POSITIVE_FILENAME":"positive_dataset_7_50.fas",
-    "NEGATIVE_FILENAME":"positive_dataset_7_100pc5.fas",
+    "POSITIVE_FILENAME":"positive_dataset_S7_50.fas",
+    "NEGATIVE_FILENAME":"positive_dataset_S7_100pc5.fas",
     "INPUT_FILENAME":"three_local_opt_from_Ivan.json",
     "OUTPUT_FILENAME":"output.txt",
     "MAX_SEQUENCES_TO_FIT_POS":25,
-    "MAX_SEQUENCES_TO_FIT_NEG":40,
+    "MAX_SEQUENCES_TO_FIT_NEG":35,
     "RANDOM_SHUFFLE_SAMPLING_POS":false,
     "RANDOM_SHUFFLE_SAMPLING_NEG":false,
     "FITNESS_FUNCTION": "welchs",
@@ -43,9 +43,9 @@
     "MIN_MU":0,
     "MAX_MU":50,
     "MIN_SIGMA":1,
-    "MAX_SIGMA":50,
+    "MAX_SIGMA":5,
     "PWM_LENGTH":4,
-    "PWM_NUM_OF_BINDING_SITES":50
+    "PWM_NUM_OF_BINDING_SITES":100
   },
   "connector": {
     "MUTATE_PROBABILITY_SIGMA":0.25,

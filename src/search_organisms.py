@@ -185,7 +185,7 @@ def main():
             org2 = organism_population[i + 1]
             
             pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
-            ref_seq = random.choice(pos_set_sample)
+            ref_seq = pos_set_sample[0]
             
             # Decide whether the parents are going to be recombined or mutated
             if random.random() < organism_factory.recombination_probability:
@@ -519,10 +519,6 @@ def main():
         
         iterations += 1
         # END WHILE
-
-    # TODO: Maybe a good idea to export the full population after all
-    # organism_factory.export_organisms(organism_population,
-    #         RESULT_BASE_PATH_DIR+"final_population.json")
 
 
 def is_finished(
