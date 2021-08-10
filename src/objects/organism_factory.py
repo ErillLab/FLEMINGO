@@ -767,7 +767,7 @@ class OrganismFactory:
             # it was not available in any of the two parents
             if connector_name[:5] == 'synth':
                 # temporarily commented out code for synthetic connectors
-                '''
+                
                 left_idx, right_idx = connector_name.split('_')[1:]
                 
                 # mu and sigma will be estimated for the gap between a left and a
@@ -797,7 +797,7 @@ class OrganismFactory:
                 _mu = random.randint(self.min_mu, self.max_mu)
                 _sigma = random.randint(self.min_sigma, self.max_sigma)
                 conn = ConnectorObject(_mu, _sigma, self.conf_con)
-                
+                '''
             # Else, the connector can be grabbed from one of the parents
             else:
                 parent, connector_idx = connector_name.split('_')
@@ -868,12 +868,15 @@ class OrganismFactory:
             gap = distance - 1
             gap_values.append(gap)
         
-        
+        '''
         # Estimate mu and sigma
         avg_gap = sum(gap_values)/len(gap_values)
         # Avoid negative mu values
         if avg_gap < 0:
             avg_gap = 0
+        '''
+        avg_gap = gap_values[0]
+        
         
         stdev_gap = np.std(gap_values)
         # Avoid setting sigma to 0

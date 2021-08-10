@@ -136,7 +136,7 @@ class ConnectorObject():
                     self._sigma + random.uniform(-self.mutate_variance_sigma,
                                                  self.mutate_variance_sigma)
                 )
-            else:
+            elif self.sigma_mutator=="log":
                 base = self.mutate_variance_sigma
                 logb_sigma = np.log(self._sigma) / np.log(base)
                 shift = random.uniform(-1, 1)
@@ -154,13 +154,16 @@ class ConnectorObject():
                     self._mu + random.uniform(-self.mutate_variance_mu,
                                               self.mutate_variance_mu)
                 )
-            else:
+            elif self.mu_mutator=="log":
                 base = self.mutate_variance_mu
                 logb_mu = np.log(self._mu) / np.log(base)
                 shift = random.uniform(-1, 1)
                 # Apply a shift in the range (-1, 1) to the log-mu
                 logb_mu += shift
                 self._mu = base**logb_mu
+            
+            elif self.mu_mutator=="standard":
+                self._mu = random.gauss(self._mu, self._sigma)
         
         # Recompute PDF and CDF values
         self.set_precomputed_pdfs_cdfs()
