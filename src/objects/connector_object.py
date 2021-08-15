@@ -163,7 +163,7 @@ class ConnectorObject():
                 self._mu = base**logb_mu
             
             elif self.mu_mutator=="standard":
-                self._mu = random.gauss(self._mu, self._sigma)
+                self._mu = abs(random.gauss(self._mu, self._sigma))
         
         # Recompute PDF and CDF values
         self.set_precomputed_pdfs_cdfs()
