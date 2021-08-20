@@ -579,26 +579,113 @@ class OrganismObject:
         if self.mutate_probability_node_mutation:
             # Mutate a random node
             if random.random() < self.mutate_probability_node_mutation:
-    
+                
                 n_nodes = self.count_nodes()
                 random_node_idx = random.randint(0, n_nodes - 1)
                 if random_node_idx < self.count_recognizers():
                     # mutate a recognizer
-                    self.recognizers[random_node_idx].mutate(org_factory)
+                    moved_pssm_bounds = self.recognizers[random_node_idx].mutate(org_factory)
+                    # Adjust adjacent gaps if needed
+                    if moved_pssm_bounds:
+                        self.adjust_gaps_after_pssm_bounds_displacement(
+                            random_node_idx, moved_pssm_bounds)
                 else:
                     # mutate a connector
                     connector_idx = random_node_idx - self.count_recognizers()
                     self.connectors[connector_idx].mutate(org_factory)
         else:
-            for recognizer in self.recognizers:
-                recognizer.mutate(org_factory)
+            # Go through all the nodes
+            
+            # Recognizers
+            for i in range(self.count_recognizers()):
+                # Mutate recognizer with index i
+                moved_pssm_bounds = self.recognizers[i].mutate(org_factory)
+                
+                # Adjust adjacent gaps if needed
+                if moved_pssm_bounds:
+                    self.adjust_gaps_after_pssm_bounds_displacement(
+                        i, moved_pssm_bounds)
+            
+            # Connectors
             for connector in self.connectors:
                 connector.mutate(org_factory)
         
-        # no matter what mutation is applied, order/columns/number of pssm's
-        # may have changed, so we call the set_row_to_pssm to set their mapping
-        # on the alignment matrix anew
+        # After applying mutations, order/columns/number of pssm's may have
+        # changed, so we call the set_row_to_pssm to set their mapping on the
+        # alignment matrix anew
         self.set_row_to_pssm()
+    
+    def adjust_gaps_after_pssm_bounds_displacement(self, pssm_index,
+                                                   pssm_displacement_code):
+        '''
+        For well-adapted organisms (organisms that have a consistent placement
+        strategy on the positive set) some PSSM mutations will produce a slight
+        change in the DNA positions occupied by the PSSMs. If the PSSM gets a
+        new column added to the left, and if there's a gap to the left of that
+        PSSM, the connector modeling that gap should decrease its mu by 1, so
+        that it mantains its optimality. Otherwise, the benefit of a good extra
+        PSSM column could be overcomed by the downsides of having the average
+        gap size off by 1 unit in the adjacent connector.
+        
+        The PSSM mutations to be taken into account for this problem are:
+            - increase/decrease PSSM size
+            - right/left shift of the PSSM
+        Those are the mutation that can produce some displacement of the PSSM's
+        bounds (the left and the right bounds). When they're called, a code is
+        generated, that keeps track of how the bounds have changed. This code
+        can be used as the second parameter of this function. The purpose of
+        this function is to adjust connectors according to those codes, so that
+        PSSMs are free to change size or shift without damaging adjacent
+        connectors.
+
+        Parameters
+        ----------
+        pssm_index : int
+            Index of the PSSM that has gone through some bound displacement.
+        pssm_displacement_code : list
+            It's a list of two integers. The first integer is the shift
+            occurred the left bound of the PSSM. The second integer is the
+            shift occurred to its right bound.
+            A positive shift means that the bound moved to the right, while a
+            negative shift means a shift to the left.
+            These codes are generated when mutating a PSSM with its mutate()
+            method.
+
+        '''
+        
+        left_bound_shift, right_bound_shift = pssm_displacement_code
+        
+        # If the LEFT bound has changed
+        if left_bound_shift != 0:
+            # Adjust connector to the left
+            conn_index = pssm_index - 1
+            
+            # There's no connector the left of a PSSM that's the first
+            # recognizer of the organism (no connector with index -1), so check
+            # that the index is not -1.
+            if conn_index >= 0:
+                # Adjust mu
+                self.connectors[conn_index]._mu += left_bound_shift
+                
+                # Update connector's PDF and CDF values
+                self.connectors[conn_index].set_precomputed_pdfs_cdfs()
+        
+        # If the RIGHT bound has changed
+        if right_bound_shift != 0:
+            # Adjust connector to the right
+            conn_index = pssm_index
+            
+            # There's no connector the right of a PSSM that's the last
+            # recognizer of the organism, so check that the index is not equal
+            # to the number of connectors
+            if conn_index < self.count_connectors():
+                # Adjust mu
+                self.connectors[conn_index]._mu -= right_bound_shift
+                
+                # Update connector's PDF and CDF values
+                self.connectors[conn_index].set_precomputed_pdfs_cdfs()
+            
+    
     
     def get_placement(self, dna_sequence, traceback=False) -> dict:
         """Places the organism elements (recognizers and connectors) on a sequence
