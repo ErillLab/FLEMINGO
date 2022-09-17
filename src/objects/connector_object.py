@@ -13,20 +13,21 @@ import numpy as np
 import math
 
 
-def norm_pdf(x, mu, sigma):
-    """ Normal probablity densitity function
-        computes the normal probability density function
-        used to compute the energy provided by the connector
-        the distance at which connecting nodes are placed
-        is the 'x' for the function, which will return the
-        probability of observing said distance under the 
-        connector model
-   """
+
+def norm_cdf(x, mu, sigma):
+    ''' Cumulative distribution function for the normal distribution. '''
+    z = (x-mu)/abs(sigma)
+    return (1.0 + math.erf(z / math.sqrt(2.0))) / 2.0
+
+def norm_pf(x, mu, sigma):
+    """
+    Probablity function for normal distribution.
+    Considering that the observed x is an integer, the probability of x is
+    defined as the probability of observing a value within x - 0.5 and x + 0.5,
+    given a normal distribution specified by the given mu and sigma.
+    """
     if sigma != 0:
-        var = float(sigma)**2
-        denom = (2*math.pi*var)**.5
-        num = math.exp(-(float(x)-float(mu))**2/(2*var))
-        p = num/denom
+        p = norm_cdf(x+0.5, mu, sigma) - norm_cdf(x-0.5, mu, sigma)
     else:
         # when sigma is 0
         if x == mu:
@@ -34,12 +35,6 @@ def norm_pdf(x, mu, sigma):
         else:
             p = 0
     return p
-
-def norm_cdf(x, mu, sigma):
-    # Cumulative distribution function for the normal distribution
-    z = (x-mu)/abs(sigma)
-    return (1.0 + math.erf(z / math.sqrt(2.0))) / 2.0
-
 
 
 class ConnectorObject():
@@ -109,7 +104,7 @@ class ConnectorObject():
         for dist in range(self.expected_seq_length):
             
             # Precompute PDF
-            self.stored_pdfs.append(norm_pdf(dist, self._mu, self._sigma))
+            self.stored_pdfs.append(norm_pf(dist, self._mu, self._sigma))
             
             # Precompute CDF
             if self._sigma != 0:
@@ -185,7 +180,7 @@ class ConnectorObject():
             The numerator is the probability of observing the distance provided
             given the connector's parameters.
             The probability of observing distance d, given the connector's
-            parameters is given by norm_pdf.
+            parameters is given by norm_pf.
             The probability is then normalized by the cumulative probability
             function within the observable range on the sequence.
             
@@ -201,7 +196,7 @@ class ConnectorObject():
         if d<self.expected_seq_length:
             numerator = self.stored_pdfs[d]
         else:
-            numerator = norm_pdf(d, self._mu, self._sigma)
+            numerator = norm_pf(d, self._mu, self._sigma)
         
         # Normalize by AUC within the range of observable d values
         max_d = s_dna_len - 1  # Maximum d observable
