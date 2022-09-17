@@ -1060,7 +1060,6 @@ class OrganismObject:
         if d == s_dna_len:
             return -1 * np.inf
         
-        pssm_length
         gap_score = self.connectors[connector_idx].get_score(d, s_dna_len)
         return gap_score
     
