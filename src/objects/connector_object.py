@@ -13,7 +13,6 @@ import numpy as np
 import math
 
 
-
 def norm_cdf(x, mu, sigma):
     ''' Cumulative distribution function for the normal distribution. '''
     z = (x-mu)/abs(sigma)
@@ -35,6 +34,17 @@ def norm_pf(x, mu, sigma):
         else:
             p = 0
     return p
+
+def prob_of_d(d, L, N):
+    ''' Given N randomly chosen integers in [1,L], this function returns the
+    probability that two consecutive integers (after sorting) are found at a
+    distance d. '''
+    if 1 <= d and d <= L-N+1:
+        num = math.comb(L-d, N-1)
+        den = math.comb(L, N)
+        return num / den
+    else:
+        return 0
 
 
 class ConnectorObject():
@@ -162,9 +172,21 @@ class ConnectorObject():
         
         # Recompute PDF and CDF values
         self.set_precomputed_pdfs_cdfs()
-
-       
-    def get_score(self, d, s_dna_len) -> float:
+    
+    
+    # !!! New null model function
+    def null_gap_likelihood(self, gap_size, recog_sizes, seq_len):
+        # For each recog of size s, we must subtract (s-1). E.g., for a recog of
+        # size 5 we must subtract 4.
+        effective_len = seq_len - sum(recog_sizes) + len(recog_sizes)
+        
+        # Distance = gap + 1
+        # The length to be used as input is the effective length
+        # Number of recognizers is the length of the list of recog sizes
+        return prob_of_d(gap_size+1, effective_len, len(recog_sizes))
+    
+    
+    def get_score(self, d, s_dna_len, recog_sizes) -> float:
         """ Returns the score of the connector, given the observed distance
             and the length of the DNA sequence on which it is being evaluated.
             Parameters
@@ -226,13 +248,7 @@ class ConnectorObject():
         
         # Denominator
         # The denominator is p(d) according to the null model
-        # The probabity to observe d depends on the number of ways of getting d,
-        # given two randomly selected positions within a sequence of lentgth L.
-        # There are L - abs(d) ways of getting two random position at
-        # distance d within a sequence of length L.
-        # The total number of equally likely couples is L*(L-1).
-        # Therefore  p(d|null_model) = (L-abs(d)) / (L*(L-1))
-        denominator = (s_dna_len - abs(d)) / (s_dna_len * (s_dna_len-1))
+        denominator = self.null_gap_likelihood(abs(d), recog_sizes, s_dna_len)
         
         # compute additive connector energy term as log-likelihood ratio
         e_connector = np.log2(numerator / denominator)
