@@ -40,11 +40,24 @@ def prob_of_d(d, L, N):
     probability that two consecutive integers (after sorting) are found at a
     distance d. '''
     if 1 <= d and d <= L-N+1:
+    #if 1 <= d and d <= L:
         num = math.comb(L-d, N-1)
         den = math.comb(L, N)
         return num / den
     else:
-        return 0
+        # !!! This probability should be 0. In the python implementation of the
+        # placement algorithm "impossible" paths are considered: gaps that are
+        # too large (some PSSM would not fit the DNA sequence on the right) are
+        # not skipped! Instead the values are stored in the matrix. As in the
+        # Needleman–Wunsch algorithm, they just will never reach the bottom line
+        # of the alignment/placement matrix, so they are implicitly discarded.
+        # No placement with such large gap can ever be observed in any practical
+        # situations (because PSSMs are not allowed to overlap, no matter what).
+        # However, we can't return 0, because it would cause a zero division
+        # error when computing those useless cells in the upper right corner of
+        # the placement matrix. Here we return 10^-10 instead, so that no error
+        # is encountered when filling the matrix.
+        return 10**(-10)
 
 
 class ConnectorObject():
