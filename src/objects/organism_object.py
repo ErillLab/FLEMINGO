@@ -1057,11 +1057,13 @@ class OrganismObject:
         """Calls the appropriate connector, with the given distance and length of the DNA sequence to
 		   obtain the energy of the connector.
 		"""
-        if d == s_dna_len:
+        if d < s_dna_len:
+            # !!! New input param for connector.get_score: the list of the lengths of the recognizers
+            recog_lengths = [recog.length for recog in self.recognizers]
+            gap_score = self.connectors[connector_idx].get_score(d, s_dna_len, recog_lengths)
+            return gap_score
+        else:
             return -1 * np.inf
-        
-        gap_score = self.connectors[connector_idx].get_score(d, s_dna_len)
-        return gap_score
     
     def get_score_from_pssm(self, row_idx_from_placement_matrix, nucleotide):
         """Calls the appropriate PSSM (and column) to obtain the score, given a nucleotide
@@ -1089,7 +1091,11 @@ class OrganismObject:
 			# diagonal score [connector needs to the length of the DNA seq]
             pssm_idx = self.row_to_pssm[row_idx][0]
             connector = self.connectors[pssm_idx - 1]
-            zero_gap_score = connector.get_score(0, len(dna_sequence))
+            
+            # !!! New input param for connector.get_score: the list of the lengths of the recognizers
+            recog_lengths = [recog.length for recog in self.recognizers]
+            
+            zero_gap_score = connector.get_score(0, len(dna_sequence), recog_lengths)
             diag_score += zero_gap_score
         
 		# get nucleotide and compute PSSM score for it
