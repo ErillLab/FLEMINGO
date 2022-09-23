@@ -11,9 +11,9 @@ import random
 import copy
 import json
 import os
-import cProfile
-import pstats
-import io
+# import cProfile
+# import pstats
+# import io
 import numpy as np
 import matplotlib.pyplot as plt
 from objects.organism_factory import OrganismFactory
@@ -38,7 +38,7 @@ MIN_FITNESS = 0
 RECOMBINATION_PROBABILITY = 0.0
 THRESHOLD = 0.0
 
-JSON_CONFIG_FILENAME = "config.json"
+JSON_CONFIG_FILENAME = "config_ser_par.json"
 """
 Configuration of the object types
 Populated by JSON read.
@@ -65,10 +65,13 @@ negative_dataset: list = []
 
 
 def main():
-    """Main function for the motif seek
     """
-
-    print("Loading parameters...")
+    Main function for the motif seek
+    """
+    
+    if i_am_main_process():  # XXX
+        print("Loading parameters...")
+    
     positive_dataset = read_fasta_file(
         DATASET_BASE_PATH_DIR + POSITIVE_FILENAME
     )
@@ -78,58 +81,67 @@ def main():
 
     mean_nodes = 0
     mean_fitness = 0
-
-    print("Instantiating population...")
-
+    
+    if i_am_main_process():  # XXX
+        print("Instantiating population...")
+    
     """
     Generate initial population
     """
     # Instantiate organism Factory object with object configurations
     organism_factory = OrganismFactory(
-        configOrganism, configOrganismFactory, configConnector, configPssm
+        configOrganism, configOrganismFactory, configConnector, configPssm, rank
     )
-    # initialize organisms population
-    organism_population = []
-
-    # Generate population depending on origin and fill type.
-    # Origin can be "random" or "file"(read a set of organisms from a file).
-    if POPULATION_ORIGIN.lower() == "random":
-        # For a random origin, we can generate #POPULATION_LENGTH organisms.
-        for i in range(POPULATION_LENGTH):
-            new_organism = organism_factory.get_organism()
-            organism_population.append(new_organism)
-    elif POPULATION_ORIGIN.lower() == "file":
-        #if the population is seeded from file
-        # Set the file organisms and fill with random/same organisms
-        # POPULATION_LENGTH must be >= len(fileOrganisms)
-        file_organisms = organism_factory.import_organisms(INPUT_FILENAME)
-        remaining_organisms = POPULATION_LENGTH - len(file_organisms)
-        fill_organism_population = []
-
-        if POPULATION_FILL_TYPE.lower() == "random":
-            # FILL remainder of the population WITH RANDOM organisms
-            for i in range(remaining_organisms):
-                new_organism = organism_factory.get_organism()
-                fill_organism_population.append(new_organism)
-
-        elif POPULATION_FILL_TYPE.lower() == "uniform":
-            # FILL the remainder of the population WITH ORGANISMS IN FILE
-            for i in range(remaining_organisms):
-                new_organism = copy.deepcopy(
-                    file_organisms[i % len(file_organisms)]
-                )
-                fill_organism_population.append(new_organism)
-                new_organism.set_id(organism_factory.get_id())
-
-        # join 
-        organism_population = file_organisms + fill_organism_population
-
-    else:
-        raise Exception("Not a valid population origin, "
-            + "check the configuration file.")
     
-
-    print("Population size = {}".format(len(organism_population)))
+    # Initialize the population of organisms
+    if i_am_main_process():  # XXX
+        
+        # Initialize list
+        organism_population = []
+        
+        # Generate population depending on origin and fill type.
+        # Origin can be "random" or "file"(read a set of organisms from a file).
+        if POPULATION_ORIGIN.lower() == "random":
+            # For a random origin, we can generate #POPULATION_LENGTH organisms.
+            for i in range(POPULATION_LENGTH):
+                new_organism = organism_factory.get_organism()
+                organism_population.append(new_organism)
+        elif POPULATION_ORIGIN.lower() == "file":
+            #if the population is seeded from file
+            # Set the file organisms and fill with random/same organisms
+            # POPULATION_LENGTH must be >= len(fileOrganisms)
+            file_organisms = organism_factory.import_organisms(INPUT_FILENAME)
+            remaining_organisms = POPULATION_LENGTH - len(file_organisms)
+            fill_organism_population = []
+    
+            if POPULATION_FILL_TYPE.lower() == "random":
+                # FILL remainder of the population WITH RANDOM organisms
+                for i in range(remaining_organisms):
+                    new_organism = organism_factory.get_organism()
+                    fill_organism_population.append(new_organism)
+    
+            elif POPULATION_FILL_TYPE.lower() == "uniform":
+                # FILL the remainder of the population WITH ORGANISMS IN FILE
+                for i in range(remaining_organisms):
+                    new_organism = copy.deepcopy(
+                        file_organisms[i % len(file_organisms)]
+                    )
+                    fill_organism_population.append(new_organism)
+                    new_organism.set_id(organism_factory.get_id())
+            
+            # join 
+            organism_population = file_organisms + fill_organism_population
+    
+        else:
+            raise Exception("Not a valid population origin, "
+                + "check the configuration file.")
+        
+        print("Population size =", len(organism_population))
+    
+    else:
+        organism_population = None
+    
+    
     """
     Initialize iteration variables.
     """
@@ -150,7 +162,8 @@ def main():
     )
     timeformat = "%Y-%m-%d--%H-%M-%S"
     
-    print("Starting execution...")
+    if i_am_main_process():  # XXX
+        print("Starting execution...")
 
     # Main loop, it iterates until organisms do not get a significant change
     # or MIN_ITERATIONS or MIN_FITNESS is reached.
@@ -158,17 +171,29 @@ def main():
     while not is_finished(END_WHILE_METHOD, iterations, max_score, 
                           last_max_score):
         
-        # Shuffle population
-        # Organisms are shuffled for deterministic crowding selection
-        random.shuffle(organism_population)
+        # XXX
+        if i_am_main_process():
+            # Shuffle population
+            # Organisms are shuffled for deterministic crowding selection
+            random.shuffle(organism_population)        
         
-        # Shuffle datasets
-        # Datasets are shuffled for subsampling
+        # XXX
+        if RUN_MODE == 'parallel':
+            # FRAGMENT AND SCATTER THE POPULATION
+            organism_population = fragment_population(organism_population)
+            organism_population = comm.scatter(organism_population, root=0)
+            
+            # print to check that the sub-populations are correct
+            # my_ids = [org._id for org in organism_population]
+            # print("From process " + str(rank) + ": loc pop is " + str(my_ids))
+        
+        # XXX
+        # Shuffle datasets (if required)
         if RANDOM_SHUFFLE_SAMPLING_POS:
-            random.shuffle(positive_dataset)
+            positive_dataset = shuffle_dataset(positive_dataset)
         if RANDOM_SHUFFLE_SAMPLING_NEG:
-            random.shuffle(negative_dataset)
-
+            negative_dataset = shuffle_dataset(negative_dataset)
+        
         # Reset max_score
         last_max_score = max_score
         max_score = float("-inf")
@@ -177,7 +202,7 @@ def main():
         
         a_fitness = []
         a_nodes = []
-
+        
         # Deterministic crowding
         # Iterate over pairs of organisms
         for i in range(0, len(organism_population) - 1, 2):
@@ -361,26 +386,21 @@ def main():
                 else:
                     raise Exception("Not a valid fitness function name, "
                                     + "check the configuration file.")
-
-
+                
                 if MAX_NODES != None:  # Upper_bound to complexity
                     
                     if first_organism.count_nodes() > MAX_NODES:
-                        #print(first_organism.count_nodes(), "nodes")
                         fitness1 = -1000 * int(first_organism.count_nodes())
                     
                     if second_organism.count_nodes() > MAX_NODES:
-                        #print(second_organism.count_nodes(), "nodes")
                         fitness2 = -1000 * int(second_organism.count_nodes())
 
                 if MIN_NODES != None:  # Lower_bound to complexity
                     
                     if first_organism.count_nodes() < MIN_NODES:
-                        #print(first_organism.count_nodes(), "nodes")
                         fitness1 = -1000 * int(first_organism.count_nodes())
                     
                     if second_organism.count_nodes() < MIN_NODES:
-                        #print(second_organism.count_nodes(), "nodes")
                         fitness2 = -1000 * int(second_organism.count_nodes())
                 
                 
@@ -439,86 +459,130 @@ def main():
                 # END FOR j
 
             # END FOR i
-
-        # Mean fitness in the population
-        mean_fitness = np.mean(a_fitness)
-        # Standard deviation of fitness in the population
-        standard_dev_fitness = np.std(a_fitness)
-        # Inequality of fitness in the population (measured with the Gini coefficient)
-        gini_fitness = gini_RSV(a_fitness)
-        # Mean number of nodes per organism in the population
-        mean_nodes = np.mean(a_nodes)
-
-        # Show IDs of final array
-        # print("-"*10)
-        _m, _s = divmod((time.time() - initial), 60)
-        _h, _m = divmod(_m, 60)
-        s_time = "{}h:{}m:{:.2f}s".format(int(_h), int(_m), _s)
-        print_ln(
-            (
-                "Iter: {} AF:{:.2f} SDF:{:.2f} GF:{:.2f} AN:{:.2f}"
-                + " - MO: {} MF: {:.2f} MN: {}"
-                + " -  BO: {} BF: {:.2f} BN: {} Time: {}"
-            ).format(
-                iterations,  # "Iter"
-                mean_fitness,  # "AF"
-                standard_dev_fitness,  # "SDF"
-                gini_fitness,  # "GF"
-                mean_nodes,  # "AN"
-                max_organism[0]._id,  # "MO"
-                max_organism[1],  # "MF" (fitness)
-                max_organism[2],  # "MN" (nodes)
-                best_organism[0]._id,  # "BO"
-                best_organism[1],  # "BF" (fitness)
-                best_organism[2],  # "BN" (nodes)
-                s_time,  # Time
-            ),
-            RESULT_BASE_PATH_DIR + OUTPUT_FILENAME,
-        )
         
-        # Print against a random positive sequence
-        pos_seq_index = random.randint(0, len(positive_dataset)-1)
-        placement = max_organism[0].get_placement(positive_dataset[pos_seq_index], traceback=True)
-        placement.print_placement(stdout = True)
-        
-        if RANDOM_SHUFFLE_SAMPLING_POS:
-            # Sort the positive dataset so that, when exporting with  export_organism
-            # function, the subset of DNA sequences used for printing will be
-            # always the same (and they'll apear always in the same order).
-            positive_dataset.sort()
-        
-        # Export organism if new best organism
-        if changed_best_score:
-            filename = "{}_{}".format(
-                time.strftime(timeformat), best_organism[0]._id
-            )
-            export_organism(
-                best_organism[0], positive_dataset, filename, organism_factory
-            )
-        # Periodic organism export
-        if iterations % PERIODIC_ORG_EXPORT == 0:
-            filename = "{}_{}".format(
-                time.strftime(timeformat), max_organism[0]._id
-            )
-            export_organism(
-                max_organism[0], positive_dataset, filename, organism_factory
-            )
-        
-        # Periodic population export
-        if iterations % PERIODIC_POP_EXPORT == 0:
-            # Select a random positive DNA sequence to use for the population export
-            seq_idx = random.randint(0, len(positive_dataset)-1)
+        if RUN_MODE == 'parallel':  # XXX
+            # GATHER AND FLATTEN THE POPULATION
+            organism_population = comm.gather(organism_population, root=0)
+            organism_population = flatten_population(organism_population)
             
-            export_population(
-                organism_population, positive_dataset, organism_factory,
-                iterations, seq_idx
+            # print to check that the population is correct
+            # This is just for code testing/debugging
+            # if rank == 0:
+            #     my_ids = [org._id for org in organism_population]
+            #     print("From process " + str(rank) + ": gathered pop is " + str(my_ids))
+            
+            # Also gather a_fitness and a_nodes
+            a_fitness = comm.gather(a_fitness, root=0)
+            a_fitness = flatten_population(a_fitness)
+            a_nodes   = comm.gather(a_nodes,   root=0)
+            a_nodes   = flatten_population(a_nodes)
+        
+        if i_am_main_process():
+            # Mean fitness in the population
+            mean_fitness = np.mean(a_fitness)
+            # Standard deviation of fitness in the population
+            standard_dev_fitness = np.std(a_fitness)
+            # Inequality of fitness in the population (measured with the Gini coefficient)
+            gini_fitness = gini_RSV(a_fitness)
+            # Mean number of nodes per organism in the population
+            mean_nodes = np.mean(a_nodes)
+            
+            # Show IDs of final array
+            # print("-"*10)
+            _m, _s = divmod((time.time() - initial), 60)
+            _h, _m = divmod(_m, 60)
+            s_time = "{}h:{}m:{:.2f}s".format(int(_h), int(_m), _s)
+            print_ln(
+                (
+                    "Iter: {} AF:{:.2f} SDF:{:.2f} GF:{:.2f} AN:{:.2f}"
+                    + " - MO: {} MF: {:.2f} MN: {}"
+                    + " -  BO: {} BF: {:.2f} BN: {} Time: {}"
+                ).format(
+                    iterations,  # "Iter"
+                    mean_fitness,  # "AF"
+                    standard_dev_fitness,  # "SDF"
+                    gini_fitness,  # "GF"
+                    mean_nodes,  # "AN"
+                    max_organism[0]._id,  # "MO"
+                    max_organism[1],  # "MF" (fitness)
+                    max_organism[2],  # "MN" (nodes)
+                    best_organism[0]._id,  # "BO"
+                    best_organism[1],  # "BF" (fitness)
+                    best_organism[2],  # "BN" (nodes)
+                    s_time,  # Time
+                ),
+                RESULT_BASE_PATH_DIR + OUTPUT_FILENAME,
             )
             
-            # Export plot, too
-            export_plots()
+            # Print against a random positive sequence
+            pos_seq_index = random.randint(0, len(positive_dataset)-1)
+            placement = max_organism[0].get_placement(positive_dataset[pos_seq_index], traceback=True)
+            placement.print_placement(stdout = True)
+            
+            
+            # XXX
+            if RANDOM_SHUFFLE_SAMPLING_POS:
+                # If the dataset is shuffled, prepare a sorted version for the
+                # 'export' functions, so that regardless of the current status of
+                # the dataset, the sequences exported are always the same and
+                # always appear in the same order.
+                pos_set_for_export = sorted(positive_dataset)
+            else:
+                pos_set_for_export = positive_dataset
+            
+            
+            # Export organism if new best organism
+            if changed_best_score:
+                filename = "{}_{}".format(
+                    time.strftime(timeformat), best_organism[0]._id
+                )
+                export_organism(
+                    best_organism[0], pos_set_for_export, filename, organism_factory
+                )
+            # Periodic organism export
+            if iterations % PERIODIC_ORG_EXPORT == 0:
+                filename = "{}_{}".format(
+                    time.strftime(timeformat), max_organism[0]._id
+                )
+                export_organism(
+                    max_organism[0], pos_set_for_export, filename, organism_factory
+                )
+            
+            # Periodic population export
+            if iterations % PERIODIC_POP_EXPORT == 0:
+                # Select a random positive DNA sequence to use for the population export
+                seq_idx = random.randint(0, len(pos_set_for_export)-1)
+                
+                export_population(
+                    organism_population, pos_set_for_export, organism_factory,
+                    iterations, seq_idx
+                )
+                
+                # Export plot, too
+                export_plots()
         
         iterations += 1
         # END WHILE
+
+
+def shuffle_dataset(dataset):
+    '''
+    Returns the dataset (list of DNA sequences) in random order. Instead of
+    directly shuffling the list, the indexes are shuffled. This is done to
+    minimize the amount of MPI communication when the program is run in
+    parallel mode. Indeed, we want all the processes to compute fitness on the
+    same subset, defined as dataset[:MAX_SEQUENCES_TO_FIT_***]. So we want the
+    processes to share the same random permutation of the datset. This function
+    ensures that by MPI broadcasting the indexes that define the permutation,
+    instead of broadcasting the shuffled dataset of sequences.
+    '''
+    indexes = list(range(len(dataset)))
+    random.shuffle(indexes)
+    if RUN_MODE == 'parallel':
+        # In parallel runs, the order is the one generated by process 0
+        indexes = comm.bcast(indexes, root=0)
+    # Sort dataset according to indexes
+    return [dataset[i] for i in indexes]
 
 
 def is_finished(
@@ -671,6 +735,26 @@ def export_plots() -> None:
     plt.close()
 
 
+def i_am_main_process():
+    ''' Returns True if rank is None (which happens when the run is serial) or
+    when rank is 0 (which happens when the run is parallel and the program is
+    executed by the process with rank 0). '''
+    return not rank
+
+def check_mpi_settings():
+    ''' If the number of processes exceeds the number of pairs of organisms in
+    the population, some processes will be left with an empty population. In
+    that case, to avoid wasting computing power, an error is raised. '''
+    if p > int(POPULATION_LENGTH / 2):
+        raise ValueError("The minimum number of organisms assigned to each " +
+                         "process is 2 (you need a pair for recombination events " +
+                         "to take place). Thus, the maximum number of processes" +
+                         "to be used is POPULATION_LENGTH / 2 (case in which " +
+                         "each process works on one single pair of organisms). " +
+                         "Please decrease number of processes to avoid wastes, " +
+                         "i.e., processes being assigned an empty subpopulation, " +
+                         "or increase the POPULATION_LENGTH.")
+
 def set_up():
     """Reads configuration file and sets up all program variables
 
@@ -679,6 +763,7 @@ def set_up():
     # specify as global variable so it can be accesed in local
     # contexts outside setUp
 
+    global RUN_MODE
     global END_WHILE_METHOD
     global POPULATION_LENGTH
     global DATASET_BASE_PATH_DIR
@@ -709,21 +794,39 @@ def set_up():
     global configOrganismFactory
     global configConnector
     global configPssm
+    
+    # MPI variables  # XXX
+    global comm
+    global rank
+    global p
 
     config = read_json_file(JSON_CONFIG_FILENAME)
     
-    # Store config variables for main function
-    
     POPULATION_LENGTH = config["main"]["POPULATION_LENGTH"]
-    if POPULATION_LENGTH % 2 == 1:
-        raise Exception("POPULATION_LENGTH must be an even number. It's " +
-                        "currently set to " + str(POPULATION_LENGTH))
+    if POPULATION_LENGTH % 2 != 0:
+        raise Exception("POPULATION_LENGTH must be an even number.")
+    
+    RUN_MODE = config["main"]["RUN_MODE"]  # XXX
+    if RUN_MODE == "parallel":
+        from mpi4py import MPI  # mpi4py is only imported if needed
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        p = comm.Get_size()
+        check_mpi_settings()
+    elif RUN_MODE == "serial":
+        comm, rank, p = None, None, None
+    else:
+        raise ValueError('RUN_MODE should be "serial" or "parallel".')
+    
+    
     DATASET_BASE_PATH_DIR = config["main"]["DATASET_BASE_PATH_DIR"]
-    RESULT_BASE_PATH_DIR = (
-        config["main"]["RESULT_BASE_PATH_DIR"]
-        + time.strftime("%Y%m%d%H%M%S")
-        + "/"
-    )
+    # XXX
+    if i_am_main_process():
+        print('\n==================\nRUN_MODE: {}\n==================\n'.format(
+            RUN_MODE))  # Remind the user about the chosen RUN_MODE
+        RESULT_BASE_PATH_DIR = (
+            config["main"]["RESULT_BASE_PATH_DIR"]
+            + time.strftime("%Y%m%d%H%M%S") + "/")
     POSITIVE_FILENAME = config["main"]["POSITIVE_FILENAME"]
     NEGATIVE_FILENAME = config["main"]["NEGATIVE_FILENAME"]
     MAX_SEQUENCES_TO_FIT_POS = config["main"]["MAX_SEQUENCES_TO_FIT_POS"]
@@ -744,11 +847,12 @@ def set_up():
     PERIODIC_POP_EXPORT = config["main"]["PERIODIC_POP_EXPORT"]
     MAX_NODES = config["organism"]["MAX_NODES"]
     MIN_NODES = config["organism"]["MIN_NODES"]
-
+    
     # Create directory where the output and results will be stored
-    os.mkdir(RESULT_BASE_PATH_DIR)
-    os.mkdir(RESULT_BASE_PATH_DIR + "population")
-    os.mkdir(RESULT_BASE_PATH_DIR + "plots")
+    if i_am_main_process():  # XXX
+        os.mkdir(RESULT_BASE_PATH_DIR)
+        os.mkdir(RESULT_BASE_PATH_DIR + "population")
+        os.mkdir(RESULT_BASE_PATH_DIR + "plots")
 
     # Store Config into variables to use later
     configOrganism = config["organism"]
@@ -757,20 +861,21 @@ def set_up():
     configPssm = config["pssm"]
 
     # Throw config on a file
-    parameters_path = RESULT_BASE_PATH_DIR + "parameters.txt"
-    print_ln("-" * 50, parameters_path)
-    print_ln(" " * 20 + "PARAMETERS", parameters_path)
-    print_ln("-" * 50, parameters_path)
-
-    print_config_json(config["main"], "Main Config", parameters_path)
-    print_config_json(configOrganism, "Organism Config", parameters_path)
-    print_config_json(
-        configOrganismFactory, "Organism Factory Config", parameters_path
-    )
-    print_config_json(configConnector, "Connector Config", parameters_path)
-    print_config_json(configPssm, "PSSM Config", parameters_path)
-
-    print_ln("-" * 50, parameters_path)
+    if i_am_main_process():  # XXX
+        parameters_path = RESULT_BASE_PATH_DIR + "parameters.txt"
+        print_ln("-" * 50, parameters_path)
+        print_ln(" " * 20 + "PARAMETERS", parameters_path)
+        print_ln("-" * 50, parameters_path)
+    
+        print_config_json(config["main"], "Main Config", parameters_path)
+        print_config_json(configOrganism, "Organism Config", parameters_path)
+        print_config_json(
+            configOrganismFactory, "Organism Factory Config", parameters_path
+        )
+        print_config_json(configConnector, "Connector Config", parameters_path)
+        print_config_json(configPssm, "PSSM Config", parameters_path)
+    
+        print_ln("-" * 50, parameters_path)
 
 
 def read_fasta_file(filename: str) -> list:
@@ -896,34 +1001,102 @@ def gini_RSV(values_for_each_class):
     return giniRSV
 
 
+def fragment_population(population):
+    '''
+    This function is used when running the pipeline in parallel mode via MPI.
+    It takes as input a list of organisms ('population') and turns it into a
+    list of lists, where each element is the sublist of organisms assigned to
+    one of the processes.
+    
+    E.g.: if the number of processes is 3, and the population is made of 10
+    organisms we have
+        input population:
+            [org0, org1, org2, org3, org4, org5, org6, org7, org8, org9]
+        number of pairs:
+            5
+        most even distribution of pairs over 3 processes:
+            [2, 2, 1]
+        output population:
+            [[org0, org1, org2, org3], [org4, org5, org6, org7], [org8, org9]]
+    '''
+    
+    # Avoid errors if the function is called on all processes during a parallel
+    # run. With the following code we don't have to worry about calling the
+    # fragment_population_function only on the "main" process.
+    if population is None:
+        return None
+    
+    # Number of pairs of organisms
+    n_pairs = int(len(population) / 2)
+    q = n_pairs // p  # p is the number of processes
+    r = n_pairs % p  # p is the number of processes
+    # Number of pairs of organisms assigned to each process
+    local_n_pairs_list = [q + 1] * r + [q] * (p - r)
+    # Number of organisms assigned to each process
+    sendcounts = [n*2 for n in local_n_pairs_list]
+    # Make a list where each element is the list of organism for a process
+    it = iter(population)
+    population = [[next(it) for _ in range(size)] for size in sendcounts]
+    # Now the population list is "fragmented" (list -> list of lists)
+    return population
+
+
+def flatten_population(population):
+    '''
+    This function is used when running the pipeline in parallel mode via MPI.
+    It is the reverse function of the 'fragment_population' function.
+    It takes as input a "fragmented" population (list of lists) and returns
+    the entire population as a simple list of organisms (list).
+    '''
+    
+    # Avoid errors if the function is called on all processes during a parallel
+    # run. With the following code we don't have to worry about calling the
+    # flatten_population only on the "main" process.
+    if population is None:
+        return None
+    
+    flat_population = []
+    for sublist in population:
+        for item in sublist:
+            flat_population.append(item)
+    return flat_population
+
+
 # Entry point to app execution
 # It calculates the time, but could include other app stats
 
 if __name__ == "__main__":
-
-    INITIAL = time.time()
+    
     # Reads configuration file and sets up all program variables
     set_up()
-
+    
+    if i_am_main_process():
+        INITIAL = time.time()
+    
     # Profiling
-    PROFILER = cProfile.Profile()
-    PROFILER.enable()
-
+    # PROFILER = cProfile.Profile()
+    # PROFILER.enable()
+    
     # Main function
     main()
-
+    
     # Profiler output
-    PROFILER.disable()
-    STRING = io.StringIO()
-    SORTBY = "cumulative"
-    PS = pstats.Stats(PROFILER, stream=STRING).sort_stats(SORTBY)
-    PS.print_stats()
+    # PROFILER.disable()
+    # STRING = io.StringIO()
+    # SORTBY = "cumulative"
+    # PS = pstats.Stats(PROFILER, stream=STRING).sort_stats(SORTBY)
+    # PS.print_stats()
     # print(STRING.getvalue())
-
+    
     # Print final execution time and read parameters
-    _M, _S = divmod((time.time() - INITIAL), 60)
-    _H, _M = divmod(_M, 60)
-    print_ln(
-        "Time: {}h:{}m:{:.2f}s".format(int(_H), int(_M), _S),
-        RESULT_BASE_PATH_DIR + "parameters.txt",
-    )
+    if i_am_main_process():
+        _M, _S = divmod((time.time() - INITIAL), 60)
+        _H, _M = divmod(_M, 60)
+        print_ln(
+            "Time: {}h:{}m:{:.2f}s".format(int(_H), int(_M), _S),
+            RESULT_BASE_PATH_DIR + "parameters.txt")
+    
+    
+
+
+
