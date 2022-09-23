@@ -1,6 +1,6 @@
 {
   "main": {
-    "RUN_MODE": "parallel",
+    "RUN_MODE": "serial",
     "POPULATION_LENGTH": 6,
     "POPULATION_ORIGIN":"random",
     "POPULATION_FILL_TYPE":"random",
@@ -8,7 +8,8 @@
     "RESULT_BASE_PATH_DIR":"results/",
     "RESULT_TEST_BASE_PATH_DIR": "resultsTEST/",
     "POSITIVE_FILENAME":"positive_dataset_7_100.fas",
-    "NEGATIVE_FILENAME":"positive_dataset_7_100pc5.fas",
+    "NEGATIVE_FILENAME":null,
+    "KMER_LEN_FOR_NEG_SET": 4,
     "INPUT_FILENAME":"three_local_opt_from_Ivan.json",
     "OUTPUT_FILENAME":"output.txt",
     "MAX_SEQUENCES_TO_FIT_POS":6,
@@ -56,7 +57,7 @@
     "MUTATE_VARIANCE_MU":5,
     "SIGMA_MUTATOR":"linear",
     "MU_MUTATOR":"standard",
-    "EXPECTED_SEQ_LENGTH": 180
+    "EXPECTED_SEQ_LENGTH": 200
   },
   "pssm": {
     "MUTATE_PROBABILITY_RANDOM_COL":0.075,
