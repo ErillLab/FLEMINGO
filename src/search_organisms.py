@@ -576,7 +576,7 @@ def main():
         # END WHILE
 
 
-def shuffle_dataset(dataset):
+def shuffle_dataset(dataset: list) -> list:
     '''
     Returns the dataset (list of DNA sequences) in random order. Instead of
     directly shuffling the list, the indexes are shuffled. This is done to
@@ -596,12 +596,12 @@ def shuffle_dataset(dataset):
     return [dataset[i] for i in indexes]
 
 
-def get_all_kmers(seq, kmer_len):
+def get_all_kmers(seq: str, kmer_len: int) -> list:
     ''' Returns the list of all the k-mers of length k in seq. '''
     return [seq[i:i+kmer_len] for i in range(len(seq)-kmer_len+1)]
 
 
-def get_k_sampled_sequence(sequence, kmer_len):
+def get_k_sampled_sequence(seq: str, kmer_len: int) -> str:
     '''
     All kmers are stored. Than sampled without replacement.
     Example with k = 3:
@@ -616,26 +616,42 @@ def get_k_sampled_sequence(sequence, kmer_len):
     '''
     
     if kmer_len > 1:
-        n_kmers = len(sequence) // kmer_len
-        n_nuclotides_rem = len(sequence) % kmer_len
+        n_kmers = len(seq) // kmer_len
+        n_nuclotides_rem = len(seq) % kmer_len
         
-        all_kmers = get_all_kmers(sequence, kmer_len)
+        all_kmers = get_all_kmers(seq, kmer_len)
         sampled_seq_list = random.sample(all_kmers, n_kmers)
-        n_nucleotides = random.sample(str(sequence), n_nuclotides_rem)
+        n_nucleotides = random.sample(seq, n_nuclotides_rem)
         sampled_seq_list += n_nucleotides
     
     else:
-        sampled_seq_list = random.sample(sequence, len(sequence))
+        sampled_seq_list = random.sample(seq, len(seq))
     
     return "".join(sampled_seq_list)
 
 
-def generate_negative_set(positive_set):
-    ''' Generates a negative set where each sequence is a pseudosequence obtained
-    from a sequence in the positive set. '''
+def generate_negative_set(positive_set: list) -> list:
+    ''' Generates a negative set made of pseudosequences that resemble the
+    positive set in terms of k-mer frequencies. If the size of the negative set
+    is not specified, it will be the size of the positive set. If the size is
+    specified and it's k*len(positive_set) where k is an integer, every sequence
+    in the positive set contributes to exactly k sequences in the negative set.
+    If the required size is not a multiple of len(positive_set), the remaining
+    number of sequences (as many as the remainder of the division) are selected
+    randomly from the positive set. '''
+    
+    if GENERATED_NEG_SET_SIZE is None:
+        neg_set_size = len(positive_set)
+    else:
+        neg_set_size = GENERATED_NEG_SET_SIZE
+    q = neg_set_size // len(positive_set)
+    r = neg_set_size % len(positive_set)
     negative_set = []
-    for seq in positive_set:
-        negative_set.append(get_k_sampled_sequence(seq, KMER_LEN_FOR_NEG_SET))
+    for i in range(q):
+        for seq in positive_set:
+            negative_set.append(get_k_sampled_sequence(seq, GENERATED_NEG_SET_KMER_LEN))
+    for seq in random.sample(positive_set, r):
+        negative_set.append(get_k_sampled_sequence(seq, GENERATED_NEG_SET_KMER_LEN))
     return negative_set
 
 
@@ -819,14 +835,15 @@ def set_up():
     # specify as global variable so it can be accesed in local
     # contexts outside setUp
 
-    global RUN_MODE
+    global RUN_MODE  # XXX
     global END_WHILE_METHOD
     global POPULATION_LENGTH
     global DATASET_BASE_PATH_DIR
     global RESULT_BASE_PATH_DIR
     global POSITIVE_FILENAME
     global NEGATIVE_FILENAME
-    global KMER_LEN_FOR_NEG_SET
+    global GENERATED_NEG_SET_SIZE  # XXX
+    global GENERATED_NEG_SET_KMER_LEN  # XXX
     global RESULT_PATH_PATH_DIR
     global MAX_SEQUENCES_TO_FIT_POS
     global MAX_SEQUENCES_TO_FIT_NEG
@@ -886,7 +903,8 @@ def set_up():
             + time.strftime("%Y%m%d%H%M%S") + "/")
     POSITIVE_FILENAME = config["main"]["POSITIVE_FILENAME"]
     NEGATIVE_FILENAME = config["main"]["NEGATIVE_FILENAME"]
-    KMER_LEN_FOR_NEG_SET = config["main"]["KMER_LEN_FOR_NEG_SET"]
+    GENERATED_NEG_SET_SIZE = config["main"]["GENERATED_NEG_SET_SIZE"]
+    GENERATED_NEG_SET_KMER_LEN = config["main"]["GENERATED_NEG_SET_KMER_LEN"]
     MAX_SEQUENCES_TO_FIT_POS = config["main"]["MAX_SEQUENCES_TO_FIT_POS"]
     MAX_SEQUENCES_TO_FIT_NEG = config["main"]["MAX_SEQUENCES_TO_FIT_NEG"]
     RANDOM_SHUFFLE_SAMPLING_POS = config["main"]["RANDOM_SHUFFLE_SAMPLING_POS"]
