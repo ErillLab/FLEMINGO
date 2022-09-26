@@ -1,0 +1,4 @@
+gcc
+python310-devel
+pip>=22
+

@@ -4,13 +4,12 @@ Organism object
 It allocates the full data structure
 """
 
-
 import random
 import numpy as np
 from scipy.stats import ks_2samp
 import copy
 from .placement_object import PlacementObject
-
+import _multiplacement
 
 class OrganismObject:
     """Organism object
@@ -36,7 +35,10 @@ class OrganismObject:
         # Instantiate recognizer and connector vectors
         self.recognizers = []
         self.connectors = []
-	
+        self.recognizers_flat = []
+        self.connectors_scores_flat = []
+        self.recognizer_lengths = []
+
         # assign organism-specific parameters
 	
         # whether fitness is computed over sequences as sum or average
@@ -614,7 +616,8 @@ class OrganismObject:
         # changed, so we call the set_row_to_pssm to set their mapping on the
         # alignment matrix anew
         self.set_row_to_pssm()
-    
+        self.flatten()
+
     def adjust_gaps_after_pssm_bounds_displacement(self, pssm_index,
                                                    pssm_displacement_code):
         '''
@@ -684,207 +687,8 @@ class OrganismObject:
                 
                 # Update connector's PDF and CDF values
                 self.connectors[conn_index].set_precomputed_pdfs_cdfs()
-            
-    
-    
-    def get_placement(self, dna_sequence, traceback=False) -> dict:
-        """Places the organism elements (recognizers and connectors) on a sequence
-		   in an optimal way, maximizing the energy (i.e. cumulative scores) obtained.
-		   
-		   That is, it returns the best possible placement of the organism on the
-		   sequence, as a function of the cumulative organism energy.
-		   
-		   Inputs:
-		   - dna_sequence: DNA sequence to place on
-		   - print_out: bool to indicate whether to print or not the placement
-           - out_file: file handle to write placement to, if desired
-		
-		   The placement function implements a modified Needleman-Wünch algorithm.
-		   
-		   The algorithm uses a two-dimensional matrix, with the sequence on the X-axis
-		   and the PSSM columns on the Y-axis.
-		   - Substitution scores are computed as PSSM column scores.
-		   - First row is set to zeros
-		   - First column is set to -inf
-		   - Gaps are only allowed in terminal PSSM rows (last column of PSSM)
-		     - Gaps can only take place between end of PSSM (cell) and another cell in row
-		   - Gaps are scored according to the score from the connector between the two
-		     PSSMs, provided with the distance (and its internal mu and sigma)
-		   - Contiguous (diagonal) PSSM alignment invokes a zero gap using the appropriate
-		     connector
-		   - The alignment matrix is (M+1)x(N+1)
-		   - The traceback matrix (which stores info for traceback) is 2 x (M+1)x(N+1).
-		     - The extra dimension captures the two coordinates for the traceback to cell
-		   - Traceback through a gap enforces that a diagonal move must be taken next
-		     (this avoids double gaps in a row)
-		   - Traceback is initiated at the cell with the best value on the bottom row
-		"""
-    
-        # Initialize the two matrices (alignment + traceback matrices)
-        
-        # Number of rows
-        m = self.sum_pssm_lengths()
-        # Number of columns
-        n = len(dna_sequence)
-        
-        # Initialize matrix of scores (alignment matrix)
-		# Matrix is (M+1)x(N+1), with the extra "fake" row/columns
-		# Matrix is initialized to -inf, then first row set to zero
-        scores_matrix = np.full((m+1, n+1), -1 * np.inf)
-        scores_matrix[0,:] = 0
-        
-        # Initialize matrix of pointers (traceback matrix), to None
-		# Matrix is 2x(M+1)x(N+1), to store row/col of incoming cell
-        pointers_matrix = np.full((2, m+1, n+1), None)
-        
-        # Fill the matrices (top-to-bottom, then left-to-right)
-        for i in range(1, m + 1):
-			# Row fill up is done in two passes:
-			#  - First fill up with possible diagonal scores
-			#  & (for terminal recognizer rows only)
-			#  - Fill up with possible gap scores (horizontal moves)
-			
-            # Diagonal scores over row i
-            for j in range(1, n + 1):
-                # call PSSM column score function with the DNA sequence
-                diag_score = self.get_diag_score(pointers_matrix, i, j, dna_sequence)
-				# assign cumulative score to alignment matrix
-                scores_matrix[i,j] = scores_matrix[i-1, j-1] + diag_score
-                # Annotate "where we came from" in the pointers_matrix
-                pointers_matrix[0][i,j] = i - 1  # row idx of the origin
-                pointers_matrix[1][i,j] = j - 1  # column idx of the origin
-                
-            # Horizontal scores over row i
-            # (only in rows at the interface with the next PSSM)
-            if self.is_last(i) and i != m:
-                
-                # Scores and pointers from horizontal moves are temporarily stored in
-                # the following arrays. They will be written altogether at the end of
-                # the loop over j, to avoid reading them as starting scores for other
-                # horizontal moves at a later cycles in the for loop over j
-				
-				# That is, the matrix with diagonal scores is left untouched, and used
-				# as reference for any gap evaluations. The result of such gap evaluations
-				# is placed on a temporary matrix. The best gap scores are computed there.
-				# This is to avoid adding the gap-to-gap score (instead of
-				# the diagonal score) that has replaced a diagonal score, as we move
-				# further right (because otherwise you could "carry" multiple gap
-				# scores
-                tmp_gap_scores = scores_matrix[i,:].copy()  # vector of length n+1
-                tmp_gap_pointers = pointers_matrix[:,i,:].copy()  # 2 x (n+1) matrix
-                
-				# for each column of the matrix
-                for j in range(1, n + 1):
-                    # Compute all the possible values from all the possible
-                    # horizontal moves (gaps) that land on [i,j]
-                    for start in range(j):
-                        gap_size = j - start	# obtain distance for connector
-						# obtain PSSM index, which is also the connector index
-						# because this is the preceding PSSM
-                        pssm_idx = self.row_to_pssm[i][0]
-						# evaluate the score for connector given distance
-						# the DNA sequence length (n) is needed for the connector
-						# background model
-                        gap_score = self.get_gap_score(pssm_idx, gap_size, n)
-						# add cumulative score (using the score matrix, which has
-						# not been modified by horizontal scores)
-                        candidate_score = scores_matrix[i, start] + gap_score
-                        
-						# assess whether temp scores should be overwritten
-						# that is, whether this gap is better than other gaps
-                        if candidate_score >= tmp_gap_scores[j]:
-                            # Write horizontal score if better than existing
-                            tmp_gap_scores[j] = candidate_score
-                            # Annotate "where we came from" in the tmp_gap_pointers
-                            tmp_gap_pointers[0,j] = i  # row idx of the origin
-                            tmp_gap_pointers[1,j] = start  # column idx of the origin
-                
-                
-                # Update the original matrices
-				# tmp_gap_scores contains the updated matrix, with the diagnonal moves
-				# and any best horizontal moves replacing them if adequate
-                scores_matrix[i,:] = tmp_gap_scores
-                pointers_matrix[:,i,:] = tmp_gap_pointers
-            
-        # Get best binding energy (max value on bottom row)
-        last_row = scores_matrix[-1,:]
-        best = max(last_row)
-        
-        # BACKTRACKING
-        
-        # Initialize placement object
-        placement = PlacementObject(self._id, dna_sequence)
-        
-        # Set the total binding energy in the placement object
-        # Applying lower bound to energy if required
-        if self.energy_threshold_method == "organism":
-            E_threshold_value = self.energy_threshold_value
-            if best < E_threshold_value:
-                placement.set_energy(E_threshold_value)
-            else:
-                placement.set_energy(best)
-        
-        
-        if traceback:
-            # Position of best (where backtracking starts from)
-            best_i = m  # it always comes from the last row by definition
-            # if multiple positions in last row have best value, pick first
-            # to initiate traceback
-            best_j = int(np.where(last_row == best)[0][0])  # column of best value
-            
-            # Traverse back the matrix from the best element in the last row
-            # and store the alignment path
-    		# traverse_matrix is a recursive function that will generate the path
-    		# taken by the optimal alignment
-            alignment_path = []
-            alignment_path = self.traverse_matrix(pointers_matrix, best_i, best_j, alignment_path)
-            alignment_path.reverse()  # Top-down instead of bottom-up
-            
-            # Get scores and positions of all the nodes of the organism
-            node_scores, node_pos_ends, cols_of_0_gaps = self.get_node_positions_and_energies(
-                alignment_path, scores_matrix, pointers_matrix, dna_sequence
-            )
+        self.flatten()
 
-            # Split node-scores into recognizers-scores and connectors-scores
-            # Remove token node [first row is treated as a node, to provide
-            # a start position for the following recognizer, by tracking its
-            # end]
-            node_scores = node_scores[1:]  
-            recognizers_scores = []
-            connectors_scores = []
-            for i in range(len(node_scores)):
-                if i % 2 == 0:
-                    recognizers_scores.append(node_scores[i])
-                else:
-                    connectors_scores.append(node_scores[i])
-            
-            # Set the individual node energies in the placement object
-            placement.set_recognizer_scores(recognizers_scores)
-            placement.set_connectors_scores(connectors_scores)
-            
-            # Annotate where each node is placed (start and stop position on DNA)
-            # in the placement object
-            
-            for i in range(0, len(node_pos_ends)-1):  # even indexes
-                
-                # get sequence coordinates for the recognizer
-                start = node_pos_ends[i]
-                stop = node_pos_ends[i+1]
-                
-                # Detect a post 0-bp gap recognizer (special case)
-                if start in cols_of_0_gaps:
-                    start -= 1
-                
-                # Define position of the node on DNA as a tuple
-                node_position = (start, stop)
-                
-                if i % 2 == 0:
-                    placement.append_recognizer_position(node_position)
-                else:
-                    placement.append_connector_position(node_position)
-        
-        return placement
-    
     def get_additive_fitness(self, a_dna: list) -> dict:
         """
 
@@ -1148,125 +952,6 @@ class OrganismObject:
         else:
             return False
     
-    def traverse_matrix(self, pointers_mat, i, j,
-                        alignment_path=[], from_gap_flag=False) -> list:
-        """Recursive function used for traceback
-		   - i and j are the starting positions
-		   - alignment_path is the path that is filled up recursively
-		   - from_gap_flag identifies the case that we got to this position from a gap
-		     and we therefore MUST go diagonal (no gap concatenation is allowed)
-		"""
-        
-        # End of the recursion
-        if i == None:  # the top row has been reached
-            return alignment_path
-        
-		# add current cell coordinates to path
-        alignment_path.append([i,j])
-        
-		# avoid double gaps
-        if from_gap_flag == True:
-            # move diagonally
-            i_next = i - 1
-            j_next = j - 1
-	    # or move back through annotated pointer
-        else:
-            # move where the pointers-matrix says
-            i_next = pointers_mat[0, i, j]
-            j_next = pointers_mat[1, i, j]
-        
-		# if moving horizontally, indicate that with flag
-        if i_next == i:
-            return self.traverse_matrix(pointers_mat, i_next, j_next,
-                                        alignment_path, from_gap_flag=True)
-        else:
-            return self.traverse_matrix(pointers_mat, i_next, j_next,
-                                        alignment_path,from_gap_flag=False)
-
-    
-    def get_node_positions_and_energies(self, alignment_path, scores_matrix,
-                                        pointers_matrix, dna_seq) -> list:
-        """Takes the alignment path and the completed score and pointer matrices.
-           Returns a list that contains:
-           - node_scores: score of recognizer/connector node
-           - node_placements_right_ends: column of matrix where placement of node ends
-           - columns_of_0_bp_gaps: column with special contiguous recognizer case
-           
-           The alignment path is already reversed, so first element is top-left.
-           
-           Function goes through the alignment path and reports where each node
-           ends (column in alingment matrix)
-		"""
-        
-        # Use the path to get info about individual positions and score of all the
-        # nodes of the organism
-        
-        node_scores = []
-        previous_score = 0
-        node_placements_right_ends = []
-        previous_element = [None, None]
-        columns_of_0_bp_gaps = []
-        
-        # for each element of the alignment path
-        for element in alignment_path:
-            row, column = element
-            
-            # if we are on a row where gaps are allowed (PSSM ends or connector)
-            if self.is_last(row):
-                
-                # if we just landed on this row via a diagonal move, then 
-                # this is a PSSM end
-                if previous_element[0] == row - 1:
-                    # The PSSM score needs to be recomputed (it could have been
-                    # over-written by a gap-score)
-                    
-                    score = self.get_diag_score(pointers_matrix, row,
-                                                         column, dna_seq)
-                    cumulative_score = scores_matrix[row-1, column-1] + score
-                
-                # this was a gap, so no need to recompute score
-                else:
-                    cumulative_score = scores_matrix[row, column]
-                
-                # compute the node score, by substracting from cumulative
-                node_score = cumulative_score - previous_score
-                node_scores.append(node_score)
-                previous_score = cumulative_score
-                
-                # mark its last position on matrix (right end)
-                node_placements_right_ends.append(column)
-                
-            # if we are on the first position of a new pssm which is adjacent to
-            # the previous one (gap of 0 bp), the cumulative score we read also
-            # contains the score of the first position of the PSSM (not only the
-            # connector score)
-            if self.is_a_0_bp_gap(pointers_matrix, row, column):
-                
-                
-                nucleotide = dna_seq[column - 1] 
-                pssm_contribution = self.get_score_from_pssm(row, nucleotide)
-                
-                
-                cell_score = scores_matrix[row, column]
-                # Remove the pssm contribution, so that the cumulative score
-                # doesn't include the first position of the next PSSM, but only the
-                # contribution from the connector
-                cumulative_score = cell_score - pssm_contribution
-                node_score = cumulative_score - previous_score
-                node_scores.append(node_score)
-                previous_score = cumulative_score
-                
-                node_placements_right_ends.append(column)
-                
-                columns_of_0_bp_gaps.append(column)
-            
-            
-            previous_element = [row, column]
-            
-        
-        return [node_scores, node_placements_right_ends, columns_of_0_bp_gaps]
-    
-    
     def get_random_connector(self) -> int:
         """Returns the index of a random connector of the organism
 
@@ -1361,7 +1046,7 @@ class OrganismObject:
         ofile = open(filename, "a+")
         # for each DNA sequence
         for s_dna in a_dna:
-            placement = self.get_placement(s_dna.lower(), traceback=True)
+            placement = self.get_placement(s_dna)
             placement.print_placement(outfile = ofile)
         ofile.close()
 
@@ -1377,6 +1062,87 @@ class OrganismObject:
         """
 
         s_dna = s_dna.lower()
-        placement = self.get_placement(s_dna.lower(), traceback=True)
+        placement = self.get_placement(s_dna)
         placement.print_placement(stdout = True)
 
+    def get_placement(self, sequence: str) -> PlacementObject:
+
+        """
+        Calculates a placement for a given organism for a given sequence using
+        the _calculatePlacement module.
+
+        Args:
+            sequence: DNA sequence to place organism on
+
+        Returns:
+            PlacementObject containing information of optimal placement
+        """
+        number_PSSM = len(self.recognizers)
+
+        # Get an array of lengths of each recognizer in the organism
+
+        # instantiation of numpy arrays that will hold placement info
+        # gathered by the _calculatePlacement module
+        gaps = np.empty(number_PSSM, dtype = np.dtype('i'))
+        gap_scores = np.empty(number_PSSM - 1, dtype = np.dtype('f'))
+        PSSM_scores = np.empty(number_PSSM + 1, dtype = np.dtype('f'))
+
+        _multiplacement.calculate(sequence, self.recognizers_flat, self.recognizer_lengths, self.connectors_scores_flat, gap_scores, PSSM_scores, gaps)
+
+        # parse data from the _calculatePlacement module and put it
+        # into a PlacementObject to be returned
+        placement = PlacementObject(self._id, sequence)
+        placement.set_energy(float(PSSM_scores[-1]))
+        placement.set_recognizer_scores([float(score) for score in PSSM_scores[:-1]])
+        placement.set_connectors_scores([float(score) for score in gap_scores])
+
+        current_position = gaps[0]
+
+        for i in range(number_PSSM):
+
+            stop = current_position + self.recognizer_lengths[i]
+            placement.append_recognizer_position([int(current_position), int(stop)])
+            current_position += self.recognizer_lengths[i]
+
+            if i < number_PSSM - 1:
+                stop = current_position + gaps[i + 1]
+                placement.append_connector_position([int(current_position), int(stop)])
+                current_position += gaps[i + 1]
+        
+        return placement
+
+    def flatten(self):
+        """
+        Flattens an organisms recognizers into a 1D array
+        computes gap scores and forms a 1D array out of them.
+        This function is to be called whenever an organism is made
+        or changed.
+        
+        Args:
+            None
+        
+        Returns:
+            None
+        """
+        
+        # instantiation of lists to hold flattened info
+        flat_recognizers = []
+        flat_connector_scores = []
+        recognizer_lengths = []
+        
+        for recognizer in self.recognizers:
+            for column in recognizer.pssm:
+                for base in ['a','g','c','t']:
+                    flat_recognizers.append(column[base])
+            recognizer_lengths.append(recognizer.length)
+
+        # organism holds a numpy array of the flattened lists
+        self.recognizers_flat = np.array(flat_recognizers, dtype = np.dtype('f')) 
+        self.recognizer_lengths = np.array(recognizer_lengths, dtype = np.dtype('i'))
+
+        for connector in self.connectors:
+            for i in range(connector.expected_seq_length):
+                flat_connector_scores.append(connector.get_score(i, connector.expected_seq_length, self.recognizer_lengths))
+        
+        # organism holds a numpy array of the flattened lists
+        self.connectors_scores_flat = np.array(flat_connector_scores, dtype = np.dtype('f'))

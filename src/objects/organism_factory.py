@@ -119,7 +119,7 @@ class OrganismFactory:
         new_organism.recognizers.append(new_recognizer)
         # Set attribute that will map organism nodes to alignment matrix rows
         new_organism.set_row_to_pssm()
-
+        new_organism.flatten()
         return new_organism
     
     def create_connector(self) -> ConnectorObject:
@@ -238,7 +238,8 @@ class OrganismFactory:
         # Check if the frequency values in the PWMs of the imported organisms
         # are consistent with  PWM_NUM_OF_BINDING_SITES  set in the config file
         self.check_pwm_frequencies_of_imported_organisms(organism_list)
-        
+        for organism in organism_list:
+            organism.flatten()
         return organism_list
     
     
@@ -418,7 +419,8 @@ class OrganismFactory:
         self.compile_recognizers(child2, par1, par2)
         self.compile_connectors(child2, par1, par2, parents_repres,
                                 par1_placements, par2_placements)
-        
+        child1.flatten()
+        child2.flatten()
         return child1, child2
     
     def store_parents_placemnts(self, parent1, parent2, dna_seq_set):
@@ -430,8 +432,8 @@ class OrganismFactory:
         p2_placements = []
         
         for dna_seq in dna_seq_set:
-            p1_placements.append(parent1.get_placement(dna_seq, traceback=True))
-            p2_placements.append(parent2.get_placement(dna_seq, traceback=True))
+            p1_placements.append(parent1.get_placement(dna_seq))
+            p2_placements.append(parent2.get_placement(dna_seq))
         
         return p1_placements, p2_placements
     
@@ -578,7 +580,7 @@ class OrganismFactory:
         pos_to_recog_dict : dictionary
 
         '''
-        org_placement = org.get_placement(dna_seq, traceback=True)        
+        org_placement = org.get_placement(dna_seq)        
         recog_positions = org_placement.recognizers_positions
         
         pos_to_recog_dict = {}

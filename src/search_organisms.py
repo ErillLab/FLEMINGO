@@ -527,7 +527,7 @@ def main():
             
             # Print against a random positive sequence
             pos_seq_index = random.randint(0, len(positive_dataset)-1)
-            placement = max_organism[0].get_placement(positive_dataset[pos_seq_index], traceback=True)
+            placement = max_organism[0].get_placement(positive_dataset[pos_seq_index])
             placement.print_placement(stdout = True)
             
             
