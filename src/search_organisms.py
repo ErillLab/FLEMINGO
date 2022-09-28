@@ -827,6 +827,16 @@ def check_mpi_settings():
                          "or increase the POPULATION_LENGTH.")
 
 
+def check_dir(dir_path):
+    ''' If the directory at the specified path doesn't exists, it's created.
+    Any missing parent directory is also created. If the directory already
+    exists, it is left un modified. This function works even when executed in
+    parallel my several processes (makedir would crash if they try to make the
+    directory at about the same time).
+    '''
+    os.makedirs(dir_path, exist_ok=True)
+
+
 def set_up():
     """Reads configuration file and sets up all program variables
 
@@ -926,9 +936,9 @@ def set_up():
     
     # Create directory where the output and results will be stored
     if i_am_main_process():  # XXX
-        os.mkdir(RESULT_BASE_PATH_DIR)
-        os.mkdir(RESULT_BASE_PATH_DIR + "population")
-        os.mkdir(RESULT_BASE_PATH_DIR + "plots")
+        check_dir(RESULT_BASE_PATH_DIR)
+        check_dir(RESULT_BASE_PATH_DIR + "population")
+        check_dir(RESULT_BASE_PATH_DIR + "plots")
 
     # Store Config into variables to use later
     configOrganism = config["organism"]
