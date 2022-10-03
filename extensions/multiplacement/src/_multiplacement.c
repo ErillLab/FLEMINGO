@@ -340,26 +340,29 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
           float_array_converter, &gapMatrix, float_array_converter, &gapScores,
           float_array_converter, &scores, int_array_converter, &gaps))
     return NULL;
+
   numPSSM = columns.shape[0];
   float *PSSMs_ptr = matrix.buf;
   float *gaps_matrix_ptr = gapMatrix.buf;
   float *gap_scores_ptr = gapScores.buf;
   float *scores_ptr = scores.buf;
-  int *column_ptr = calloc(numPSSM, sizeof(int)); 
-  int *gaps_ptr = calloc(numPSSM, sizeof(int));
+  int *column_ptr = NULL;
+  int *gaps_ptr = NULL; 
 
-
+  //if passes as a long (mpi on windows does it for some reason)
+  //make an int array anf copy information in and typcast each entry
   if (columns.itemsize == sizeof(long)){
+    column_ptr = calloc(numPSSM, sizeof(int)); 
     long *tempColumns = columns.buf;
     for (int i = 0; i < numPSSM; i++){
       column_ptr[i] = (int)tempColumns[i];
     }
   }else{
     column_ptr = columns.buf;
-
   }
 
   if(gaps.itemsize == sizeof(long)){
+      gaps_ptr = calloc(numPSSM, sizeof(int));
       long *tempGaps = gaps.buf;
       for (int i = 0; i < numPSSM - 1; i++){
         gaps_ptr[i] = (int)tempGaps[i];
@@ -386,7 +389,25 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
 
     calculatePlacements(scoreMatrix, gaps_matrix_ptr, column_ptr, numPSSM,
                         lenSequence, gap_scores_ptr, scores_ptr, gaps_ptr);
+
   }
+
+  //if the earilier long -> int conversion was necessary
+  //we need to copy info back over to gaps so it can be read by python
+  //and free gaps and columns
+  if (gaps.itemsize == sizeof(long)) {
+    long *tempGaps = gaps.buf; 
+    for (int i = 0; i < numPSSM - 1; i++){
+      tempGaps[i] = (long)gaps_ptr[i]; 
+    }
+    free(gaps_ptr);
+  }
+
+  if (columns.itemsize == sizeof(long)){
+    free(column_ptr);
+  }
+
+
 
   float_array_converter(NULL, &matrix);
   int_array_converter(NULL, &columns);
