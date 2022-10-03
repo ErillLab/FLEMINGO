@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 const int NUM_BASES = 4;
 
 int getForwardOffset(int index, int cols[], int numPSSM) {
@@ -74,7 +75,6 @@ void calculatePlacements(float *scoreMatrix, float *gapMatrix, int *cols,
 // row is our starting cumulative score), for each index, we compare the scores
 // obtained by summing the PSSM score at that index with each previous
 // cumulative alignment score for k <= j, when k == j, the gap length is 0
-#ifdef INFINITY
   for (int i = 1; i < numPSSM; i++) {
     // printf("Calculating alignments for PSSM %i\n", i);
 
@@ -108,11 +108,10 @@ void calculatePlacements(float *scoreMatrix, float *gapMatrix, int *cols,
     for (int l = 0; l < numAlignments; l++) {
       alignments[l] = tempMax[l];
       gapAlignments[(i - 1) * numAlignments + l] = tempGaps[l];
-      tempMax[l] = -1.0 / 0.0;
+      tempMax[l] = -INFINITY;
       tempGaps[l] = 0;
     }
   }
-#endif
 
   // finding gap lengths to ref orma alignments
   // starting from the index of the greatest score in alignments
@@ -281,9 +280,9 @@ static int int_array_converter(PyObject *object, void *address) {
     break;
   }
 
-  if (datatype != 'i' && datatype != 'f') {
+  if (datatype != 'i' && datatype != 'l') {
     PyErr_Format(PyExc_RuntimeError,
-                 "columns array has incorrect data format ('%c', expected 'i')",
+                 "columns array has incorrect data format ('%c', expected 'i' or 'l')",
                  datatype);
     goto exit;
   }
@@ -341,15 +340,34 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
           float_array_converter, &gapMatrix, float_array_converter, &gapScores,
           float_array_converter, &scores, int_array_converter, &gaps))
     return NULL;
-
   numPSSM = columns.shape[0];
   float *PSSMs_ptr = matrix.buf;
   float *gaps_matrix_ptr = gapMatrix.buf;
   float *gap_scores_ptr = gapScores.buf;
   float *scores_ptr = scores.buf;
-  int *column_ptr = columns.buf;
-  int *gaps_ptr = gaps.buf;
+  int *column_ptr = calloc(numPSSM, sizeof(int)); 
+  int *gaps_ptr = calloc(numPSSM, sizeof(int));
 
+
+  if (columns.itemsize == sizeof(long)){
+    long *tempColumns = columns.buf;
+    for (int i = 0; i < numPSSM; i++){
+      column_ptr[i] = (int)tempColumns[i];
+    }
+  }else{
+    column_ptr = columns.buf;
+
+  }
+
+  if(gaps.itemsize == sizeof(long)){
+      long *tempGaps = gaps.buf;
+      for (int i = 0; i < numPSSM - 1; i++){
+        gaps_ptr[i] = (int)tempGaps[i];
+      }
+  }else{
+    gaps_ptr = gaps.buf;
+  }
+ 
   // just do .buf in the function calls
   float *scoreMatrix =
       calculateScores(sequence, lenSequence, PSSMs_ptr, column_ptr, numPSSM);
