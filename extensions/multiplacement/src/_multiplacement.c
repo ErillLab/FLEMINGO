@@ -7,7 +7,7 @@
 #include <math.h>
 const int NUM_BASES = 4;
 
-int getForwardOffset(int index, int cols[], int numPSSM) {
+int get_forward_offset(int index, int cols[], int num_rec) {
   // finds the first possible possition for a pssm
   // based on number of columns of preceding pssms
 
@@ -18,12 +18,12 @@ int getForwardOffset(int index, int cols[], int numPSSM) {
   return offset;
 }
 
-int getReverseOffset(int index, int cols[], int numPSSM) {
+int get_reverse_offset(int index, int cols[], int num_rec) {
   // finds the last possible possition for a pssm
   // based on number of columns of subsequenct pssms
 
   int offset = 0;
-  for (int i = numPSSM - 1; i >= index; i--) {
+  for (int i = num_rec - 1; i >= index; i--) {
     offset += cols[i];
   }
 
@@ -31,42 +31,43 @@ int getReverseOffset(int index, int cols[], int numPSSM) {
   return offset - 1;
 }
 
-int maxIndex(float *arr, int size) {
-  int maxIndex = 0;
+int max_index(float *arr, int size) {
+  int max_index = 0;
   for (int i = 0; i < size; i++) {
 
-    if (arr[i] > arr[maxIndex]) {
-      maxIndex = i;
+    if (arr[i] > arr[max_index]) {
+      max_index = i;
     }
   }
-  return maxIndex;
+  return max_index;
 }
 
-void calculatePlacements(float *scoreMatrix, float *gapMatrix, int *cols,
-                         int numPSSM, int lenSequence, float *gapScores,
+void traceback(float *score_matrix, float *gapMatrix, int *cols,
+                         int num_rec, int len_seq, float *gapScores,
                          float *scores, int *gaps) {
-  int numAlignments = 0;
+  int num_alignments = 0;
   int gapLength = 0;
-  int forwardOffset = getForwardOffset(0, cols, numPSSM);
-  int reverseOffset = getReverseOffset(0, cols, numPSSM);
-  numAlignments = lenSequence - forwardOffset - reverseOffset;
+  int forward_offset = get_forward_offset(0, cols, num_rec);
+  int reverse_offset = get_reverse_offset(0, cols, num_rec);
+  num_alignments = len_seq - forward_offset - reverse_offset;
 
+  //printf("last in traceback\n");
   // number of total alignments by number of pssms
   // first index in each column holds current max score for that index
   // all other indices hold gap lengths that got that alignment
-  float *alignments = calloc(numAlignments, sizeof(*scoreMatrix));
-  int *gapAlignments = calloc(numAlignments * (numPSSM - 1), sizeof(*gaps));
-  float *tempMax = calloc(numAlignments, sizeof(*scoreMatrix));
-  int *tempGaps = calloc(numAlignments, sizeof(*gaps));
+  float *alignments = PyMem_Calloc(num_alignments, sizeof(*score_matrix));
+  int *gapAlignments = PyMem_Calloc(num_alignments * (num_rec - 1), sizeof(*gaps));
+  float *tempMax =  PyMem_Calloc(num_alignments, sizeof(*score_matrix));
+  int *tempGaps = PyMem_Calloc(num_alignments, sizeof(*gaps));
 
   // start with first row as our current max
-  for (int i = 0; i < numAlignments; i++) {
-    alignments[i] = scoreMatrix[i];
-    tempMax[i] = scoreMatrix[i];
+  for (int i = 0; i < num_alignments; i++) {
+    alignments[i] = score_matrix[i];
+    tempMax[i] = score_matrix[i];
   }
 
-// time complexity should be (numConnectors * numAlignments * sum(0 1 2 ...
-// numAlignments))
+// time complexity should be (numConnectors * num_alignments * sum(0 1 2 ...
+// num_alignments))
 
 // for each connector (number of pssms - 1) populate alignments with
 // current maximum score for that index
@@ -75,10 +76,10 @@ void calculatePlacements(float *scoreMatrix, float *gapMatrix, int *cols,
 // row is our starting cumulative score), for each index, we compare the scores
 // obtained by summing the PSSM score at that index with each previous
 // cumulative alignment score for k <= j, when k == j, the gap length is 0
-  for (int i = 1; i < numPSSM; i++) {
+  for (int i = 1; i < num_rec; i++) {
     // printf("Calculating alignments for PSSM %i\n", i);
 
-    for (int j = 0; j < numAlignments; j++) {
+    for (int j = 0; j < num_alignments; j++) {
 
       for (int k = 0; k <= j; k++) {
 
@@ -89,25 +90,25 @@ void calculatePlacements(float *scoreMatrix, float *gapMatrix, int *cols,
 
         if (k == 0) {
           tempMax[j] = alignments[k] +
-                       gapMatrix[(i - 1) * lenSequence + gapLength] +
-                       scoreMatrix[i * numAlignments + j];
+                       gapMatrix[(i - 1) * len_seq + gapLength] +
+                       score_matrix[i * num_alignments + j];
           tempGaps[j] = gapLength;
         } else {
           if (tempMax[j] < alignments[k] +
-                               gapMatrix[(i - 1) * lenSequence + gapLength] +
-                               scoreMatrix[i * numAlignments + j]) {
+                               gapMatrix[(i - 1) * len_seq + gapLength] +
+                               score_matrix[i * num_alignments + j]) {
             tempMax[j] = alignments[k] +
-                         gapMatrix[(i - 1) * lenSequence + gapLength] +
-                         scoreMatrix[i * numAlignments + j];
+                         gapMatrix[(i - 1) * len_seq + gapLength] +
+                         score_matrix[i * num_alignments + j];
             tempGaps[j] = gapLength;
           }
         }
       }
     }
 
-    for (int l = 0; l < numAlignments; l++) {
+    for (int l = 0; l < num_alignments; l++) {
       alignments[l] = tempMax[l];
-      gapAlignments[(i - 1) * numAlignments + l] = tempGaps[l];
+      gapAlignments[(i - 1) * num_alignments + l] = tempGaps[l];
       tempMax[l] = -INFINITY;
       tempGaps[l] = 0;
     }
@@ -118,63 +119,61 @@ void calculatePlacements(float *scoreMatrix, float *gapMatrix, int *cols,
   // trace back of gap alignments is conducted by subtracting the value
   // at the max score index from the index and going up a row
   // this is repeated until we know all the gap lengths in the alignment
-  int index = maxIndex(alignments, numAlignments);
-  gaps[numPSSM - 1] = gapAlignments[(numPSSM - 2) * numAlignments + index];
+  int index = max_index(alignments, num_alignments);
+  gaps[num_rec - 1] = gapAlignments[(num_rec - 2) * num_alignments + index];
 
   // the cumulative best score is written into the last index of the scores
   // array
-  scores[numPSSM] = alignments[index];
+  scores[num_rec] = alignments[index];
 
-  for (int i = numPSSM - 3; i >= 0; i--) {
-    gaps[i + 1] = gapAlignments[i * numAlignments + index - gaps[i + 2]];
+  for (int i = num_rec - 3; i >= 0; i--) {
+    gaps[i + 1] = gapAlignments[i * num_alignments + index - gaps[i + 2]];
     index -= gaps[i + 2];
   }
   gaps[0] = index - gaps[1];
 
   int gapOffset = 0;
-  for (int i = 0; i < numPSSM - 1; i++) {
-    gapScores[i] = gapMatrix[i * lenSequence + gaps[i + 1]];
+  for (int i = 0; i < num_rec - 1; i++) {
+    gapScores[i] = gapMatrix[i * len_seq + gaps[i + 1]];
   }
 
   // scores for each PSSM are filled by iterating over the score matrix
   // and using the appropriate gap lengths as a cumulative offset
-  for (int i = 0; i < numPSSM; i++) {
+  for (int i = 0; i < num_rec; i++) {
     gapOffset += gaps[i];
-    scores[i] = scoreMatrix[i * numAlignments + gapOffset];
+    scores[i] = score_matrix[i * num_alignments + gapOffset];
   }
-
-  free(alignments);
-  free(gapAlignments);
-  free(tempMax);
-  free(tempGaps);
-  free(scoreMatrix);
+  PyMem_Free(alignments);
+  PyMem_Free(gapAlignments);
+  PyMem_Free(tempMax);
+  PyMem_Free(tempGaps);
 }
 
-float *calculateScores(const char seq[], int lenSequence, float pssm[],
-                       int cols[], int numPSSM) {
-  // length of the sequence by number of pssms
+void fill_matrix(const char seq[], int len_seq, float pssm[],
+                       int cols[], int num_rec, float score_matrix[]) {
+  // length of the seq by number of pssms
 
+  //printf("last in fill_matrix\n");
   float score = 0;
-  int forwardOffset = 0;
-  int reverseOffset = 0;
-  forwardOffset = getForwardOffset(0, cols, numPSSM);
-  reverseOffset = getReverseOffset(0, cols, numPSSM);
-  int numAlignments = lenSequence - forwardOffset - reverseOffset;
-  float *PSSMScores = calloc(numAlignments * numPSSM, sizeof(*pssm));
+  int forward_offset = 0;
+  int reverse_offset = 0;
+  forward_offset = get_forward_offset(0, cols, num_rec);
+  reverse_offset = get_reverse_offset(0, cols, num_rec);
+  int num_alignments = len_seq - forward_offset - reverse_offset;
 
   // pre computes alignments of each pssm at each possible position
   // i = current pssm
-  // j = starting position on sequence for computing score
+  // j = starting position on seq for computing score
   // k = current column in pssm
-  // time complexity should be (numPSSMs * numAignments * avgLengthPSSMs)
+  // time complexity should be (num_recs * numAignments * avgLengthPSSMs)
 
-  for (int i = 0; i < numPSSM; i++) {
+  for (int i = 0; i < num_rec; i++) {
     // printf("Calculating scores for PSSM %i\n", i);
     // these functions are unnessesary, change to using += and -= cols[i]
-    forwardOffset = getForwardOffset(i, cols, numPSSM);
-    reverseOffset = getReverseOffset(i, cols, numPSSM);
+    forward_offset = get_forward_offset(i, cols, num_rec);
+    reverse_offset = get_reverse_offset(i, cols, num_rec);
 
-    for (int j = forwardOffset; j < lenSequence - reverseOffset; j++) {
+    for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
       score = 0;
       // printf("\nstarting positon %i\n", j);
       for (int k = 0; k < cols[i]; k++) {
@@ -182,240 +181,169 @@ float *calculateScores(const char seq[], int lenSequence, float pssm[],
         case 'A':
         case 'a':
           // printf("   Score for pssm %i column %i with %c: %0.2f\n", i, k,
-          // seq[j + k], pssm[(forwardOffset + k) * 4 + 0]);
-          score += pssm[(forwardOffset + k) * 4 + 0];
+          // seq[j + k], pssm[(forward_offset + k) * 4 + 0]);
+          score += pssm[(forward_offset + k) * 4 + 0];
           break;
         case 'G':
         case 'g':
           // printf("   Score for pssm %i column %i with %c: %0.2f\n", i, k,
-          // seq[j + k], pssm[(forwardOffset + k) * 4 + 1]);
-          score += pssm[(forwardOffset + k) * 4 + 1];
+          // seq[j + k], pssm[(forward_offset + k) * 4 + 1]);
+          score += pssm[(forward_offset + k) * 4 + 1];
           break;
         case 'C':
         case 'c':
           // printf("   Score for pssm %i column %i with %c: %0.2f\n", i, k,
-          // seq[j + k], pssm[(forwardOffset + k) * 4 + 2]);
-          score += pssm[(forwardOffset + k) * 4 + 2];
+          // seq[j + k], pssm[(forward_offset + k) * 4 + 2]);
+          score += pssm[(forward_offset + k) * 4 + 2];
           break;
         case 'T':
         case 't':
           // printf("   Score for pssm %i column %i with %c: %0.2f\n", i, k,
-          // seq[j + k], pssm[(forwardOffset + k) * 4 + 3]);
-          score += pssm[(forwardOffset + k) * 4 + 3];
+          // seq[j + k], pssm[(forward_offset + k) * 4 + 3]);
+          score += pssm[(forward_offset + k) * 4 + 3];
           break;
         }
       }
-      PSSMScores[(i * numAlignments) + j - forwardOffset] = score;
+      score_matrix[(i * num_alignments) + j - forward_offset] = score;
     }
   }
 
-  return PSSMScores;
 }
 
-static int float_array_converter(PyObject *object, void *address) {
-  const int flags = PyBUF_C_CONTIGUOUS | PyBUF_FORMAT;
-  char datatype;
-  Py_buffer *view = address;
+static int
+matrix_converter(PyObject* object, void* address)
+{
+    const int flags = PyBUF_C_CONTIGUOUS | PyBUF_FORMAT;
+    char datatype;
+    Py_buffer* view = address;
 
-  if (object == NULL)
-    goto exit;
-  if (PyObject_GetBuffer(object, view, flags) == -1) {
-    PyErr_SetString(PyExc_RuntimeError, "PSSMs is not an array");
-    return 0;
-  }
-
-  datatype = view->format[0];
-  switch (datatype) {
-  case '@':
-  case '=':
-  case '<':
-  case '>':
-  case '!':
-    datatype = view->format[1];
-    break;
-  default:
-    break;
-  }
-
-  if (datatype != 'f') {
-    PyErr_Format(
-        PyExc_RuntimeError,
-        "PSSMs matrix data format incorrect data format ('%c', expected 'f')",
-        datatype);
-    goto exit;
-  }
-
-  if (view->ndim != 1) {
-    PyErr_Format(PyExc_RuntimeError,
-                 "PSSMs matrix has incorrect rank (%d expected 1)", view->ndim);
-    goto exit;
-  }
-
-  return Py_CLEANUP_SUPPORTED;
+    if (object == NULL) goto exit;
+    if (PyObject_GetBuffer(object, view, flags) == -1) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "position-weight matrix is not an array");
+        return 0;
+    }
+    datatype = view->format[0];
+    switch (datatype) {
+        case '@':
+        case '=':
+        case '<':
+        case '>':
+        case '!': datatype = view->format[1]; break;
+        default: break;
+    }
+    return Py_CLEANUP_SUPPORTED;
 
 exit:
-  PyBuffer_Release(view);
-  return 0;
+    PyBuffer_Release(view);
+    return 0;
 }
 
-static int int_array_converter(PyObject *object, void *address) {
-  const int flags = PyBUF_C_CONTIGUOUS | PyBUF_FORMAT;
-  char datatype;
-  Py_buffer *view = address;
+static int
+scores_converter(PyObject* object, void* address)
+{
+    const int flags = PyBUF_C_CONTIGUOUS | PyBUF_FORMAT;
+    char datatype;
+    Py_buffer* view = address;
 
-  if (object == NULL)
-    goto exit;
-  if (PyObject_GetBuffer(object, view, flags) == -1)
-    return 0;
-  datatype = view->format[0];
-  switch (datatype) {
-  case '@':
-  case '=':
-  case '<':
-  case '>':
-  case '!':
-    datatype = view->format[1];
-    break;
-  default:
-    break;
-  }
-
-  if (datatype != 'i' && datatype != 'l') {
-    PyErr_Format(PyExc_RuntimeError,
-                 "columns array has incorrect data format ('%c', expected 'i' or 'l')",
-                 datatype);
-    goto exit;
-  }
-
-  if (view->ndim != 1) {
-    PyErr_Format(PyExc_ValueError,
-                 "columns array has incorrect rank (%d expected 1)",
-                 view->ndim);
-    goto exit;
-  }
-  return Py_CLEANUP_SUPPORTED;
+    if (object == NULL) goto exit;
+    if (PyObject_GetBuffer(object, view, flags) == -1) return 0;
+    datatype = view->format[0];
+    switch (datatype) {
+        case '@':
+        case '=':
+        case '<':
+        case '>':
+        case '!': datatype = view->format[1]; break;
+        default: break;
+    }
+    return Py_CLEANUP_SUPPORTED;
 
 exit:
-  PyBuffer_Release(view);
-  return 0;
+    PyBuffer_Release(view);
+    return 0;
 }
 
 static char calculate__doc__[] =
-    "    _multiplacement(sequence, PSSMs[], columns[], gap_score_array, "
-    "gap_scores, PSSM_scores, gap_lengths)\n"
-    "\n"
-    "This function calculates the optimal placement for a complex multi PSSM "
-    "model\n"
-    "along a given sequence and writes information to gap_scores, PSSM_scores "
-    "and gap_lengths\n";
+"    calculate(sequence, pwm, scores)\n"
+"\n"
+"This function calculates the position-weight matrix scores for all\n"
+"positions along the sequence for position-weight matrix pwm, and stores\n"
+"them in the provided numpy array scores.\n";
 
-static PyObject *py_calculate(PyObject *self, PyObject *args,
-                              PyObject *keywords) {
-  const char *sequence;
-  static char *kwlist[] = {"sequence",  "PSSMs",  "columns", "gapMatrix",
-                           "gapScores", "scores", "gaps",    NULL};
-  Py_ssize_t numPSSM;
-  Py_ssize_t lenSequence;
-  PyObject *result = Py_None;
+static PyObject*
+py_calculate(PyObject* self, PyObject* args, PyObject* keywords)
+{
+    const char* seq;
+    static char* kwlist[] = {"sequence", "rec_matrices", "rec_lengths", 
+                             "con_matrices", "rec_scores", "con_scores",
+                             "con_lengths", NULL};
+    //printf("back in c\n");
+    Py_ssize_t len_seq;
+    Py_ssize_t num_rec;
+    PyObject* result = Py_None;
+    Py_buffer rec_matrices;
+    Py_buffer con_matrices;
+    Py_buffer rec_lengths;
+    Py_buffer rec_scores;
+    Py_buffer con_scores;
+    Py_buffer con_lengths;
 
-  Py_buffer matrix;
-  Py_buffer columns;
-  Py_buffer gapMatrix;
-  Py_buffer gapScores;
-  Py_buffer scores;
-  Py_buffer gaps;
+    //double* test = malloc(100000000000000000000000 * sizeof(double));
+    //free(test);
 
-  // I don't know why this is done, but it was in _pwm.c so I'll
-  // stick to what they did
-  matrix.obj = NULL;
-  columns.obj = NULL;
-  gapMatrix.obj = NULL;
-  gapScores.obj = NULL;
-  scores.obj = NULL;
-  gaps.obj = NULL;
-
-  if (!PyArg_ParseTupleAndKeywords(
-          args, keywords, "s#O&O&O&O&O&O&", kwlist, &sequence, &lenSequence,
-          float_array_converter, &matrix, int_array_converter, &columns,
-          float_array_converter, &gapMatrix, float_array_converter, &gapScores,
-          float_array_converter, &scores, int_array_converter, &gaps))
-    return NULL;
-
-  numPSSM = columns.shape[0];
-  float *PSSMs_ptr = matrix.buf;
-  float *gaps_matrix_ptr = gapMatrix.buf;
-  float *gap_scores_ptr = gapScores.buf;
-  float *scores_ptr = scores.buf;
-  int *column_ptr = NULL;
-  int *gaps_ptr = NULL; 
-
+    rec_matrices.obj = NULL;
+    con_matrices.obj = NULL;
+    rec_lengths.obj = NULL;
+    rec_scores.obj = NULL;
+    con_scores.obj = NULL;
+    con_lengths.obj = NULL;
+    //printf("now parsing\n");
+    if (!PyArg_ParseTupleAndKeywords(args, keywords, "y#O&O&O&O&O&O&", kwlist,
+                                     &seq, &len_seq,
+                                     matrix_converter, &rec_matrices,
+                                     matrix_converter, &rec_lengths,
+                                     matrix_converter, &con_matrices,
+                                     matrix_converter, &rec_scores,
+                                     matrix_converter, &con_scores,
+                                     matrix_converter, &con_lengths)) return NULL;
+  //printf("Parsed successfully\n");
+  num_rec = rec_lengths.shape[0];
+  float *rec_matrices_ptr = rec_matrices.buf;
+  float *con_matrices_ptr = con_matrices.buf;
+  float *con_scores_ptr = con_scores.buf;
+  float *rec_scores_ptr = rec_scores.buf;
+  int *rec_lengths_ptr = rec_lengths.buf;
+  int *con_lengths_ptr = con_lengths.buf; 
   //if passes as a long (mpi on windows does it for some reason)
   //make an int array anf copy information in and typcast each entry
-  if (columns.itemsize == sizeof(long)){
-    column_ptr = calloc(numPSSM, sizeof(int)); 
-    long *tempColumns = columns.buf;
-    for (int i = 0; i < numPSSM; i++){
-      column_ptr[i] = (int)tempColumns[i];
-    }
-  }else{
-    column_ptr = columns.buf;
-  }
-
-  if(gaps.itemsize == sizeof(long)){
-      gaps_ptr = calloc(numPSSM, sizeof(int));
-      long *tempGaps = gaps.buf;
-      for (int i = 0; i < numPSSM - 1; i++){
-        gaps_ptr[i] = (int)tempGaps[i];
-      }
-  }else{
-    gaps_ptr = gaps.buf;
-  }
+  //just do .buf in the function calls
  
-  // just do .buf in the function calls
-  float *scoreMatrix =
-      calculateScores(sequence, lenSequence, PSSMs_ptr, column_ptr, numPSSM);
+  int forward_offset = get_forward_offset(0, rec_lengths_ptr, num_rec);
+  int reverse_offset = get_reverse_offset(0, rec_lengths_ptr, num_rec);
+  int num_alignments = len_seq - forward_offset - reverse_offset;
+  float *score_matrix = PyMem_Calloc(num_alignments * num_rec, sizeof(*rec_matrices_ptr));
+  fill_matrix(seq, len_seq, rec_matrices_ptr, rec_lengths_ptr, num_rec, score_matrix);
 
-  if (numPSSM == 1) {
-
-    int forwardOffset = getForwardOffset(0, column_ptr, numPSSM);
-    int reverseOffset = getReverseOffset(0, column_ptr, numPSSM);
-    gaps_ptr[0] =
-        maxIndex(scoreMatrix, lenSequence - forwardOffset - reverseOffset);
-    scores_ptr[0] = scoreMatrix[gaps_ptr[0]];
-    gap_scores_ptr[0] = 0.00;
-    free(scoreMatrix);
-
+  if (num_rec == 1) { 
+    con_lengths_ptr[0] = max_index(score_matrix, len_seq - forward_offset - reverse_offset);
+    rec_scores_ptr[0] = score_matrix[con_lengths_ptr[0]];
+    con_scores_ptr[0] = 0.00;
   } else {
-
-    calculatePlacements(scoreMatrix, gaps_matrix_ptr, column_ptr, numPSSM,
-                        lenSequence, gap_scores_ptr, scores_ptr, gaps_ptr);
-
+    traceback(score_matrix, con_matrices_ptr, rec_lengths_ptr, num_rec, len_seq, con_scores_ptr, rec_scores_ptr, con_lengths_ptr); 
   }
-
-  //if the earilier long -> int conversion was necessary
-  //we need to copy info back over to gaps so it can be read by python
-  //and free gaps and columns
-  if (gaps.itemsize == sizeof(long)) {
-    long *tempGaps = gaps.buf; 
-    for (int i = 0; i < numPSSM - 1; i++){
-      tempGaps[i] = (long)gaps_ptr[i]; 
-    }
-    free(gaps_ptr);
-  }
-
-  if (columns.itemsize == sizeof(long)){
-    free(column_ptr);
-  }
-
-
-
-  float_array_converter(NULL, &matrix);
-  int_array_converter(NULL, &columns);
-  float_array_converter(NULL, &gapMatrix);
-  float_array_converter(NULL, &gapScores);
-  int_array_converter(NULL, &gaps);
-
+  
+  //printf("last in main\n");
+  PyMem_Free(score_matrix);
   Py_INCREF(Py_None);
+  result = Py_None;
+  matrix_converter(NULL, &rec_matrices);
+  scores_converter(NULL, &rec_lengths);
+  matrix_converter(NULL, &con_matrices);
+  matrix_converter(NULL, &rec_scores);
+  matrix_converter(NULL, &con_scores);
+  scores_converter(NULL, &con_lengths);
+  //printf("Made it to returning org of size %i\n", num_rec);
   return result;
 }
 
