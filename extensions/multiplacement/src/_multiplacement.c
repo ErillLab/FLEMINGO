@@ -71,7 +71,6 @@ void traceback(float *score_matrix, int num_alignments, float *gapMatrix,
   // previous cumulative alignment score for k <= j, when k == j, the gap length
   // is 0
   for (int i = 1; i < num_rec; i++) {
-    // printf("Calculating alignments for PSSM %i\n", i);
 
     for (int j = 0; j < num_alignments; j++) {
 
@@ -100,6 +99,8 @@ void traceback(float *score_matrix, int num_alignments, float *gapMatrix,
       }
     }
 
+    // we must reset our temp arrays so that they will be overwritten
+    // when doing the comparison of scores
     for (int l = 0; l < num_alignments; l++) {
       alignments[l] = temp_max_scores[l];
       gap_alignments[(i - 1) * num_alignments + l] = temp_gap_lengths[l];
@@ -153,44 +154,32 @@ void fill_matrix(const char seq[], int len_seq, float pssm[], int cols[],
   int reverse_offset = 0;
 
   // pre computes alignments of each pssm at each possible position
-  // i = current pssm
+  // i = current recognizer
   // j = starting position on seq for computing score
-  // k = current column in pssm
-  // time complexity should be (num_recs * numAignments * avgLengthPSSMs)
+  // k = current column in recognizer
 
   for (int i = 0; i < num_rec; i++) {
-    // printf("Calculating scores for PSSM %i\n", i);
-    // these functions are unnessesary, change to using += and -= cols[i]
     forward_offset = get_forward_offset(i, cols, num_rec);
     reverse_offset = get_reverse_offset(i, cols, num_rec);
 
     for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
       score = 0;
-      // printf("\nstarting positon %i\n", j);
       for (int k = 0; k < cols[i]; k++) {
         switch (seq[j + k]) {
         case 'A':
         case 'a':
-          // printf("   Score for pssm %i column %i with %c: %0.2f\n", i, k,
-          // seq[j + k], pssm[(forward_offset + k) * 4 + 0]);
           score += pssm[(forward_offset + k) * 4 + 0];
           break;
         case 'G':
         case 'g':
-          // printf("   Score for pssm %i column %i with %c: %0.2f\n", i, k,
-          // seq[j + k], pssm[(forward_offset + k) * 4 + 1]);
           score += pssm[(forward_offset + k) * 4 + 1];
           break;
         case 'C':
         case 'c':
-          // printf("   Score for pssm %i column %i with %c: %0.2f\n", i, k,
-          // seq[j + k], pssm[(forward_offset + k) * 4 + 2]);
           score += pssm[(forward_offset + k) * 4 + 2];
           break;
         case 'T':
         case 't':
-          // printf("   Score for pssm %i column %i with %c: %0.2f\n", i, k,
-          // seq[j + k], pssm[(forward_offset + k) * 4 + 3]);
           score += pssm[(forward_offset + k) * 4 + 3];
           break;
         }
@@ -245,7 +234,6 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   static char *kwlist[] = {
       "sequence",   "rec_matrices", "rec_lengths", "con_matrices",
       "rec_scores", "con_scores",   "con_lengths", NULL};
-  // printf("back in c\n");
   Py_ssize_t len_seq;
   Py_ssize_t num_rec;
   PyObject *result = Py_None;
@@ -256,23 +244,29 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   Py_buffer con_scores;
   Py_buffer con_lengths;
 
-  // double* test = malloc(100000000000000000000000 * sizeof(double));
-  // free(test);
-
   rec_matrices.obj = NULL;
   con_matrices.obj = NULL;
   rec_lengths.obj = NULL;
   rec_scores.obj = NULL;
   con_scores.obj = NULL;
   con_lengths.obj = NULL;
-  // printf("now parsing\n");
   if (!PyArg_ParseTupleAndKeywords(
           args, keywords, "y#O&O&O&O&O&O&", kwlist, &seq, &len_seq,
           matrix_converter, &rec_matrices, matrix_converter, &rec_lengths,
           matrix_converter, &con_matrices, matrix_converter, &rec_scores,
           matrix_converter, &con_scores, matrix_converter, &con_lengths))
     return NULL;
-  // printf("Parsed successfully\n");
+
+  // sequence:     DNA sequence used for placement
+  // rec_matrices: one dimensional flattened representation of the
+  //               scoring matrices for all recognizers
+  // rec_lengths:  length of each recognizer (the number of columns)
+  // con_matrices: one dimensional flattened representation of pre-computed
+  //               scores for each connector for each gap length
+  // rec_scores:   buffer used to store our calculated scores for recognizers
+  // con_scores:   buffer used to score our calculated scores for connectors
+  // con_lengths:  buffer used to store the length of each connector for our
+  // placment
   num_rec = rec_lengths.shape[0];
   float *rec_matrices_ptr = rec_matrices.buf;
   float *con_matrices_ptr = con_matrices.buf;
@@ -280,10 +274,9 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   float *rec_scores_ptr = rec_scores.buf;
   int *rec_lengths_ptr = rec_lengths.buf;
   int *con_lengths_ptr = con_lengths.buf;
-  // if passes as a long (mpi on windows does it for some reason)
-  // make an int array anf copy information in and typcast each entry
-  // just do .buf in the function calls
 
+  // getting the number of alignments is needed for calculating the size
+  // of the array we will use to store the scores for each recognizer alignment
   int forward_offset = get_forward_offset(0, rec_lengths_ptr, num_rec);
   int reverse_offset = get_reverse_offset(0, rec_lengths_ptr, num_rec);
   int num_alignments = len_seq - forward_offset - reverse_offset;
@@ -292,6 +285,8 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   fill_matrix(seq, len_seq, rec_matrices_ptr, rec_lengths_ptr, num_rec,
               score_matrix, num_alignments);
 
+  // traceback function breaks when the number of recognizers is less than
+  // two since it opperates on the assumption of having at least one connector
   if (num_rec == 1) {
     con_lengths_ptr[0] =
         max_index(score_matrix, len_seq - forward_offset - reverse_offset);
@@ -303,7 +298,6 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
               con_lengths_ptr);
   }
 
-  // printf("last in main\n");
   PyMem_Free(score_matrix);
   Py_INCREF(Py_None);
   result = Py_None;
@@ -313,7 +307,6 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   matrix_converter(NULL, &rec_scores);
   matrix_converter(NULL, &con_scores);
   matrix_converter(NULL, &con_lengths);
-  // printf("Made it to returning org of size %i\n", num_rec);
   return result;
 }
 
