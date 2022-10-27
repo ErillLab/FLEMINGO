@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+void (*fill_row)();
+
 const int NUM_BASES = 4;
 
 int get_forward_offset(int index, int cols[], int num_rec) {
@@ -144,47 +147,93 @@ void traceback(float *score_matrix, int num_alignments, float *gapMatrix,
   PyMem_Free(temp_gap_lengths);
 }
 
-void fill_matrix(const char seq[], int len_seq, float pssm[], int cols[],
-                 int num_rec, float score_matrix[], int num_alignments) {
-  // length of the seq by number of pssms
-
-  // printf("last in fill_matrix\n");
-  float score = 0;
-  int forward_offset = 0;
-  int reverse_offset = 0;
-
-  // pre computes alignments of each pssm at each possible position
-  // i = current recognizer
-  // j = starting position on seq for computing score
-  // k = current column in recognizer
-
-  for (int i = 0; i < num_rec; i++) {
-    forward_offset = get_forward_offset(i, cols, num_rec);
-    reverse_offset = get_reverse_offset(i, cols, num_rec);
-
-    for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
-      score = 0;
-      for (int k = 0; k < cols[i]; k++) {
-        switch (seq[j + k]) {
+void fill_row_pssm(const char* seq, int len_seq, int curr_rec, float rec_matrices[],
+  int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]){
+  
+  float score = 0.0; 
+  for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
+    score = 0.0;
+    for (int k = 0; k < rec_length; k++) {
+      switch (seq[j + k]) {
         case 'A':
         case 'a':
-          score += pssm[(forward_offset + k) * 4 + 0];
+          score += rec_matrices[(forward_offset + k) * 4 + 0];
           break;
         case 'G':
         case 'g':
-          score += pssm[(forward_offset + k) * 4 + 1];
+          score += rec_matrices[(forward_offset + k) * 4 + 1];
           break;
         case 'C':
         case 'c':
-          score += pssm[(forward_offset + k) * 4 + 2];
+          score += rec_matrices[(forward_offset + k) * 4 + 2];
           break;
         case 'T':
         case 't':
-          score += pssm[(forward_offset + k) * 4 + 3];
+          score += rec_matrices[(forward_offset + k) * 4 + 3];
           break;
-        }
       }
-      score_matrix[(i * num_alignments) + j - forward_offset] = score;
+    }
+    score_matrix[(curr_rec * num_alignments) + j - forward_offset] = score;
+
+  }
+}
+
+void fill_row_mgw(const char* seq, int len_seq, int curr_rec, float rec_matrices[],
+  int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]){
+
+
+}
+
+void fill_row_prot(const char* seq, int len_seq, int curr_rec, float rec_matrices[],
+  int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]){
+
+
+}
+void fill_row_helt(const char* seq, int len_seq, int curr_rec, float rec_matrices[],
+  int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]){
+
+
+}
+void fill_row_roll(const char* seq, int len_seq, int curr_rec, float rec_matrices[],
+  int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]){
+
+
+}
+
+
+void fill_matrix(const char seq[], int len_seq, float rec_matrices[], int rec_lengths[],
+                 const char rec_types[], int num_rec,float score_matrix[], int num_alignments) {
+  // length of the seq by number of pssms
+
+  // printf("last in fill_matrix\n");
+  int forward_offset;
+  int reverse_offset;
+
+  // pre computes alignments of each pssm at each possible position
+  // i = current recognizer
+  for (int i = 0; i < num_rec; i++) {
+    forward_offset = get_forward_offset(i, rec_lengths, num_rec);
+    reverse_offset = get_reverse_offset(i, rec_lengths, num_rec);
+      switch(rec_types[i]){
+	case 'P':
+	case 'p':
+	  fill_row_pssm(seq, len_seq, i, rec_matrices, rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix);
+	  break;
+	case 'M':
+	case 'm':
+	  fill_row_mgw();
+	  break;
+	case 'T':
+	case 't':
+	  fill_row_prot();
+	  break;
+	case 'H':
+	case 'h':
+	  fill_row_helt();
+	  break;
+	case 'R':
+	case 'r':
+	  fill_row_roll();
     }
   }
 }
@@ -231,9 +280,16 @@ static char calculate__doc__[] =
 static PyObject *py_calculate(PyObject *self, PyObject *args,
                               PyObject *keywords) {
   const char *seq;
+  const char *rec_types;
   static char *kwlist[] = {
-      "sequence",   "rec_matrices", "rec_lengths", "con_matrices",
-      "rec_scores", "con_scores",   "con_lengths", NULL};
+      "sequence",   
+      "rec_matrices", 
+      "rec_lengths", 
+      "rec_types", 
+      "con_matrices",
+      "rec_scores", 
+      "con_scores",   
+      "con_lengths", NULL};
   Py_ssize_t len_seq;
   Py_ssize_t num_rec;
   PyObject *result = Py_None;
@@ -251,10 +307,15 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   con_scores.obj = NULL;
   con_lengths.obj = NULL;
   if (!PyArg_ParseTupleAndKeywords(
-          args, keywords, "y#O&O&O&O&O&O&", kwlist, &seq, &len_seq,
-          matrix_converter, &rec_matrices, matrix_converter, &rec_lengths,
-          matrix_converter, &con_matrices, matrix_converter, &rec_scores,
-          matrix_converter, &con_scores, matrix_converter, &con_lengths))
+          args, keywords, "y#O&O&y#O&O&O&O&", kwlist, 
+	  &seq, &len_seq,
+          matrix_converter, &rec_matrices, 
+	  matrix_converter, &rec_lengths,
+	  &rec_types, &num_rec, 
+	  matrix_converter, &con_matrices, 
+	  matrix_converter, &rec_scores,
+          matrix_converter, &con_scores, 
+	  matrix_converter, &con_lengths))
     return NULL;
 
   // sequence:     DNA sequence used for placement
@@ -280,9 +341,8 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   int forward_offset = get_forward_offset(0, rec_lengths_ptr, num_rec);
   int reverse_offset = get_reverse_offset(0, rec_lengths_ptr, num_rec);
   int num_alignments = len_seq - forward_offset - reverse_offset;
-  float *score_matrix =
-      PyMem_Calloc(num_alignments * num_rec, sizeof(*rec_matrices_ptr));
-  fill_matrix(seq, len_seq, rec_matrices_ptr, rec_lengths_ptr, num_rec,
+  float *score_matrix = PyMem_Calloc(num_alignments * num_rec, sizeof(*rec_matrices_ptr));
+  fill_matrix(seq, len_seq, rec_matrices_ptr, rec_lengths_ptr, rec_types, num_rec,
               score_matrix, num_alignments);
 
   // traceback function breaks when the number of recognizers is less than

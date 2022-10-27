@@ -38,7 +38,7 @@ class OrganismObject:
         self.recognizers_flat = []
         self.connectors_scores_flat = []
         self.recognizer_lengths = []
-
+        self.recognizer_types = ""
         # assign organism-specific parameters
 	
         # whether fitness is computed over sequences as sum or average
@@ -1086,7 +1086,7 @@ class OrganismObject:
         gaps = np.empty(number_PSSM, dtype = np.dtype('i'))
         gap_scores = np.empty(number_PSSM - 1, dtype = np.dtype('f'))
         PSSM_scores = np.empty(number_PSSM + 1, dtype = np.dtype('f'))
-        _multiplacement.calculate(bytes(sequence, "ASCII"), self.recognizers_flat, self.recognizer_lengths, self.connectors_scores_flat, PSSM_scores, gap_scores, gaps)
+        _multiplacement.calculate(bytes(sequence, "ASCII"), self.recognizers_flat, self.recognizer_lengths, bytes(self.recognizer_types, "ASCII"), self.connectors_scores_flat, PSSM_scores, gap_scores, gaps)
         # parse data from the _calculatePlacement module and put it
         # into a PlacementObject to be returned
         placement = PlacementObject(self._id, sequence)
@@ -1127,16 +1127,19 @@ class OrganismObject:
         flat_recognizers = []
         flat_connector_scores = []
         recognizer_lengths = []
-        
+        recognizer_types = []    
+
         for recognizer in self.recognizers:
             for column in recognizer.pssm:
                 for base in ['a','g','c','t']:
                     flat_recognizers.append(column[base])
             recognizer_lengths.append(recognizer.length)
+            recognizer_types.append(recognizer.rec_type)
 
         # organism holds a numpy array of the flattened lists
         self.recognizers_flat = np.array(flat_recognizers, dtype = np.dtype('f')) 
         self.recognizer_lengths = np.array(recognizer_lengths, dtype = np.dtype('i'))
+        self.recognizer_types = ''.join(recognizer_types)
 
         for connector in self.connectors:
             for i in range(connector.expected_seq_length):
