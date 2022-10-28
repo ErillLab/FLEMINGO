@@ -44,9 +44,48 @@ int max_index(float *arr, int size) {
   return max_index;
 }
 
-void traceback(float *score_matrix, int num_alignments, float *gapMatrix,
-               int *cols, int num_rec, int len_seq, float *gapScores,
-               float *scores, int *gaps) {
+
+void traceback(int num_rec, int len_seq, float* con_matrices, float* rec_score_matrix, 
+               int num_alignments, float* rec_alignments, int* con_alignments,
+               float* rec_scores, float* con_scores, int* con_lengths){
+  // finding gap lengths to ref orma alignments
+  // starting from the index of the greatest score in alignments
+  // trace back of gap alignments is conducted by subtracting the value
+  // at the max score index from the index and going up a row
+  // this is repeated until we know all the gap lengths in the alignment
+  int index = max_index(rec_alignments, num_alignments);
+  con_lengths[num_rec - 1] = con_alignments[(num_rec - 2) * num_alignments + index];
+
+  // the cumulative best score is written into the last index of the scores
+  // array
+  rec_scores[num_rec] = rec_alignments[index];
+
+  //the start and end of this for loop are weird because the first and last
+  //indices are filled manually, so these bounds only encompass the middle
+  //scores
+  for (int i = num_rec - 3; i >= 0; i--) {
+    con_lengths[i + 1] = con_alignments[i * num_alignments + index - con_lengths[i + 2]];
+    index -= con_lengths[i + 2];
+  }
+  con_lengths[0] = index - con_lengths[1];
+
+  int gapOffset = 0;
+  for (int i = 0; i < num_rec - 1; i++) {
+    con_scores[i] = con_matrices[i * len_seq + con_lengths[i + 1]];
+  }
+
+  // scores for each PSSM are filled by iterating over the score matrix
+  // and using the appropriate gap lengths as a cumulative offset
+  for (int i = 0; i < num_rec; i++) {
+    gapOffset += con_lengths[i];
+    rec_scores[i] = rec_score_matrix[i * num_alignments + gapOffset];
+  }
+
+}
+
+void fill_traceback_matrix(float *score_matrix, int num_alignments, float *gapMatrix,
+               int *cols, int num_rec, int len_seq, float *con_scores,
+               float *rec_scores, int *con_lengths) {
   int gap_length = 0;
 
   // printf("last in traceback\n");
@@ -55,9 +94,9 @@ void traceback(float *score_matrix, int num_alignments, float *gapMatrix,
   //  all other indices hold gap lengths that got that alignment
   float *alignments = PyMem_Calloc(num_alignments, sizeof(*score_matrix));
   int *gap_alignments =
-      PyMem_Calloc(num_alignments * (num_rec - 1), sizeof(*gaps));
+      PyMem_Calloc(num_alignments * (num_rec - 1), sizeof(*con_lengths));
   float *temp_max_scores = PyMem_Calloc(num_alignments, sizeof(*score_matrix));
-  int *temp_gap_lengths = PyMem_Calloc(num_alignments, sizeof(*gaps));
+  int *temp_gap_lengths = PyMem_Calloc(num_alignments, sizeof(*con_lengths));
 
   // start with first row as our current max
   for (int i = 0; i < num_alignments; i++) {
@@ -111,40 +150,16 @@ void traceback(float *score_matrix, int num_alignments, float *gapMatrix,
       temp_gap_lengths[l] = 0;
     }
   }
-
-  // finding gap lengths to ref orma alignments
-  // starting from the index of the greatest score in alignments
-  // trace back of gap alignments is conducted by subtracting the value
-  // at the max score index from the index and going up a row
-  // this is repeated until we know all the gap lengths in the alignment
-  int index = max_index(alignments, num_alignments);
-  gaps[num_rec - 1] = gap_alignments[(num_rec - 2) * num_alignments + index];
-
-  // the cumulative best score is written into the last index of the scores
-  // array
-  scores[num_rec] = alignments[index];
-
-  for (int i = num_rec - 3; i >= 0; i--) {
-    gaps[i + 1] = gap_alignments[i * num_alignments + index - gaps[i + 2]];
-    index -= gaps[i + 2];
-  }
-  gaps[0] = index - gaps[1];
-
-  int gapOffset = 0;
-  for (int i = 0; i < num_rec - 1; i++) {
-    gapScores[i] = gapMatrix[i * len_seq + gaps[i + 1]];
-  }
-
-  // scores for each PSSM are filled by iterating over the score matrix
-  // and using the appropriate gap lengths as a cumulative offset
-  for (int i = 0; i < num_rec; i++) {
-    gapOffset += gaps[i];
-    scores[i] = score_matrix[i * num_alignments + gapOffset];
-  }
-  PyMem_Free(alignments);
-  PyMem_Free(gap_alignments);
   PyMem_Free(temp_max_scores);
   PyMem_Free(temp_gap_lengths);
+
+  traceback(num_rec, len_seq, gapMatrix, score_matrix, 
+            num_alignments, alignments, gap_alignments,
+            rec_scores, con_scores, con_lengths);
+
+  PyMem_Free(alignments);
+  PyMem_Free(gap_alignments);
+  
 }
 
 void fill_row_pssm(const char* seq, int len_seq, int curr_rec, float rec_matrices[],
@@ -221,19 +236,20 @@ void fill_matrix(const char seq[], int len_seq, float rec_matrices[], int rec_le
 	  break;
 	case 'M':
 	case 'm':
-	  fill_row_mgw();
+//	  fill_row_mgw();
 	  break;
 	case 'T':
 	case 't':
-	  fill_row_prot();
+//	  fill_row_prot();
 	  break;
 	case 'H':
 	case 'h':
-	  fill_row_helt();
+//	  fill_row_helt();
 	  break;
 	case 'R':
 	case 'r':
-	  fill_row_roll();
+//	  fill_row_roll();
+    break;
     }
   }
 }
@@ -353,7 +369,7 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
     rec_scores_ptr[0] = score_matrix[con_lengths_ptr[0]];
     con_scores_ptr[0] = 0.00;
   } else {
-    traceback(score_matrix, num_alignments, con_matrices_ptr, rec_lengths_ptr,
+    fill_traceback_matrix(score_matrix, num_alignments, con_matrices_ptr, rec_lengths_ptr,
               num_rec, len_seq, con_scores_ptr, rec_scores_ptr,
               con_lengths_ptr);
   }
