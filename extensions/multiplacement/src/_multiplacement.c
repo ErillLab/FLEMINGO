@@ -1,11 +1,11 @@
+#include <strings.h>
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-void (*fill_row)();
+#include "constants.h"
 
 const int NUM_BASES = 4;
 
@@ -44,6 +44,21 @@ int max_index(float *arr, int size) {
   return max_index;
 }
 
+float get_bin_frequency(float score, float bin_frequencies[], float bin_edges[], int num_bins){
+  for (int i = 1; i < num_bins; i++){
+    if (score < bin_edges[i]){
+      return bin_frequencies[i];
+    }
+  } 
+}
+
+float shape_average(float array[], int num_elements){
+  float sum = array[0] + array[num_elements - 1]; 
+  for (int i = 0; i < num_elements; i++){
+    sum += array[i];
+  }
+  return sum/(num_elements + 2);
+}
 
 void traceback(int num_rec, int len_seq, float* con_matrices, float* rec_score_matrix, 
                int num_alignments, float* rec_alignments, int* con_alignments,
@@ -64,8 +79,8 @@ void traceback(int num_rec, int len_seq, float* con_matrices, float* rec_score_m
   //indices are filled manually, so these bounds only encompass the middle
   //scores
   for (int i = num_rec - 3; i >= 0; i--) {
-    con_lengths[i + 1] = con_alignments[i * num_alignments + index - con_lengths[i + 2]];
-    index -= con_lengths[i + 2];
+    con_lengths[i + 1]  = con_alignments[i * num_alignments + index - con_lengths[i + 2]];
+    index              -= con_lengths[i + 2];
   }
   con_lengths[0] = index - con_lengths[1];
 
@@ -77,8 +92,8 @@ void traceback(int num_rec, int len_seq, float* con_matrices, float* rec_score_m
   // scores for each PSSM are filled by iterating over the score matrix
   // and using the appropriate gap lengths as a cumulative offset
   for (int i = 0; i < num_rec; i++) {
-    gapOffset += con_lengths[i];
-    rec_scores[i] = rec_score_matrix[i * num_alignments + gapOffset];
+    gapOffset     += con_lengths[i];
+    rec_scores[i]  = rec_score_matrix[i * num_alignments + gapOffset];
   }
 
 }
@@ -92,15 +107,14 @@ void fill_traceback_matrix(float *score_matrix, int num_alignments, float *gapMa
   //  number of total alignments by number of pssms
   //  first index in each column holds current max score for that index
   //  all other indices hold gap lengths that got that alignment
-  float *alignments = PyMem_Calloc(num_alignments, sizeof(*score_matrix));
-  int *gap_alignments =
-      PyMem_Calloc(num_alignments * (num_rec - 1), sizeof(*con_lengths));
-  float *temp_max_scores = PyMem_Calloc(num_alignments, sizeof(*score_matrix));
-  int *temp_gap_lengths = PyMem_Calloc(num_alignments, sizeof(*con_lengths));
+  float *alignments        = PyMem_Calloc(num_alignments,                 sizeof(*score_matrix));
+  int   *gap_alignments    = PyMem_Calloc(num_alignments * (num_rec - 1), sizeof(*con_lengths));
+  float *temp_max_scores   = PyMem_Calloc(num_alignments,                 sizeof(*score_matrix));
+  int   *temp_gap_lengths  = PyMem_Calloc(num_alignments,                 sizeof(*con_lengths));
 
   // start with first row as our current max
   for (int i = 0; i < num_alignments; i++) {
-    alignments[i] = score_matrix[i];
+    alignments[i]      = score_matrix[i];
     temp_max_scores[i] = score_matrix[i];
   }
 
@@ -124,17 +138,11 @@ void fill_traceback_matrix(float *score_matrix, int num_alignments, float *gapMa
         gap_length = j - k;
 
         if (k == 0) {
-          temp_max_scores[j] = alignments[k] +
-                               gapMatrix[(i - 1) * len_seq + gap_length] +
-                               score_matrix[i * num_alignments + j];
+          temp_max_scores[j]  = alignments[k] + gapMatrix[(i - 1) * len_seq + gap_length] + score_matrix[i * num_alignments + j];
           temp_gap_lengths[j] = gap_length;
         } else {
-          if (temp_max_scores[j] <
-              alignments[k] + gapMatrix[(i - 1) * len_seq + gap_length] +
-                  score_matrix[i * num_alignments + j]) {
-            temp_max_scores[j] = alignments[k] +
-                                 gapMatrix[(i - 1) * len_seq + gap_length] +
-                                 score_matrix[i * num_alignments + j];
+          if (temp_max_scores[j] < alignments[k] + gapMatrix[(i - 1) * len_seq + gap_length] + score_matrix[i * num_alignments + j]) {
+            temp_max_scores[j]  = alignments[k] + gapMatrix[(i - 1) * len_seq + gap_length] + score_matrix[i * num_alignments + j];
             temp_gap_lengths[j] = gap_length;
           }
         }
@@ -146,16 +154,14 @@ void fill_traceback_matrix(float *score_matrix, int num_alignments, float *gapMa
     for (int l = 0; l < num_alignments; l++) {
       alignments[l] = temp_max_scores[l];
       gap_alignments[(i - 1) * num_alignments + l] = temp_gap_lengths[l];
-      temp_max_scores[l] = -INFINITY;
-      temp_gap_lengths[l] = 0;
+      temp_max_scores[l]                           = -INFINITY;
+      temp_gap_lengths[l]                          = 0;
     }
   }
   PyMem_Free(temp_max_scores);
   PyMem_Free(temp_gap_lengths);
 
-  traceback(num_rec, len_seq, gapMatrix, score_matrix, 
-            num_alignments, alignments, gap_alignments,
-            rec_scores, con_scores, con_lengths);
+  traceback(num_rec, len_seq, gapMatrix, score_matrix, num_alignments, alignments, gap_alignments, rec_scores, con_scores, con_lengths);
 
   PyMem_Free(alignments);
   PyMem_Free(gap_alignments);
@@ -193,63 +199,195 @@ void fill_row_pssm(const char* seq, int len_seq, int curr_rec, float rec_matrice
   }
 }
 
-void fill_row_mgw(const char* seq, int len_seq, int curr_rec, float rec_matrices[],
-  int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]){
+void fill_row_mgw(const char* seq, int len_seq, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
 
+  float score = 0.0; 
+  float sum = 0.0;
+  int index = 0;
+  int num_pentamers = rec_length - 4;
+  float *pentamer_scores = PyMem_Malloc(num_pentamers * sizeof(float));
+  
+  for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
+    score = 0.0;
+    sum = 0.0;
+    
+    for (int k = 0; k < num_pentamers; k++) {
+      index = 0;
+      for (int l = k; l < k + 5; l++){
+        printf("%c", seq[j + l]);
+        switch (seq[j + l]) {
+          case 'A':
+          case 'a':
+            index += pow(4, 4 - (l - k)) * 0;
+            break;
+          case 'G':
+          case 'g':
+            index += pow(4, 4 - (l - k)) * 1;
+            break;
+          case 'C':
+          case 'c':
+            index += pow(4, 4 - (l - k)) * 2;
+            break;
+          case 'T':
+          case 't':
+            index += pow(4, 4 - (l - k)) * 3;
+            break;
+        }
+      }
+      //printf(": index: %i | MGW_SCORES[%i]: %f\n", index, index, MGW_SCORES[index]); 
+      pentamer_scores[k] = MGW_SCORES[index];
+    }
 
+    //still need to get actual score from llr
+
+  }
+  PyMem_Free(pentamer_scores);
 }
 
-void fill_row_prot(const char* seq, int len_seq, int curr_rec, float rec_matrices[],
-  int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]){
+void fill_row_prot(const char* seq, int len_seq, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
 
+  float score = 0.0; 
+  float sum = 0.0;
+  int index = 0;
+  int num_pentamers = rec_length - 4;
+  float *pentamer_scores = PyMem_Malloc(num_pentamers * sizeof(float));
+  
+  for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
+    score = 0.0;
+    sum = 0.0;
+    
+    for (int k = 0; k < num_pentamers; k++) {
+      index = 0;
+      for (int l = k; l < k + 5; l++){
+        printf("%c", seq[j + l]);
+        switch (seq[j + l]) {
+          case 'A':
+          case 'a':
+            index += pow(4, 4 - (l - k)) * 0;
+            break;
+          case 'G':
+          case 'g':
+            index += pow(4, 4 - (l - k)) * 1;
+            break;
+          case 'C':
+          case 'c':
+            index += pow(4, 4 - (l - k)) * 2;
+            break;
+          case 'T':
+          case 't':
+            index += pow(4, 4 - (l - k)) * 3;
+            break;
+        }
+      }
+      pentamer_scores[k] = PROT_SCORES[index];
+    }
 
+    //still need to get actual score from llr
+  }
+  PyMem_Free(pentamer_scores);
 }
-void fill_row_helt(const char* seq, int len_seq, int curr_rec, float rec_matrices[],
-  int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]){
 
 
+void fill_row_helt(const char* seq, int len_seq, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
+  float  score                 = 0.0; 
+  float  sum                   = 0.0;
+  int    index                 = 0;
+  int    num_pentamers         = rec_length - 4;
+  float *pentamer_scores       = PyMem_Malloc(2 * num_pentamers  * sizeof(float));
+  
+  for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
+    score = 0.0;
+    sum   = 0.0;
+    
+    for (int k = 0; k < num_pentamers; k++) {
+      index = 0;
+
+      for (int l = k; l < k + 5; l++){
+        printf("%c", seq[j + l]);
+        switch (seq[j + l]) {
+          case 'A':
+          case 'a':
+            index += pow(4, 4 - (l - k)) * 0;
+            break;
+          case 'G':
+          case 'g':
+            index += pow(4, 4 - (l - k)) * 1;
+            break;
+          case 'C':
+          case 'c':
+            index += pow(4, 4 - (l - k)) * 2;
+            break;
+          case 'T':
+          case 't':
+            index += pow(4, 4 - (l - k)) * 3;
+            break;
+        }
+
+      }
+      pentamer_scores[k]     = HELT_SCORES[index];
+      pentamer_scores[k + 1] = HELT_SCORES[1024 + index];
+    }
+    score = shape_average(pentamer_scores, num_pentamers * 2);
+    //still need to get actual score from llr
+
+  }
+  PyMem_Free(pentamer_scores);
 }
+
+
 void fill_row_roll(const char* seq, int len_seq, int curr_rec, float rec_matrices[],
-  int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]){
-
+                   int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]){
 
 }
 
 
 void fill_matrix(const char seq[], int len_seq, float rec_matrices[], int rec_lengths[],
-                 const char rec_types[], int num_rec,float score_matrix[], int num_alignments) {
-  // length of the seq by number of pssms
+                 const char rec_types[], int num_rec,float score_matrix[], int num_alignments, 
+                 float bin_frequencies[], float bin_edges[], int num_bins[]) {
 
-  // printf("last in fill_matrix\n");
-  int forward_offset;
-  int reverse_offset;
+  int forward_offset = 0;
+  int reverse_offset = 0;
+  int curr_count_pssm_rec = 0;
+  int curr_count_shape_rec = 0;
+  int* rec_offsets = (int*)malloc(num_rec * sizeof(int));
+
+  //this is for getting the correct offset for each recognizer within its own concatenated array
+  for (int i = 0; i < num_rec; i++){
+    if (rec_types[i] == 'P' || rec_types[i] == 'p'){
+     rec_offsets[i] = curr_count_pssm_rec;
+     curr_count_pssm_rec++; 
+    }else{
+      rec_offsets[i] = curr_count_shape_rec;
+      curr_count_shape_rec++;
+    }     
+  }
 
   // pre computes alignments of each pssm at each possible position
   // i = current recognizer
   for (int i = 0; i < num_rec; i++) {
     forward_offset = get_forward_offset(i, rec_lengths, num_rec);
     reverse_offset = get_reverse_offset(i, rec_lengths, num_rec);
-      switch(rec_types[i]){
-	case 'P':
-	case 'p':
-	  fill_row_pssm(seq, len_seq, i, rec_matrices, rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix);
-	  break;
-	case 'M':
-	case 'm':
-//	  fill_row_mgw();
-	  break;
-	case 'T':
-	case 't':
-//	  fill_row_prot();
-	  break;
-	case 'H':
-	case 'h':
-//	  fill_row_helt();
-	  break;
-	case 'R':
-	case 'r':
-//	  fill_row_roll();
-    break;
+    switch(rec_types[i]){
+    case 'P':
+    case 'p':
+      fill_row_pssm(seq, len_seq, rec_offsets[i], rec_matrices, rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix);
+      break;
+    case 'M':
+    case 'm':
+      fill_row_mgw(seq, len_seq, rec_offsets[i], rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix, bin_frequencies, bin_edges, num_bins[0]);
+      break;
+    case 'T':
+    case 't':
+      fill_row_prot(seq, len_seq, rec_offsets[i], rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix, bin_frequencies, bin_edges, num_bins[0]);
+      break;
+    case 'H':
+    case 'h':
+      fill_row_helt(seq, len_seq, rec_offsets[i], rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix, bin_frequencies, bin_edges, num_bins[0]);
+      break;
+    case 'R':
+    case 'r':
+  //	  fill_row_roll();
+      break;
     }
   }
 }
@@ -303,6 +441,9 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
       "rec_lengths", 
       "rec_types", 
       "con_matrices",
+      "bin_frequencies",
+      "bin_edges",
+      "num_bins",
       "rec_scores", 
       "con_scores",   
       "con_lengths", NULL};
@@ -315,6 +456,9 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   Py_buffer rec_scores;
   Py_buffer con_scores;
   Py_buffer con_lengths;
+  Py_buffer bin_frequencies;
+  Py_buffer bin_edges;
+  Py_buffer num_bins;
 
   rec_matrices.obj = NULL;
   con_matrices.obj = NULL;
@@ -322,15 +466,21 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   rec_scores.obj = NULL;
   con_scores.obj = NULL;
   con_lengths.obj = NULL;
+  bin_frequencies.obj = NULL;
+  bin_edges.obj = NULL;
+  num_bins.obj = NULL;
   if (!PyArg_ParseTupleAndKeywords(
-          args, keywords, "y#O&O&y#O&O&O&O&", kwlist, 
+          args, keywords, "y#O&O&y#O&O&O&O&O&O&O&", kwlist, 
 	  &seq, &len_seq,
           matrix_converter, &rec_matrices, 
 	  matrix_converter, &rec_lengths,
 	  &rec_types, &num_rec, 
-	  matrix_converter, &con_matrices, 
-	  matrix_converter, &rec_scores,
-          matrix_converter, &con_scores, 
+	  matrix_converter, &con_matrices,  
+    matrix_converter, &bin_frequencies,
+    matrix_converter, &bin_edges,
+    matrix_converter, &num_bins,
+    matrix_converter, &rec_scores,
+    matrix_converter, &con_scores, 
 	  matrix_converter, &con_lengths))
     return NULL;
 
@@ -348,9 +498,13 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   float *rec_matrices_ptr = rec_matrices.buf;
   float *con_matrices_ptr = con_matrices.buf;
   float *con_scores_ptr = con_scores.buf;
+  float *bin_frequencies_ptr = bin_frequencies.buf;
+  float *bin_edges_ptr = bin_edges.buf;
+  int* num_bins_ptr = num_bins.buf;
   float *rec_scores_ptr = rec_scores.buf;
   int *rec_lengths_ptr = rec_lengths.buf;
   int *con_lengths_ptr = con_lengths.buf;
+
 
   // getting the number of alignments is needed for calculating the size
   // of the array we will use to store the scores for each recognizer alignment
@@ -359,7 +513,7 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   int num_alignments = len_seq - forward_offset - reverse_offset;
   float *score_matrix = PyMem_Calloc(num_alignments * num_rec, sizeof(*rec_matrices_ptr));
   fill_matrix(seq, len_seq, rec_matrices_ptr, rec_lengths_ptr, rec_types, num_rec,
-              score_matrix, num_alignments);
+              score_matrix, num_alignments, bin_frequencies_ptr, bin_edges_ptr, num_bins_ptr);
 
   // traceback function breaks when the number of recognizers is less than
   // two since it opperates on the assumption of having at least one connector
