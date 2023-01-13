@@ -197,8 +197,39 @@ class ConnectorObject():
         # The length to be used as input is the effective length
         # Number of recognizers is the length of the list of recog sizes
         return prob_of_d(gap_size+1, effective_len, len(recog_sizes))
-    
-    
+
+    def get_numerator(self, d, s_dna_len, recog_sizes) -> float:
+        if d<self.expected_seq_length:
+            numerator = self.stored_pdfs[d]
+        else:
+            numerator = norm_pf(d, self._mu, self._sigma)
+        
+        # Normalize by AUC within the range of observable d values
+        max_d = s_dna_len - 1  # Maximum d observable
+        # min_d = -1 * max_d  # Minimum d observable
+        
+        if self._sigma == 0:
+            auc = 1.0  # all the gaussian is within the (-(L-1), +(L-1)) range
+        else:
+            if max_d<self.expected_seq_length:
+                auc = self.stored_cdfs[max_d] - self.stored_cdfs[0]
+            else:
+                auc = (norm_cdf(max_d, self._mu, self._sigma) -
+                       norm_cdf(0, self._mu, self._sigma))
+        
+        # Avoid zero-division error
+        # This will never happen, unless an organism evolves an extremely large sigma
+        if auc < 1e-100:
+            auc = 1e-100 
+            print("AUC was 0 with mu =", self._mu, "and sigma =", self._sigma)                
+        
+        # avoid log(0) error when computing e_connector
+        if numerator < 1e-100:
+            numerator = 1e-100        
+
+        # Apply normalization
+        return np.log2(numerator / auc)
+
     def get_score(self, d, s_dna_len, recog_sizes) -> float:
         """ Returns the score of the connector, given the observed distance
             and the length of the DNA sequence on which it is being evaluated.
@@ -297,3 +328,4 @@ class ConnectorObject():
             False because is a connector
         """
         return False
+
