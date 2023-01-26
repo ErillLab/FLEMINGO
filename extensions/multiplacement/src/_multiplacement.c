@@ -1,6 +1,7 @@
 #include "_multiplacement.h"
+#include "_aux.h"
 
-void fill_row_pssm(const char* seq, int len_seq, int curr_rec, float rec_matrices[], int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]){
+void fill_row_pssm(const char* seq, int len_seq, int row, int curr_rec, float rec_matrices[], int pssm_score_offset, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]){
   float score = 0.0; 
   for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
     score = 0.0;
@@ -8,29 +9,32 @@ void fill_row_pssm(const char* seq, int len_seq, int curr_rec, float rec_matrice
       switch (seq[j + k]) {
         case 'A':
         case 'a':
-          score += rec_matrices[(forward_offset + k) * 4 + 0];
+          score += rec_matrices[(pssm_score_offset + k) * 4 + 0];
           break;
         case 'G':
         case 'g':
-          score += rec_matrices[(forward_offset + k) * 4 + 1];
+          score += rec_matrices[(pssm_score_offset + k) * 4 + 1];
           break;
         case 'C':
         case 'c':
-          score += rec_matrices[(forward_offset + k) * 4 + 2];
+          score += rec_matrices[(pssm_score_offset + k) * 4 + 2];
           break;
         case 'T':
         case 't':
-          score += rec_matrices[(forward_offset + k) * 4 + 3];
+          score += rec_matrices[(pssm_score_offset + k) * 4 + 3];
           break;
       }
     }
-    score_matrix[(curr_rec * num_alignments) + j - forward_offset] = score;
+    printf("score: %f\n", score);
+    score_matrix[(row * num_alignments) + j - forward_offset] = score;
 
   }
 }
 
-void fill_row_mgw(const char* seq, int len_seq, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
+void fill_row_mgw(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
   float score = 0.0; 
+  float null_freq = 0.0; 
+  float alt_freq = 0.0; 
   float sum = 0.0;
   int index = 0;
   int num_pentamers = rec_length - 4;
@@ -43,7 +47,7 @@ void fill_row_mgw(const char* seq, int len_seq, int curr_rec, int rec_length, in
     for (int k = 0; k < num_pentamers; k++) {
       index = 0;
       for (int l = k; l < k + 5; l++){
-        printf("%c", seq[j + l]);
+        //printf("%c", seq[j + l]);
         switch (seq[j + l]) {
           case 'A':
           case 'a':
@@ -68,12 +72,17 @@ void fill_row_mgw(const char* seq, int len_seq, int curr_rec, int rec_length, in
     }
 
     //still need to get actual score from llr
-
+    score = shape_average(pentamer_scores, num_pentamers);
+    null_freq = get_bin_frequency(score, bin_frequencies, bin_edges, num_bins);
+    printf("getting null freq from score: %f\n", score);
+    alt_freq = get_bin_frequency(score, bin_frequencies + num_bins, bin_edges, num_bins);
+    printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
+    score_matrix[(row * num_alignments) + j - forward_offset] = log2(alt_freq/null_freq);
   }
   free(pentamer_scores);
 }
 
-void fill_row_prot(const char* seq, int len_seq, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
+void fill_row_prot(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
 
   float score = 0.0; 
   float sum = 0.0;
@@ -88,7 +97,7 @@ void fill_row_prot(const char* seq, int len_seq, int curr_rec, int rec_length, i
     for (int k = 0; k < num_pentamers; k++) {
       index = 0;
       for (int l = k; l < k + 5; l++){
-        printf("%c", seq[j + l]);
+      //printf("%c", seq[j + l]);
         switch (seq[j + l]) {
           case 'A':
           case 'a':
@@ -116,7 +125,7 @@ void fill_row_prot(const char* seq, int len_seq, int curr_rec, int rec_length, i
   free(pentamer_scores);
 }
 
-void fill_row_helt(const char* seq, int len_seq, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
+void fill_row_helt(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
   float  score                 = 0.0; 
   float  sum                   = 0.0;
   int    index                 = 0;
@@ -131,7 +140,7 @@ void fill_row_helt(const char* seq, int len_seq, int curr_rec, int rec_length, i
       index = 0;
 
       for (int l = k; l < k + 5; l++){
-        printf("%c", seq[j + l]);
+        //printf("%c", seq[j + l]);
         switch (seq[j + l]) {
           case 'A':
           case 'a':
@@ -162,7 +171,7 @@ void fill_row_helt(const char* seq, int len_seq, int curr_rec, int rec_length, i
   free(pentamer_scores);
 }
 
-void fill_row_roll(const char* seq, int len_seq, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
+void fill_row_roll(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
   float  score                 = 0.0; 
   float  sum                   = 0.0;
   int    index                 = 0;
@@ -177,7 +186,7 @@ void fill_row_roll(const char* seq, int len_seq, int curr_rec, int rec_length, i
       index = 0;
 
       for (int l = k; l < k + 5; l++){
-        printf("%c", seq[j + l]);
+        //printf("%c", seq[j + l]);
         switch (seq[j + l]) {
           case 'A':
           case 'a':
@@ -320,105 +329,73 @@ void fill_traceback_matrix(float *score_matrix, int num_alignments, float *gapMa
 
   traceback(num_rec, len_seq, gapMatrix, score_matrix, num_alignments, alignments, gap_alignments, rec_scores, con_scores, con_lengths, max_length, effective_length, is_precomputed);
   free(alignments);
-  free(gap_alignments);
-  
+  free(gap_alignments);  
 }
-
-/*
-void fill_matrix(const char seq[], int len_seq, float pssm[], int cols[], int num_rec, float score_matrix[], int num_alignments) {
-  // length of the seq by number of pssms
-
-  // printf("last in fill_matrix\n");
-  float score = 0;
-  int forward_offset = 0;
-  int reverse_offset = 0;
-
-  // pre computes alignments of each pssm at each possible position
-  // i = current recognizer
-  // j = starting position on seq for computing score
-  // k = current column in recognizer
-
-  for (int i = 0; i < num_rec; i++) {
-    forward_offset = get_forward_offset(i, cols, num_rec);
-    reverse_offset = get_reverse_offset(i, cols, num_rec);
-
-    for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
-      score = 0;
-      for (int k = 0; k < cols[i]; k++) {
-        switch (seq[j + k]) {
-        case 'A':
-        case 'a':
-          score += pssm[(forward_offset + k) * 4 + 0];
-          break;
-        case 'G':
-        case 'g':
-          score += pssm[(forward_offset + k) * 4 + 1];
-          break;
-        case 'C':
-        case 'c':
-          score += pssm[(forward_offset + k) * 4 + 2];
-          break;
-        case 'T':
-        case 't':
-          score += pssm[(forward_offset + k) * 4 + 3];
-          break;
-        }
-      }
-      score_matrix[(i * num_alignments) + j - forward_offset] = score;
-    }
-  }
-}
-*/
 
 void fill_matrix(const char seq[], int len_seq, float rec_matrices[], int rec_lengths[], const char rec_types[], int num_rec,float score_matrix[], int num_alignments, float bin_frequencies[], float bin_edges[], int num_bins[]) {
   //printf("made it matrix\n");
   int forward_offset = 0;
   int reverse_offset = 0;
+  int pssm_score_offset = 0;
   int curr_count_pssm_rec = 0;
   int curr_count_shape_rec = 0;
-  int* rec_offsets = (int*)malloc(num_rec * sizeof(int));
-
+  int* rec_offsets = (int*)calloc(num_rec, sizeof(int));
+  int* pssm_offsets = (int*)calloc(num_rec, sizeof(int));
+  int* bin_offsets = (int*)calloc(num_rec, sizeof(int));
   //this is for getting the correct offset for each recognizer within its own concatenated array
   for (int i = 0; i < num_rec; i++){
     //printf("%c\n", rec_types[i]);
     if (rec_types[i] == 'P' || rec_types[i] == 'p'){
      rec_offsets[i] = curr_count_pssm_rec;
      curr_count_pssm_rec++; 
+     pssm_offsets[i] = rec_lengths[i];
     }else{
       rec_offsets[i] = curr_count_shape_rec;
+      bin_offsets[i] = int_arr_sum(num_bins, curr_count_shape_rec);
       curr_count_shape_rec++;
     }     
   }
 
+  if (curr_count_shape_rec > 1){
+    for (int i = 0; i < num_rec; i++){
+      printf("bin_offset at %i is %i\n", i, bin_offsets[i]);
+    }    
+
+    for (int i = 0; i < curr_count_shape_rec; i++){
+      printf("bin size:\n", num_bins[i]);
+    }
+  }
   // pre computes alignments of each pssm at each possible position
   // i = current recognizer
   for (int i = 0; i < num_rec; i++) {
     forward_offset = get_forward_offset(i, rec_lengths, num_rec);
     reverse_offset = get_reverse_offset(i, rec_lengths, num_rec);
+    printf("doing rec: %i\n", i);
     switch(rec_types[i]){
     case 'P':
     case 'p':
-      //printf("fill row pssm\n");
-      fill_row_pssm(seq, len_seq, rec_offsets[i], rec_matrices, rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix);
+      printf("fill row pssm: pssm offset: %i\n", rec_offsets[i]);
+      pssm_score_offset = int_arr_sum(pssm_offsets, i);
+      fill_row_pssm(seq, len_seq, i, rec_offsets[i], rec_matrices, pssm_score_offset, rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix);
       break;
     case 'M':
     case 'm':
-      printf("should not be here\n");
-      fill_row_mgw(seq, len_seq, rec_offsets[i], rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix, bin_frequencies, bin_edges, num_bins[0]);
+      fill_row_mgw(seq, len_seq, i, rec_offsets[i], rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix, bin_frequencies, bin_edges, num_bins[0]);
       break;
     case 'T':
     case 't':
-      fill_row_prot(seq, len_seq, rec_offsets[i], rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix, bin_frequencies, bin_edges, num_bins[0]);
+      fill_row_prot(seq, len_seq, i, rec_offsets[i], rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix, bin_frequencies, bin_edges, num_bins[0]);
       break;
     case 'H':
     case 'h':
-      fill_row_helt(seq, len_seq, rec_offsets[i], rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix, bin_frequencies, bin_edges, num_bins[0]);
+      fill_row_helt(seq, len_seq, i, rec_offsets[i], rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix, bin_frequencies, bin_edges, num_bins[0]);
       break;
     case 'R':
     case 'r':
-      fill_row_roll(seq, len_seq, rec_offsets[i], rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix, bin_frequencies, bin_edges, num_bins[0]);
+      fill_row_roll(seq, len_seq, i, rec_offsets[i], rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix, bin_frequencies, bin_edges, num_bins[0]);
       break;
       break;
     }
   }
+  print_scores(score_matrix, num_rec, num_alignments);
 }

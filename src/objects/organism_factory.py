@@ -6,6 +6,7 @@
 import random
 import json
 import numpy as np
+from .shape_object import ShapeObject
 from .organism_object import OrganismObject
 from .connector_object import ConnectorObject
 from .pssm_object import PssmObject
@@ -17,7 +18,7 @@ class OrganismFactory:
     """Factory class
     """
 
-    def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank) -> None:
+    def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank, shape_null_models, conf_shape) -> None:
         """
         Instantiates an OrganismFactory object.
         Reads in the configuration paramaters for the factory and for all object
@@ -31,7 +32,8 @@ class OrganismFactory:
         # Process rank (used to esure unique organism IDs when running in parallel mode)
         self._process_rank = p_rank
         #self._id = 0
-        
+        self.shape_null_models = shape_null_models
+        self.conf_shape = conf_shape
         # lambda parameter for Poisson distribution that will instantiate
         # organism. lambda is the expected number of recognizers in the
         # organism (and also its variance)
@@ -136,6 +138,13 @@ class OrganismFactory:
 
         return new_connector
 
+
+    def create_recognizer(self, length = None):
+        if random.random() > 0.5:
+            return self.create_pssm(length)
+        else:
+            return self.create_shape(length)
+
     def create_pssm(self, length = None) -> PssmObject:
         """It return a PSSM object with a specific length
 
@@ -155,6 +164,25 @@ class OrganismFactory:
             pwm.append(self.get_pwm_column())
 
         return PssmObject(np.array(pwm), self.conf_pssm)
+    
+    def create_shape(self, length = None):
+        if length == None:
+            length = 5
+
+        mu = random.randint(self.min_mu, self.max_mu)
+        sigma = random.randint(self.min_sigma, self.max_sigma)
+        rec_type = ''
+        y = random.random()
+        if y >= 0.00 and y < 0.25:
+            rec_type  = 'm'
+        if y >= 0.25 and y < 0.50:
+            rec_type  = 't'
+        if y >= 0.50 and y < 0.75:
+            rec_type  = 'r'
+        if y >= 0.75 and y <= 1.00:
+            rec_type  = 'h'
+        return ShapeObject(rec_type, length, mu, sigma, self.conf_shape, self.shape_null_models)
+
 
     def get_pwm_column(self) -> dict:
         """Generates a single column for a PWM
@@ -313,9 +341,11 @@ class OrganismFactory:
         for o_organism in a_organisms:
             organism = []
             for i in range(o_organism.count_recognizers() - 1):
-                organism.append(self.export_pssm(o_organism.recognizers[i]))
-                organism.append(self.export_connector(o_organism.connectors[i]))
-            organism.append(self.export_pssm(o_organism.recognizers[-1]))
+                if o_organism.recognizers[i].type == 'p':
+                    organism.append(self.export_pssm(o_organism.recognizers[i]))
+                    organism.append(self.export_connector(o_organism.connectors[i]))
+            if o_organism.recognizers[-1].type == 'p':
+                organism.append(self.export_pssm(o_organism.recognizers[-1]))
             list_json_organisms.append(organism)
         
         with open(filename, "w+") as json_file:

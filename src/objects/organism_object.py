@@ -39,6 +39,9 @@ class OrganismObject:
         self.connectors_scores_flat = []
         self.recognizer_lengths = []
         self.recognizer_types = ""
+        self.recognizer_models = []
+        self.recognizer_bin_edges = []
+        self.recognizer_bin_nums = []
         # assign organism-specific parameters
 	
         # whether fitness is computed over sequences as sum or average
@@ -413,7 +416,7 @@ class OrganismObject:
             
 			# instantiate the new recognizer and connector
             new_connector = org_factory.create_connector()
-            new_recognizer = org_factory.create_pssm()
+            new_recognizer = org_factory.create_recognizer()
             
 			# "blind" method: one of the existing connectors is used
 			# (unchanged) to connect to the new recognizer
@@ -1078,6 +1081,7 @@ class OrganismObject:
         Returns:
             PlacementObject containing information of optimal placement
         """
+        #print(self.recognizer_types)
         number_PSSM = len(self.recognizers)
         max_length = 0
         if number_PSSM < 2:
@@ -1091,7 +1095,7 @@ class OrganismObject:
         gaps = np.empty(number_PSSM, dtype = np.dtype('i'))
         gap_scores = np.empty(number_PSSM - 1, dtype = np.dtype('f'))
         PSSM_scores = np.empty(number_PSSM + 1, dtype = np.dtype('f'))
-        _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), self.recognizers_flat, self.recognizer_lengths,  self.connectors_scores_flat, PSSM_scores, gap_scores, gaps, max_length, gap_scores, gap_scores, gaps)
+        _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), self.recognizers_flat, self.recognizer_lengths,  self.connectors_scores_flat, PSSM_scores, gap_scores, gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
         # parse data from the _calculatePlacement module and put it
         # into a PlacementObject to be returned
         placement = PlacementObject(self._id, sequence)
@@ -1112,6 +1116,12 @@ class OrganismObject:
                 placement.append_connector_position([int(current_position), int(stop)])
                 current_position += gaps[i + 1]
         
+        if 'm' in self.recognizer_types:
+            print(self.recognizer_types)
+            print(self.recognizer_models)
+            placement.print_placement(stdout=True)
+            print(self.recognizers_flat)
+            exit()
         return placement
 
     def flatten(self):
@@ -1131,20 +1141,36 @@ class OrganismObject:
         # instantiation of lists to hold flattened info
         flat_recognizers = []
         flat_connector_scores = []
+        flat_rec_models = []
+        rec_bin_nums = []
+        rec_bin_edges = []
         recognizer_lengths = []
         self.recognizer_types = ""
         
         for recognizer in self.recognizers:
-            for column in recognizer.pssm:
-                for base in ['a','g','c','t']:
-                    flat_recognizers.append(column[base])
+            if recognizer.type == 'p':
+                for column in recognizer.pssm:
+                    for base in ['a','g','c','t']:
+                        flat_recognizers.append(column[base])
+            else:
+                for prob in recognizer.null_model:
+                    flat_rec_models.append(prob)
+                for prob in recognizer.alt_model:
+                    print("hi")
+                    flat_rec_models.append(prob)
+                for edge in recognizer.bins:
+                    rec_bin_edges.append(edge)
+                rec_bin_nums.append(len(recognizer.bins))
             recognizer_lengths.append(recognizer.length)
-            self.recognizer_types += recognizer.rec_type
+            self.recognizer_types += recognizer.type
 
         # organism holds a numpy array of the flattened lists
         self.recognizers_flat = np.array(flat_recognizers, dtype = np.dtype('f')) 
         self.recognizer_lengths = np.array(recognizer_lengths, dtype = np.dtype('i'))
-
+        self.recognizer_models = np.array(flat_rec_models, dtype = np.dtype('f'))
+        self.recognizer_bin_nums = np.array(rec_bin_nums, dtype = np.dtype('i'))
+        self.recognizer_bin_edges = np.array(rec_bin_edges, dtype = np.dtype('f'))
+        print(self.recognizer_types, self.recognizer_bin_nums)
         if self.is_precomputed == True:
             for connector in self.connectors:
                 for i in range(connector.expected_seq_length):

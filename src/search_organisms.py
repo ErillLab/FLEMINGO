@@ -37,8 +37,9 @@ MIN_ITERATIONS = 0
 MIN_FITNESS = 0
 RECOMBINATION_PROBABILITY = 0.0
 THRESHOLD = 0.0
-
+SHAPE_NULL_MODELS = {}
 JSON_CONFIG_FILENAME = "config.json"
+NULL_MODEL_PATH = ""
 """
 Configuration of the object types
 Populated by JSON read.
@@ -101,7 +102,7 @@ def main():
     """
     # Instantiate organism Factory object with object configurations
     organism_factory = OrganismFactory(
-        configOrganism, configOrganismFactory, configConnector, configPssm, rank
+        configOrganism, configOrganismFactory, configConnector, configPssm, rank, SHAPE_NULL_MODELS, configShape
     )
     
     # Initialize the population of organisms
@@ -872,12 +873,15 @@ def set_up():
     global PERIODIC_POP_EXPORT
     global MAX_NODES
     global MIN_NODES
+    global NULL_MODEL_PATH
+    global SHAPE_NULL_MODELS
 
     # Config data
     global configOrganism
     global configOrganismFactory
     global configConnector
     global configPssm
+    global configShape
     
     # MPI variables  # XXX
     global comm
@@ -933,19 +937,24 @@ def set_up():
     PERIODIC_POP_EXPORT = config["main"]["PERIODIC_POP_EXPORT"]
     MAX_NODES = config["organism"]["MAX_NODES"]
     MIN_NODES = config["organism"]["MIN_NODES"]
-    
+    NULL_MODEL_PATH = config["main"]["NULL_MODEL_PATH"]
+
     # Create directory where the output and results will be stored
     if i_am_main_process():  # XXX
         check_dir(RESULT_BASE_PATH_DIR)
         check_dir(RESULT_BASE_PATH_DIR + "population")
         check_dir(RESULT_BASE_PATH_DIR + "plots")
+        check_dir(NULL_MODEL_PATH)
 
     # Store Config into variables to use later
     configOrganism = config["organism"]
     configOrganismFactory = config["organismFactory"]
     configConnector = config["connector"]
     configPssm = config["pssm"]
+    configShape = config["shape"]
 
+    SHAPE_NULL_MODELS = load_null_models(config["shape"]["MAX_COLUMNS"])
+    print(SHAPE_NULL_MODELS)
     # Throw config on a file
     if i_am_main_process():  # XXX
         parameters_path = RESULT_BASE_PATH_DIR + "parameters.txt"
@@ -960,6 +969,7 @@ def set_up():
         )
         print_config_json(configConnector, "Connector Config", parameters_path)
         print_config_json(configPssm, "PSSM Config", parameters_path)
+        print_config_json(configShape, "Shape Config", parameters_path)
     
         print_ln("-" * 50, parameters_path)
 
@@ -1147,7 +1157,29 @@ def flatten_population(population):
             flat_population.append(item)
     return flat_population
 
+def load_null_models(max_shape_size):
+    null_shape_models = {"mgw": {}, "prot": {}, "roll": {}, "helt": {}}
 
+    for shape in ["mgw", "prot", "roll", "helt"]:
+        for j in range(5, max_shape_size + 1):
+            null_shape_models[shape][j] = {"values": [], "bins": []}
+            with open(NULL_MODEL_PATH + shape + "_" + str(j) + "_null") as null_model:
+                n = null_model.read()
+                n = n.replace("(", "")
+                n = n.replace(")", "")
+                n = n.replace("[", "")
+                n = n.replace("]", "")
+                n = n.replace(",", "")
+                n = n.replace("\n", "")
+                n = n.strip()
+                n = n.split("array")
+
+                n = [i.strip() for i in n[1:]]
+                n = [i.split() for i in n]
+                n = [float(i) for i in n[0]],[float(j) for j in n[1]]
+                null_shape_models[shape][j]["values"] = np.array(n[0], dtype=np.dtype('f'))
+                null_shape_models[shape][j]["bins"] = np.array(n[1], dtype=np.dtype('f'))
+    return null_shape_models
 # Entry point to app execution
 # It calculates the time, but could include other app stats
 

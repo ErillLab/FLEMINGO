@@ -18,13 +18,13 @@ void fill_traceback_matrix(float *score_matrix, int num_alignments, float *gapMa
 
 void fill_matrix(const char seq[], int len_seq, float pssm[], int cols[], const char rec_types[], int num_rec, float score_matrix[], int num_alignments, float bin_freqs[], float bin_edges[], int num_bins[]);
 
-void fill_row_pssm(const char* seq, int len_seq, int curr_rec, float rec_matrices[], int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]);
+void fill_row_pssm(const char* seq, int len_seq, int row, int curr_rec, float rec_matrices[], int pssm_score_offset, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[]);
 
-void fill_row_mgw(const char* seq, int len_seq, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins);
+void fill_row_mgw(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins);
 
-void fill_row_prot(const char* seq, int len_seq, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins);
+void fill_row_prot(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins);
 
-void fill_row_helt(const char* seq, int len_seq, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins);
+void fill_row_helt(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins);
 
-void fill_row_roll(const char* seq, int len_seq, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins);
+void fill_row_roll(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins);
 #endif

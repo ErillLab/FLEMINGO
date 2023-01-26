@@ -1,4 +1,21 @@
 #include "_aux.h"
+void print_scores(float* scores, int num_rec, int num_align){
+  for (int i = 0; i < num_rec; i++){
+    printf("|");
+    for (int j = 0; j < num_align; j++){
+      printf("%5.1f|", scores[i * num_align + j]);
+    }
+    printf("\n");
+  }
+}
+int int_arr_sum(int* int_arr, int stop){
+  int sum = 0; 
+  for (int i = 0; i < stop; i++){
+    sum += int_arr[i];
+  }
+  return sum;
+}
+
 int min(int n, int k){
   if (n > k)
     return k;
@@ -120,6 +137,7 @@ float get_bin_frequency(float score, float bin_frequencies[], float bin_edges[],
       return bin_frequencies[i];
     }
   } 
+  return bin_frequencies[num_bins - 1];
 }
 
 float shape_average(float array[], int num_elements){

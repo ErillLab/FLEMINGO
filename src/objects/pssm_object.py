@@ -37,6 +37,7 @@ class PssmObject():
         self.length = len(pwm)  # length of the numpy array
         self.pwm = pwm  # numpy array of dictionaries
         self.pssm = None #scoring matrix
+        self.type = 'p'
         
         # assign PSSM-specific configuration elements
         self.mutate_probability_random_col = config[
