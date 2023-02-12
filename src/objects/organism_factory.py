@@ -166,7 +166,7 @@ class OrganismFactory:
         return PssmObject(np.array(pwm), self.conf_pssm)
     
     def create_shape(self, length = None):
-        if length == None:
+        if length == None or length < 5:
             length = 5
 
         mu = random.randint(self.min_mu, self.max_mu)

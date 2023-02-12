@@ -7,7 +7,7 @@
     "DATASET_BASE_PATH_DIR": "datasets/",
     "RESULT_BASE_PATH_DIR": "results/",
     "RESULT_TEST_BASE_PATH_DIR": "resultsTEST/",
-    "POSITIVE_FILENAME": "test.fas",
+    "POSITIVE_FILENAME": "positive_dataset_7_100.fas",
     "NEGATIVE_FILENAME": null,
     "GENERATED_NEG_SET_SIZE": 334,
     "GENERATED_NEG_SET_KMER_LEN": 4,

@@ -134,9 +134,14 @@ int max_index(float *arr, int size) {
 float get_bin_frequency(float score, float bin_frequencies[], float bin_edges[], int num_bins){
   for (int i = 1; i < num_bins; i++){
     if (score < bin_edges[i]){
-      return bin_frequencies[i];
+      if (bin_frequencies[num_bins - 1] == 0.00) {
+        return bin_frequencies[i];
+      }else{
+        return bin_frequencies[i - 1];
+      }
     }
   } 
+
   return bin_frequencies[num_bins - 1];
 }
 

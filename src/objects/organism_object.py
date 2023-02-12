@@ -3,7 +3,7 @@
 Organism object
 It allocates the full data structure
 """
-
+import math
 import random
 import numpy as np
 from scipy.stats import ks_2samp
@@ -1092,6 +1092,7 @@ class OrganismObject:
 
         # instantiation of numpy arrays that will hold placement info
         # gathered by the _calculatePlacement module
+        #print(self.recognizer_types);
         gaps = np.empty(number_PSSM, dtype = np.dtype('i'))
         gap_scores = np.empty(number_PSSM - 1, dtype = np.dtype('f'))
         PSSM_scores = np.empty(number_PSSM + 1, dtype = np.dtype('f'))
@@ -1117,10 +1118,21 @@ class OrganismObject:
                 current_position += gaps[i + 1]
         
         if 'm' in self.recognizer_types:
-            print(self.recognizer_types)
-            print(self.recognizer_models)
+            pass
+            #print(self.recognizer_types)
+            #print(self.recognizer_models)
+            #placement.print_placement(stdout=True)
+            #print(self.recognizers_flat)
+        #placement.print_placement(stdout=True)
+        if math.isnan(placement.energy) or placement.energy > 100000 or placement.energy < -100000:
+            print("--------------------------------------")
             placement.print_placement(stdout=True)
-            print(self.recognizers_flat)
+            print(self.recognizer_types)
+            print("--------------------------------------")
+            print("null model")
+            for rec in self.recognizers:
+                if rec.type != 'p':
+                    print(rec.null_model)
             exit()
         return placement
 
@@ -1153,10 +1165,12 @@ class OrganismObject:
                     for base in ['a','g','c','t']:
                         flat_recognizers.append(column[base])
             else:
+                if recognizer.length < 5:
+                    recognizer.length = 5
                 for prob in recognizer.null_model:
                     flat_rec_models.append(prob)
                 for prob in recognizer.alt_model:
-                    print("hi")
+                    #print("hi")
                     flat_rec_models.append(prob)
                 for edge in recognizer.bins:
                     rec_bin_edges.append(edge)
@@ -1170,7 +1184,7 @@ class OrganismObject:
         self.recognizer_models = np.array(flat_rec_models, dtype = np.dtype('f'))
         self.recognizer_bin_nums = np.array(rec_bin_nums, dtype = np.dtype('i'))
         self.recognizer_bin_edges = np.array(rec_bin_edges, dtype = np.dtype('f'))
-        print(self.recognizer_types, self.recognizer_bin_nums)
+        #print(self.recognizer_types, self.recognizer_bin_nums)
         if self.is_precomputed == True:
             for connector in self.connectors:
                 for i in range(connector.expected_seq_length):

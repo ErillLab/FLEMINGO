@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import math
+import copy
 
 def norm_cdf(x, mu, sigma):
     ''' Cumulative distribution function for the normal distribution. '''
@@ -34,7 +35,7 @@ class ShapeObject:
         self.null_model = []
         self.bins = []
         self.alt_model = []
-
+        self.nulls = null_models
         self.set_null_model(null_models)
         self.set_alt_model()
 
@@ -60,19 +61,19 @@ class ShapeObject:
             rec_type = "roll"
         if self.type == 'h':
             rec_type = "helt"
-        self.null_model = null_models[rec_type][self.length]["values"];
+        self.null_model = null_models[rec_type][self.length]["values"]
         self.bins = null_models[rec_type][self.length]["bins"]
 
     def set_alt_model(self):
         alt_model = []
         for i in self.bins:
-            print(i)
+            #print(i)
             score = norm_pf(i + 0.05, self._mu, self._sigma)
             if score < 0.001:
                 score = 0.0001
             alt_model.append(score)
         self.alt_model = np.array(alt_model, dtype=np.dtype("f"))
-        print(self.type, self.length, self._mu, self._sigma)
+        #print(self.type, self.length, self._mu, self._sigma)
         #print("NULL_MODEL:",self.null_model)
         #print("ALT_MODEL:",alt_model) 
 
@@ -115,11 +116,15 @@ class ShapeObject:
             elif self.mu_mutator=="standard":
                 self._mu = abs(random.gauss(self._mu, self._sigma))
 
-        if random.random() < self.mutate_probability_increase_size:
-           self.length += 1 
+        if random.random() < self.mutate_probability_increase_size and self.length < self.max_columns:
+            self.length += 1 
+            self.set_null_model(self.nulls)
+            self.set_alt_model()
 
-        if random.random() < self.mutate_probability_decrease_size:
+        if random.random() < self.mutate_probability_decrease_size and self.length > self.min_columns:
             self.length -= 1
+            self.set_null_model(self.nulls)
+            self.set_alt_model()
 
     def export(self, export_file) -> None:
         """Exports pssm to a file

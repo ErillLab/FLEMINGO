@@ -25,7 +25,7 @@ void fill_row_pssm(const char* seq, int len_seq, int row, int curr_rec, float re
           break;
       }
     }
-    printf("score: %f\n", score);
+    //printf("score: %f\n", score);
     score_matrix[(row * num_alignments) + j - forward_offset] = score;
 
   }
@@ -43,10 +43,12 @@ void fill_row_mgw(const char* seq, int len_seq, int row, int curr_rec, int rec_l
   for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
     score = 0.0;
     sum = 0.0;
-    
+    //printf("j = %i\n", j);
+    //printf("num_pent = %i\n", num_pentamers);
     for (int k = 0; k < num_pentamers; k++) {
       index = 0;
       for (int l = k; l < k + 5; l++){
+        //printf("hi\n");
         //printf("%c", seq[j + l]);
         switch (seq[j + l]) {
           case 'A':
@@ -68,13 +70,14 @@ void fill_row_mgw(const char* seq, int len_seq, int row, int curr_rec, int rec_l
         }
       }
       //printf(": index: %i | MGW_SCORES[%i]: %f\n", index, index, MGW_SCORES[index]); 
+      //printf("k = %i\n", k);    
       pentamer_scores[k] = MGW_SCORES[index];
     }
 
     //still need to get actual score from llr
     score = shape_average(pentamer_scores, num_pentamers);
     null_freq = get_bin_frequency(score, bin_frequencies, bin_edges, num_bins);
-    printf("getting null freq from score: %f\n", score);
+    printf("\ngetting null freq from score: %f\n", score);
     alt_freq = get_bin_frequency(score, bin_frequencies + num_bins, bin_edges, num_bins);
     printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
     score_matrix[(row * num_alignments) + j - forward_offset] = log2(alt_freq/null_freq);
@@ -85,6 +88,8 @@ void fill_row_mgw(const char* seq, int len_seq, int row, int curr_rec, int rec_l
 void fill_row_prot(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
 
   float score = 0.0; 
+  float null_freq = 0.0; 
+  float alt_freq = 0.0; 
   float sum = 0.0;
   int index = 0;
   int num_pentamers = rec_length - 4;
@@ -93,11 +98,13 @@ void fill_row_prot(const char* seq, int len_seq, int row, int curr_rec, int rec_
   for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
     score = 0.0;
     sum = 0.0;
-    
+    //printf("j = %i\n", j);    
+    //printf("num_pent = %i\n", num_pentamers);
     for (int k = 0; k < num_pentamers; k++) {
       index = 0;
       for (int l = k; l < k + 5; l++){
-      //printf("%c", seq[j + l]);
+        //printf("hi\n");
+        printf("%c", seq[j + l]);
         switch (seq[j + l]) {
           case 'A':
           case 'a':
@@ -117,16 +124,26 @@ void fill_row_prot(const char* seq, int len_seq, int row, int curr_rec, int rec_
             break;
         }
       }
+      //printf("k = %i\n", k);    
       pentamer_scores[k] = PROT_SCORES[index];
     }
 
     //still need to get actual score from llr
+
+    score = shape_average(pentamer_scores, num_pentamers);
+    null_freq = get_bin_frequency(score, bin_frequencies, bin_edges, num_bins);
+    printf("\ngetting null freq from score: %f\n", score);
+    alt_freq = get_bin_frequency(score, bin_frequencies + num_bins, bin_edges, num_bins);
+    printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
+    score_matrix[(row * num_alignments) + j - forward_offset] = log2(alt_freq/null_freq);
   }
   free(pentamer_scores);
 }
 
 void fill_row_helt(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
   float  score                 = 0.0; 
+  float null_freq = 0.0; 
+  float alt_freq = 0.0; 
   float  sum                   = 0.0;
   int    index                 = 0;
   int    num_pentamers         = rec_length - 4;
@@ -135,11 +152,14 @@ void fill_row_helt(const char* seq, int len_seq, int row, int curr_rec, int rec_
   for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
     score = 0.0;
     sum   = 0.0;
+    //printf("j = %i\n", j);    
+    //printf("num_pent = %i\n", num_pentamers);
     
     for (int k = 0; k < num_pentamers; k++) {
       index = 0;
 
       for (int l = k; l < k + 5; l++){
+        //printf("hi\n");
         //printf("%c", seq[j + l]);
         switch (seq[j + l]) {
           case 'A':
@@ -161,11 +181,17 @@ void fill_row_helt(const char* seq, int len_seq, int row, int curr_rec, int rec_
         }
 
       }
+      //printf("k = %i\n", k);    
       pentamer_scores[k]     = HELT_SCORES[index];
-      pentamer_scores[k + 1] = HELT_SCORES[1024 + index];
+      pentamer_scores[k + num_pentamers] = HELT_SCORES[1024 + index];
     }
     score = shape_average(pentamer_scores, num_pentamers * 2);
     //still need to get actual score from llr
+    null_freq = get_bin_frequency(score, bin_frequencies, bin_edges, num_bins);
+    printf("getting null freq from score: %f\n", score);
+    alt_freq = get_bin_frequency(score, bin_frequencies + num_bins, bin_edges, num_bins);
+    printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
+    score_matrix[(row * num_alignments) + j - forward_offset] = log2(alt_freq/null_freq);
 
   }
   free(pentamer_scores);
@@ -173,6 +199,8 @@ void fill_row_helt(const char* seq, int len_seq, int row, int curr_rec, int rec_
 
 void fill_row_roll(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins){
   float  score                 = 0.0; 
+  float null_freq = 0.0; 
+  float alt_freq = 0.0; 
   float  sum                   = 0.0;
   int    index                 = 0;
   int    num_pentamers         = rec_length - 4;
@@ -181,11 +209,14 @@ void fill_row_roll(const char* seq, int len_seq, int row, int curr_rec, int rec_
   for (int j = forward_offset; j < len_seq - reverse_offset; j++) {
     score = 0.0;
     sum   = 0.0;
+    //printf("j = %i\n", j);    
+    //printf("num_pent = %i\n", num_pentamers);
     
     for (int k = 0; k < num_pentamers; k++) {
       index = 0;
 
       for (int l = k; l < k + 5; l++){
+        //printf("hi\n");
         //printf("%c", seq[j + l]);
         switch (seq[j + l]) {
           case 'A':
@@ -207,12 +238,18 @@ void fill_row_roll(const char* seq, int len_seq, int row, int curr_rec, int rec_
         }
 
       }
+      //printf("k = %i\n", k);    
       pentamer_scores[k]     = ROLL_SCORES[index];
-      pentamer_scores[k + 1] = ROLL_SCORES[1024 + index];
+      pentamer_scores[k + num_pentamers] = ROLL_SCORES[1024 + index];
     }
     score = shape_average(pentamer_scores, num_pentamers * 2);
     //still need to get actual score from llr
 
+    null_freq = get_bin_frequency(score, bin_frequencies, bin_edges, num_bins);
+    printf("getting null freq from score: %f\n", score);
+    alt_freq = get_bin_frequency(score, bin_frequencies + num_bins, bin_edges, num_bins);
+    printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
+    score_matrix[(row * num_alignments) + j - forward_offset] = log2(alt_freq/null_freq);
   }
   free(pentamer_scores);
 }
@@ -358,11 +395,11 @@ void fill_matrix(const char seq[], int len_seq, float rec_matrices[], int rec_le
 
   if (curr_count_shape_rec > 1){
     for (int i = 0; i < num_rec; i++){
-      printf("bin_offset at %i is %i\n", i, bin_offsets[i]);
+      //printf("bin_offset at %i is %i\n", i, bin_offsets[i]);
     }    
 
     for (int i = 0; i < curr_count_shape_rec; i++){
-      printf("bin size:\n", num_bins[i]);
+      //printf("bin size:\n", num_bins[i]);
     }
   }
   // pre computes alignments of each pssm at each possible position
@@ -370,11 +407,11 @@ void fill_matrix(const char seq[], int len_seq, float rec_matrices[], int rec_le
   for (int i = 0; i < num_rec; i++) {
     forward_offset = get_forward_offset(i, rec_lengths, num_rec);
     reverse_offset = get_reverse_offset(i, rec_lengths, num_rec);
-    printf("doing rec: %i\n", i);
+    //printf("doing rec: %i: of type %c\n", i, rec_types[i]);
     switch(rec_types[i]){
     case 'P':
     case 'p':
-      printf("fill row pssm: pssm offset: %i\n", rec_offsets[i]);
+      //printf("fill row pssm: pssm offset: %i\n", rec_offsets[i]);
       pssm_score_offset = int_arr_sum(pssm_offsets, i);
       fill_row_pssm(seq, len_seq, i, rec_offsets[i], rec_matrices, pssm_score_offset, rec_lengths[i], num_alignments, forward_offset, reverse_offset, score_matrix);
       break;
@@ -397,5 +434,5 @@ void fill_matrix(const char seq[], int len_seq, float rec_matrices[], int rec_le
       break;
     }
   }
-  print_scores(score_matrix, num_rec, num_alignments);
+  //print_scores(score_matrix, num_rec, num_alignments);
 }

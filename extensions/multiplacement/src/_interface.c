@@ -124,10 +124,12 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   int num_alignments = len_seq - forward_offset - reverse_offset;
   float *score_matrix =
       PyMem_Calloc(num_alignments * num_rec, sizeof(*rec_matrices_ptr));
+
+  //printf("before fill matrix\n");
   fill_matrix(seq, len_seq, rec_matrices_ptr, rec_lengths_ptr, rec_types, num_rec,
               score_matrix, num_alignments, bin_freqs_ptr, bin_edges_ptr,
               num_bins_ptr);
-
+  //printf("after fill matrix\n");
   if (con_matrices.shape[0] == (num_rec - 1) * 2)
     is_precomputed = false;
   // traceback function breaks when the number of recognizers is less than
@@ -152,6 +154,9 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   matrix_converter(NULL, &rec_scores);
   matrix_converter(NULL, &con_scores);
   matrix_converter(NULL, &con_lengths);
+  matrix_converter(NULL, &bin_freqs);
+  matrix_converter(NULL, &bin_edges);
+  matrix_converter(NULL, &num_bins);
   return result;
 }
 

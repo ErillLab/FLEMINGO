@@ -491,6 +491,7 @@ def main():
         
         if i_am_main_process():
             # Mean fitness in the population
+            print(a_fitness)
             mean_fitness = np.mean(a_fitness)
             # Standard deviation of fitness in the population
             standard_dev_fitness = np.std(a_fitness)
