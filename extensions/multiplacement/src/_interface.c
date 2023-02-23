@@ -1,5 +1,5 @@
 #include "_interface.h"
-
+#include "organism/organism.h"
 static int matrix_converter(PyObject *object, void *address) {
   const int flags = PyBUF_C_CONTIGUOUS | PyBUF_FORMAT;
   char datatype;
@@ -116,9 +116,47 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   float *bin_edges_ptr = bin_edges.buf;
   int *num_bins_ptr = num_bins.buf;
   bool is_precomputed = true;
-  //printf("hello\n");
-  // getting the number of alignments is needed for calculating the size
-  // of the array we will use to store the scores for each recognizer alignment
+
+  if (con_matrices.shape[0] == (num_rec - 1) * 2){
+    is_precomputed = false;
+    max_length = 2;
+  }
+
+  float*** recs = (float***)PyMem_RawMalloc(num_rec * sizeof(float**));
+  float** cons = (float**)PyMem_RawMalloc((num_rec - 1) * sizeof(float*));
+
+  int m_offset = 0;
+  int n_shape = 0;
+  int b_offset = 0;
+
+  for (int i = 0; i < num_rec; i++){
+    if (rec_types[i] == 'p'){
+      recs[i] = (float**)PyMem_RawMalloc(sizeof(float*));
+      recs[i][0] = rec_matrices_ptr + m_offset;
+    }else{
+      recs[i] = (float**)PyMem_RawMalloc(3 * sizeof(float*));
+      recs[i][0] = bin_freqs_ptr + m_offset;
+      m_offset += num_bins_ptr[n_shape];
+      recs[i][1] = bin_freqs_ptr + m_offset;
+      recs[i][2] = bin_freqs_ptr + b_offset;
+      n_shape += 1;
+    }
+    if (i < num_rec - 1){
+      cons[i] = con_matrices_ptr + (i * max_length);
+    }
+  }
+
+  place(seq, len_seq, recs, rec_lengths_ptr, rec_types, num_rec, num_bins_ptr, cons, max_length, rec_scores_ptr, con_scores_ptr, con_lengths_ptr);
+
+  for (int i = 0; i < num_rec; i++){
+      PyMem_RawFree(recs[i]);
+      recs[i] = NULL;
+  }
+  PyMem_RawFree(recs);
+  PyMem_RawFree(cons);
+  recs = NULL;
+  cons = NULL;
+  /*
   int forward_offset = get_forward_offset(0, rec_lengths_ptr, num_rec);
   int reverse_offset = get_reverse_offset(0, rec_lengths_ptr, num_rec);
   int num_alignments = len_seq - forward_offset - reverse_offset;
@@ -130,8 +168,6 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
               score_matrix, num_alignments, bin_freqs_ptr, bin_edges_ptr,
               num_bins_ptr);
   //printf("after fill matrix\n");
-  if (con_matrices.shape[0] == (num_rec - 1) * 2)
-    is_precomputed = false;
   // traceback function breaks when the number of recognizers is less than
   // two since it opperates on the assumption of having at least one connector
   if (num_rec == 1) {
@@ -144,16 +180,26 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
               num_rec, len_seq, con_scores_ptr, rec_scores_ptr,
               con_lengths_ptr, max_length, is_precomputed);
   }
+  */
 
-  PyMem_Free(score_matrix);
+  //printf("final score: %f\n", rec_scores_ptr[num_rec]);
+  /*
+  PyMem_Free(org.recs);
+  org.recs = NULL;
+  PyMem_Free(org.cons);
+  org.cons = NULL;
+  //PyMem_Free(score_matrix);
+  */
   Py_INCREF(Py_None);
   result = Py_None;
   matrix_converter(NULL, &rec_matrices);
   matrix_converter(NULL, &rec_lengths);
   matrix_converter(NULL, &con_matrices);
+
   matrix_converter(NULL, &rec_scores);
   matrix_converter(NULL, &con_scores);
   matrix_converter(NULL, &con_lengths);
+
   matrix_converter(NULL, &bin_freqs);
   matrix_converter(NULL, &bin_edges);
   matrix_converter(NULL, &num_bins);

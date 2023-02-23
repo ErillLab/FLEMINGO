@@ -26,6 +26,7 @@ void fill_row_pssm(const char* seq, int len_seq, int row, int curr_rec, float re
       }
     }
     //printf("score: %f\n", score);
+    //printf("%f\n", score);
     score_matrix[(row * num_alignments) + j - forward_offset] = score;
 
   }
@@ -77,9 +78,9 @@ void fill_row_mgw(const char* seq, int len_seq, int row, int curr_rec, int rec_l
     //still need to get actual score from llr
     score = shape_average(pentamer_scores, num_pentamers);
     null_freq = get_bin_frequency(score, bin_frequencies, bin_edges, num_bins);
-    printf("\ngetting null freq from score: %f\n", score);
+    //printf("\ngetting null freq from score: %f\n", score);
     alt_freq = get_bin_frequency(score, bin_frequencies + num_bins, bin_edges, num_bins);
-    printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
+    //printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
     score_matrix[(row * num_alignments) + j - forward_offset] = log2(alt_freq/null_freq);
   }
   free(pentamer_scores);
@@ -104,7 +105,7 @@ void fill_row_prot(const char* seq, int len_seq, int row, int curr_rec, int rec_
       index = 0;
       for (int l = k; l < k + 5; l++){
         //printf("hi\n");
-        printf("%c", seq[j + l]);
+        //printf("%c", seq[j + l]);
         switch (seq[j + l]) {
           case 'A':
           case 'a':
@@ -132,9 +133,9 @@ void fill_row_prot(const char* seq, int len_seq, int row, int curr_rec, int rec_
 
     score = shape_average(pentamer_scores, num_pentamers);
     null_freq = get_bin_frequency(score, bin_frequencies, bin_edges, num_bins);
-    printf("\ngetting null freq from score: %f\n", score);
+    //printf("\ngetting null freq from score: %f\n", score);
     alt_freq = get_bin_frequency(score, bin_frequencies + num_bins, bin_edges, num_bins);
-    printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
+    //printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
     score_matrix[(row * num_alignments) + j - forward_offset] = log2(alt_freq/null_freq);
   }
   free(pentamer_scores);
@@ -188,9 +189,9 @@ void fill_row_helt(const char* seq, int len_seq, int row, int curr_rec, int rec_
     score = shape_average(pentamer_scores, num_pentamers * 2);
     //still need to get actual score from llr
     null_freq = get_bin_frequency(score, bin_frequencies, bin_edges, num_bins);
-    printf("getting null freq from score: %f\n", score);
+    //printf("getting null freq from score: %f\n", score);
     alt_freq = get_bin_frequency(score, bin_frequencies + num_bins, bin_edges, num_bins);
-    printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
+   // printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
     score_matrix[(row * num_alignments) + j - forward_offset] = log2(alt_freq/null_freq);
 
   }
@@ -246,9 +247,9 @@ void fill_row_roll(const char* seq, int len_seq, int row, int curr_rec, int rec_
     //still need to get actual score from llr
 
     null_freq = get_bin_frequency(score, bin_frequencies, bin_edges, num_bins);
-    printf("getting null freq from score: %f\n", score);
+    //printf("getting null freq from score: %f\n", score);
     alt_freq = get_bin_frequency(score, bin_frequencies + num_bins, bin_edges, num_bins);
-    printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
+    //printf("calculated score of %f\n from alt freq: %f\n and null freq: %f\n", log2(alt_freq/null_freq), alt_freq, null_freq);
     score_matrix[(row * num_alignments) + j - forward_offset] = log2(alt_freq/null_freq);
   }
   free(pentamer_scores);
@@ -434,5 +435,235 @@ void fill_matrix(const char seq[], int len_seq, float rec_matrices[], int rec_le
       break;
     }
   }
-  //print_scores(score_matrix, num_rec, num_alignments);
+}
+
+float con(float* con, int s_len, int eff_len, int n_rec, int gap){
+  return log2f(get_numerator(s_len, gap, con[0], con[1])/get_denominator(gap + 1, n_rec, eff_len));
+}
+
+void pssm(char* seq, int s_len, float* matrix, int len, float* row){
+  float score = 0.0;
+  for (int i = 0; i < s_len + 1; i++) {
+    score = 0.0;
+    for (int j = 0; j < len; j++) {
+      switch(seq[i + j]) {
+        case 'a':
+        case 'A':
+          score += matrix[j * 4 + 0];
+          break;
+        
+        case 'g':
+        case 'G':
+          score += matrix[j * 4 + 1];
+          break;
+        
+        case 'c':
+        case 'C':
+          score += matrix[j * 4 + 2];
+          break;
+        
+        case 't':
+        case 'T':
+          score += matrix[j * 4 + 3];
+          break;
+      }
+    }
+    row[i] = score;
+  }
+}
+
+void mgw(char* seq, int s_len, float** rec, int len, int n_bin, float* row){
+  int n_pent = len - 4;
+  float alt_f = 0.0;
+  float null_f = 0.0;
+  float* alt = rec[0];
+  float* null = rec[1];
+  float* edges = rec[2];
+  float* pent_s = (float*)malloc(n_pent * sizeof(float));
+  float score = 0.0;
+  int idx = 0;
+  for (int i = 0; i < len + 1; i++){
+    for (int j = 0; j < n_pent; j++){
+      score = 0.0;
+      idx = 0;
+      for (int k = j; k < j + 5; k++){
+        switch(seq[k]){
+          case 'a':
+          case 'A':
+            idx += pow(4, 4 - (k - j)) * 0;
+            break;
+
+          case 'g':
+          case 'G':
+            idx += pow(4, 4 - (k - j)) * 1;
+            break;
+
+          case 'c':
+          case 'C':
+            idx += pow(4, 4 - (k - j)) * 2;
+            break;
+
+          case 't':
+          case 'T':
+            idx += pow(4, 4 - (k - j)) * 3;
+            break;
+        }
+      }
+      pent_s[j] = MGW_SCORES[idx];
+
+    }
+    score = shape_average(pent_s, n_pent);
+    alt_f = get_bin_frequency(score, alt, edges, n_bin);
+    null_f = get_bin_frequency(score, null, edges, n_bin);
+    row[i] = log2f(alt_f / null_f);
+    row[i] = 1.2;
+
+  }
+  free(pent_s);
+}
+
+void prot(char* seq, int s_len, float** rec, int len, int n_bin, float* row){
+  
+}
+
+void roll(char* seq, int s_len, float** rec, int len, int n_bin, float* row){
+  
+}
+
+void helt(char* seq, int s_len, float** rec, int len, int n_bin, float* row){
+  
+}
+
+void shape(char* seq, int s_len, float** rec, int len, char feat, int n_bin, float* row){
+  switch(feat){
+    case 'm':
+    case 'M':
+      mgw(seq, s_len, rec, len, n_bin, row);
+      break;
+
+    case 't':
+    case 'T':
+      prot(seq, s_len, rec, len, n_bin, row);
+      break;
+
+    case 'r':
+    case 'R':
+      roll(seq, s_len, rec, len, n_bin, row);
+      break;
+
+    case 'h':
+    case 'H':
+      helt(seq, s_len, rec, len, n_bin, row);
+      break;
+    
+  }
+}
+
+void row(char* seq, int s_len, float** rec, int len, char feat, int n_bin, float* row){
+  if (feat == 'p'){
+    pssm(seq, s_len, rec[0], len, row);
+  }else{
+    shape(seq, s_len, rec, len, feat, n_bin, row);
+  }
+}
+
+void place(char* seq, int s_len, float*** recs, int* r_lens, char* r_types, int n_rec, int* b_lens, float** cons, int m_len, float* r_scores, float* c_scores, int* c_lens){
+  int o_len = 0;
+  int i_shape = 0;
+  for (int i = 0; i < n_rec; i++){
+    o_len += r_lens[i];
+  }
+
+  int eff_len = s_len - o_len - n_rec;
+  int n_align = s_len - o_len + 1;
+
+  int f_offset = 0;
+  float* t_row = (float*)malloc(n_align * sizeof(float));
+  for (int i = 0; i < n_align; i++){
+    t_row[i] = -INFINITY;
+  }
+  float* c_row = (float*)calloc(n_align, sizeof(float));
+
+  float* rs_matrix = (float*)calloc(n_align * n_rec, sizeof(float));
+  float* gs_matrix = (float*)calloc(n_align * (n_rec - 1), sizeof(float));
+  int*   tr_matrix = (int*)calloc(n_align * (n_rec - 1), sizeof(int));
+  int    gap       = 0;
+  float  g_score   = 0.0;
+  
+  for (int i = 0; i < n_rec; i++) {
+    row(seq + f_offset, n_align, recs[i], r_lens[i], r_types[i], b_lens[i_shape], rs_matrix + (i * n_align));
+    if (i > 0) {
+
+      for (int j = 0; j < n_align; j++){
+        for (int k = 0; k < j + 1; k++){
+          
+          gap = j - k;
+          g_score = con(cons[i - 1], s_len, eff_len, n_rec, gap);
+          if (t_row[j] < c_row[k] + g_score + rs_matrix[i * n_align + j]){
+            t_row[j] = c_row[k] + g_score + rs_matrix[i * n_align + j];
+            tr_matrix[(i - 1) * n_align + j] = gap;
+            gs_matrix[(i - 1) * n_align + j] = g_score; 
+          }
+
+        }
+
+      }
+
+      for (int j = 0; j < n_align; j++){
+        c_row[j] = t_row[j];
+        t_row[j] = -INFINITY;
+      }
+    } else {
+      for (int j = 0; j < n_align; j++){
+        c_row[j] = rs_matrix[(i * n_align) + j];
+      }
+    }
+
+    f_offset += r_lens[i];
+  }
+
+  int m_idx = max_index(c_row, n_align);
+  r_scores[n_rec] = c_row[m_idx];
+  for (int i = n_rec - 1; i >= 0; i--) {
+    r_scores[i] = rs_matrix[i * n_align + m_idx];
+    if (i > 0){
+      c_scores[i - 1] = gs_matrix[(i - 1) * n_align + m_idx];
+      c_lens[i] = tr_matrix[(i - 1) * n_align + m_idx];
+      m_idx -= tr_matrix[(i - 1) * n_align + m_idx];
+    }
+  }
+
+  if (n_rec > 1){
+    c_lens[0] = m_idx - c_lens[1];
+  } else {
+    c_lens[0] = m_idx;
+  }
+
+  /*
+  printf("%f: \n", r_scores[n_rec]);
+  for (int i = 0; i < n_rec; i++){
+    printf("rec %i: %f \n", i, r_scores[i]);
+    if (i < n_rec - 1){
+      printf("con: %i: %i, %f\n", i, c_lens[i], c_scores[i]);
+    }
+  }
+  */
+
+  printf("a\n");
+  free(c_row);
+  printf("b\n");
+  free(t_row);
+  printf("c\n");
+  free(rs_matrix);
+  printf("d\n");
+  free(gs_matrix);
+  printf("e\n");
+  free(tr_matrix);
+  printf("f\n");
+  fflush(stdout);
+  c_row = NULL;
+  t_row = NULL;
+  rs_matrix = NULL;
+  gs_matrix = NULL;
+  tr_matrix = NULL;
 }

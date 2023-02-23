@@ -27,4 +27,6 @@ void fill_row_prot(const char* seq, int len_seq, int row, int curr_rec, int rec_
 void fill_row_helt(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins);
 
 void fill_row_roll(const char* seq, int len_seq, int row, int curr_rec, int rec_length, int num_alignments, int forward_offset, int reverse_offset, float score_matrix[], float bin_frequencies[], float bin_edges[], int num_bins);
+
+void place(char* seq, int s_len, float*** recs, int* r_lens, char* r_types, int n_rec, int* b_lens, float** cons, int m_len, float* r_scores, float* c_scores, int* c_lens);
 #endif
