@@ -8,8 +8,6 @@
 #include "_constants.h"
 
 
-void print_scores(float* scores, int num_rec, int num_align);
-
 int int_arr_sum(int*, int);
 
 int min(int n, int k);

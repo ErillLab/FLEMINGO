@@ -122,74 +122,29 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
     max_length = 2;
   }
 
-  float*** recs = (float***)PyMem_RawMalloc(num_rec * sizeof(float**));
-  float** cons = (float**)PyMem_RawMalloc((num_rec - 1) * sizeof(float*));
+  Organism org;
+  parse_org(&org, 
+            rec_matrices_ptr, 
+            rec_lengths_ptr, 
+            bin_freqs_ptr, 
+            bin_edges_ptr, 
+            num_bins_ptr,
+            rec_types, 
+            num_rec, 
+            con_matrices_ptr, 
+            max_length, 
+            is_precomputed);
 
-  int m_offset = 0;
-  int n_shape = 0;
-  int b_offset = 0;
+  place_org(&org, 
+             seq, len_seq, 
+             rec_scores_ptr, 
+             con_scores_ptr, 
+             con_lengths_ptr,
+             is_precomputed);
 
-  for (int i = 0; i < num_rec; i++){
-    if (rec_types[i] == 'p'){
-      recs[i] = (float**)PyMem_RawMalloc(sizeof(float*));
-      recs[i][0] = rec_matrices_ptr + m_offset;
-    }else{
-      recs[i] = (float**)PyMem_RawMalloc(3 * sizeof(float*));
-      recs[i][0] = bin_freqs_ptr + m_offset;
-      m_offset += num_bins_ptr[n_shape];
-      recs[i][1] = bin_freqs_ptr + m_offset;
-      recs[i][2] = bin_freqs_ptr + b_offset;
-      n_shape += 1;
-    }
-    if (i < num_rec - 1){
-      cons[i] = con_matrices_ptr + (i * max_length);
-    }
-  }
-
-  place(seq, len_seq, recs, rec_lengths_ptr, rec_types, num_rec, num_bins_ptr, cons, max_length, rec_scores_ptr, con_scores_ptr, con_lengths_ptr);
-
-  for (int i = 0; i < num_rec; i++){
-      PyMem_RawFree(recs[i]);
-      recs[i] = NULL;
-  }
-  PyMem_RawFree(recs);
-  PyMem_RawFree(cons);
-  recs = NULL;
-  cons = NULL;
-  /*
-  int forward_offset = get_forward_offset(0, rec_lengths_ptr, num_rec);
-  int reverse_offset = get_reverse_offset(0, rec_lengths_ptr, num_rec);
-  int num_alignments = len_seq - forward_offset - reverse_offset;
-  float *score_matrix =
-      PyMem_Calloc(num_alignments * num_rec, sizeof(*rec_matrices_ptr));
-
-  //printf("before fill matrix\n");
-  fill_matrix(seq, len_seq, rec_matrices_ptr, rec_lengths_ptr, rec_types, num_rec,
-              score_matrix, num_alignments, bin_freqs_ptr, bin_edges_ptr,
-              num_bins_ptr);
-  //printf("after fill matrix\n");
-  // traceback function breaks when the number of recognizers is less than
-  // two since it opperates on the assumption of having at least one connector
-  if (num_rec == 1) {
-    con_lengths_ptr[0] =
-        max_index(score_matrix, len_seq - forward_offset - reverse_offset);
-    rec_scores_ptr[0] = score_matrix[con_lengths_ptr[0]];
-    con_scores_ptr[0] = 0.00;
-  } else {
-    fill_traceback_matrix(score_matrix, num_alignments, con_matrices_ptr, rec_lengths_ptr,
-              num_rec, len_seq, con_scores_ptr, rec_scores_ptr,
-              con_lengths_ptr, max_length, is_precomputed);
-  }
-  */
-
-  //printf("final score: %f\n", rec_scores_ptr[num_rec]);
-  /*
-  PyMem_Free(org.recs);
-  org.recs = NULL;
-  PyMem_Free(org.cons);
-  org.cons = NULL;
-  //PyMem_Free(score_matrix);
-  */
+  //print_org(&org);
+  free(org.recs);
+  free(org.cons);
   Py_INCREF(Py_None);
   result = Py_None;
   matrix_converter(NULL, &rec_matrices);

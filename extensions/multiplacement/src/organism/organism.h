@@ -17,23 +17,72 @@ struct Organism {
   Connector* cons;
 };
 
+void print_scores(Organism* org, float* r_scores, float* c_scores, int* c_lens, int n_rec){
+  for (int i = 0; i < n_rec; i++){
+    printf("|%c[%5.2f]|", org->recs[i].feat, r_scores[i]);
+    if (i < n_rec - 1){
+      printf("+|(%i)", c_lens[i + 1]);
+      printf("c[%5.2f]|+", c_scores[i]);
+    }
+  }
+  printf("=%5.2f\n", r_scores[n_rec]);
+
+}
+
+void print_placement(Organism* org, char* seq, int s_len, int* pos, int n_rec){
+  
+  for (int i = 0; i < s_len; i++){
+    printf("%c", seq[i]);
+  }
+  printf("\n");
+
+  int start;
+  int stop;
+  for (int i = 0; i < pos[0]; i++){
+    printf(" ");
+  }
+
+  int s = 0;
+  int e = 0;
+  for (int i = 0; i < n_rec; i++){
+    s = e + pos[i];
+    e = s + org->recs[i].len;
+
+    printf("%c", org->recs[i].feat);
+    for (int j = s + 1; j < e - 1; j++)
+      printf("#");
+
+    if (org->recs[i].len > 1)
+      printf("%c", org->recs[i].feat);
+
+    if (i < n_rec - 1)
+      for (int j = e; j < e + pos[i + 1]; j++)
+        printf("-");
+  }
+
+  for (int i = pos[n_rec - 1] + org->recs[n_rec - 1].len; i < s_len; i++){
+    printf(" ");
+  }
+  printf("\n\n");
+
+}
+
 void parse_org(Organism *org, float* matrix, int* rec_lengths, float* models, float* edges, int* model_lengths, char* rec_types, int num_recs, float* con_matrix, int max_len, bool precomputed){
   org->len = num_recs;
+  org->recs = (Recognizer*)malloc(num_recs * sizeof(Recognizer));
+  org->cons = (Connector*)malloc((num_recs - 1) * sizeof(Connector));
   org->precomputed = precomputed;
   int m_offset = 0;
   int a_offset = 0;
   int c_offset = 0;
-  int pssm_i = 0;
   int shape_i = 0;
 
   for (int i = 0; i < num_recs; i++){
     if (rec_types[i] == 'p') {
       parse_pssm(&org->recs[i], matrix + m_offset, rec_lengths[i]);
-      m_offset += rec_lengths[pssm_i] * 4;
-      pssm_i += 1;
+      m_offset += rec_lengths[i] * 4;
     } else { 
       parse_shape(&org->recs[i], models + a_offset, models + a_offset + model_lengths[shape_i], edges + a_offset + shape_i, model_lengths[shape_i], rec_lengths[i], rec_types[i]);
-      printf("null_model_offset: %i, alt_model_offset: %i\n", a_offset, a_offset + model_lengths[shape_i]);
       a_offset += model_lengths[shape_i] * 2;
       shape_i += 1;
     }
@@ -74,46 +123,39 @@ void print_org(Organism *org) {
         printf("[%5.2f, %5.2f]: %3.2f\n", c->edges[j], c->edges[j+1], c->alt_f[j]);
       }
     }
-  }
-  
+  }  
 }
 
-
-void place_org( Organism* org,  char* seq,  int s_len, float* rec_scores, float* con_scores, int* con_lengths) {
-  int n_recs = org->len;
-  int* r_lens = (int*)malloc(n_recs * sizeof(int));
+void place_org( Organism* org,  char* seq,  int s_len, float* r_scores, float* c_scores, int* c_lens, bool precomputed) {
+  int n_rec = org->len;
+  int* r_lens = (int*)malloc(n_rec * sizeof(int));
   int m_len = 0;
-  for (int i = 0; i < n_recs; i++){
+  for (int i = 0; i < n_rec; i++){
     r_lens[i] = org->recs[i].len;
     m_len += r_lens[i];
   }
 
-  int eff_len = s_len - m_len - n_recs;
+  int eff_len = s_len - m_len - n_rec;
   int n_align = s_len - m_len + 1;
 
   int f_offset = 0;
-  //int r_offset = s_len - m_len;
 
   float* t_row = (float*)malloc(n_align * sizeof(float));
   for (int i = 0; i < n_align; i++){
     t_row[i] = -INFINITY;
   }
-  //memset(t_row, -100000.0, n_align * sizeof(float));
   float* c_row = (float*)calloc(n_align, sizeof(float));
 
-  float* rs_matrix = (float*)calloc(n_align * n_recs, sizeof(float));
-  float* gs_matrix = (float*)calloc(n_align * (n_recs - 1), sizeof(float));
-  int*   tr_matrix = (int*)calloc(n_align * (n_recs - 1), sizeof(int));
+  float* rs_matrix = (float*)calloc(n_align * n_rec, sizeof(float));
+  float* gs_matrix = (float*)calloc(n_align * (n_rec - 1), sizeof(float));
+  int*   tr_matrix = (int*)calloc(n_align * (n_rec - 1), sizeof(int));
   int    gap       = 0;
   float  g_score   = 0.0;
 
   Recognizer* rec = NULL;
   Connector* con = NULL;
-  printf("top\n");
-  for (int i = 0; i < n_recs; i++) {
+  for (int i = 0; i < n_rec; i++) {
     rec = &org->recs[i];
-    printf("rec: %i of type %c, of len: %i\n", i, rec->feat, rec->len);
-    //r_offset += r_lens[i];
     score_row(rec, seq + f_offset, n_align, rs_matrix + (i * n_align));
     if (i > 0) {
       con = &org->cons[i - 1];
@@ -121,7 +163,7 @@ void place_org( Organism* org,  char* seq,  int s_len, float* rec_scores, float*
       for (int j = 0; j < n_align; j++){
         for (int k = 0; k < j + 1; k++){
           gap = j - k;
-          g_score = score_con(con, gap, s_len, eff_len, n_recs);
+          g_score = score_con(con, gap, s_len, eff_len, n_rec, precomputed);
           if (t_row[j] < c_row[k] + g_score + rs_matrix[i * n_align + j]){
             t_row[j] = c_row[k] + g_score + rs_matrix[i * n_align + j];
             tr_matrix[(i - 1) * n_align + j] = gap;
@@ -146,27 +188,25 @@ void place_org( Organism* org,  char* seq,  int s_len, float* rec_scores, float*
   }
 
   int m_idx = max_index(c_row, n_align);
-  rec_scores[n_recs] = c_row[m_idx];
-  for (int i = n_recs - 1; i >= 0; i--) {
-    rec_scores[i] = rs_matrix[i * n_align + m_idx];
+  r_scores[n_rec] = c_row[m_idx];
+  for (int i = n_rec - 1; i >= 0; i--) {
+    r_scores[i] = rs_matrix[i * n_align + m_idx];
     if (i > 0){
-      con_scores[i - 1] = gs_matrix[(i - 1) * n_align + m_idx];
-      con_lengths[i - 1] = tr_matrix[(i - 1) * n_align + m_idx];
+      c_scores[i - 1] = gs_matrix[(i - 1) * n_align + m_idx];
+      c_lens[i] = tr_matrix[(i - 1) * n_align + m_idx];
       m_idx -= tr_matrix[(i - 1) * n_align + m_idx];
     }
+    c_lens[0] = m_idx;
   }
-  printf("end\n");
-  printf("lens\n");
+
   free(r_lens);
-  printf("t_row\n");
   free(t_row);
-  printf("c_row\n");
   free(c_row);
-  printf("rs_matrix\n");
   free(rs_matrix);
-  printf("gs_matrix\n");
   free(gs_matrix);
-  printf("tr_matrix\n");
   free(tr_matrix);
+
+  print_scores(org, r_scores, c_scores, c_lens, n_rec);
+  print_placement(org, seq, s_len, c_lens, n_rec);
 }
 #endif

@@ -127,16 +127,25 @@ class ConnectorObject():
         for dist in range(self.expected_seq_length):
             
             # Precompute PDF
-            self.stored_pdfs.append(norm_pf(dist, self._mu, self._sigma))
-            
+            pdf = np.log2(norm_pf(dist, self._mu, self._sigma))
+            if pdf > -1E10:
+                self.stored_pdfs.append(pdf)
+            elif pdf <= -1E10:
+                self.stored_pdfs.append(-1E10)            
             # Precompute CDF
+
             if self._sigma != 0:
-                self.stored_cdfs.append(norm_cdf(dist, self._mu, self._sigma))
+                cdf = np.log2(norm_cdf(dist, self._mu, self._sigma))
+                if cdf > -1E10:
+                    self.stored_cdfs.append(cdf)
+                elif cdf <= -1E10:
+                    self.stored_cdfs.append(-1E10)
+
             else:
                 if dist<self._mu:
-                    self.stored_cdfs.append(0.0)
+                    self.stored_cdfs.append(1E-10)
                 else:
-                    self.stored_cdfs.append(1.0)
+                    self.stored_cdfs.append(0.0)
     
     def mutate(self, org_factory) -> None:
         """mutation for a connector

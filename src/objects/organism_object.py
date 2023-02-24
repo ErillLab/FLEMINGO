@@ -1117,23 +1117,7 @@ class OrganismObject:
                 placement.append_connector_position([int(current_position), int(stop)])
                 current_position += gaps[i + 1]
         
-        if 'm' in self.recognizer_types:
-            pass
-            #print(self.recognizer_types)
-            #print(self.recognizer_models)
-            #placement.print_placement(stdout=True)
-            #print(self.recognizers_flat)
         #placement.print_placement(stdout=True)
-        if math.isnan(placement.energy) or placement.energy > 100000 or placement.energy < -100000:
-            print("--------------------------------------")
-            placement.print_placement(stdout=True)
-            print(self.recognizer_types)
-            print("--------------------------------------")
-            print("null model")
-            for rec in self.recognizers:
-                if rec.type != 'p':
-                    print(rec.null_model)
-            exit()
         return placement
 
     def flatten(self):
@@ -1170,7 +1154,6 @@ class OrganismObject:
                 for prob in recognizer.null_model:
                     flat_rec_models.append(prob)
                 for prob in recognizer.alt_model:
-                    #print("hi")
                     flat_rec_models.append(prob)
                 for edge in recognizer.bins:
                     rec_bin_edges.append(edge)
@@ -1184,11 +1167,11 @@ class OrganismObject:
         self.recognizer_models = np.array(flat_rec_models, dtype = np.dtype('f'))
         self.recognizer_bin_nums = np.array(rec_bin_nums, dtype = np.dtype('i'))
         self.recognizer_bin_edges = np.array(rec_bin_edges, dtype = np.dtype('f'))
-        #print(self.recognizer_types, self.recognizer_bin_nums)
         if self.is_precomputed == True:
             for connector in self.connectors:
-                for i in range(connector.expected_seq_length):
-                    flat_connector_scores.append(connector.get_numerator(i, connector.expected_seq_length, self.recognizer_lengths))
+                flat_connector_scores += (connector.stored_pdfs + connector.stored_cdfs)
+#               for i in range(connector.expected_seq_length):
+
             # organism holds a numpy array of the flattened lists
             self.connectors_scores_flat = np.array(flat_connector_scores, dtype = np.dtype('f'))
 

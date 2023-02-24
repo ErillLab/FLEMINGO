@@ -1,13 +1,22 @@
 #include "_aux.h"
-void print_scores(float* scores, int num_rec, int num_align){
-  for (int i = 0; i < num_rec; i++){
-    printf("|");
-    for (int j = 0; j < num_align; j++){
-      printf("%5.1f|", scores[i * num_align + j]);
+void print_matrixi(int* matrix, int row, int col){
+  for (int i = 0; i < row; i++){
+    for (int j = 0; j < col; j++){
+      printf("|%3i", matrix[i * col + j]);
     }
-    printf("\n");
+    printf("|\n");
   }
 }
+
+void print_matrixf(float* matrix, int row, int col){
+  for (int i = 0; i < row; i++){
+    for (int j = 0; j < col; j++){
+      printf("|%8.1e", matrix[i * col + j]);
+    }
+    printf("|\n");
+  }
+}
+
 int int_arr_sum(int* int_arr, int stop){
   int sum = 0; 
   for (int i = 0; i < stop; i++){
@@ -79,7 +88,7 @@ float get_score(float *arr, int dna_length, int effective_length, int num_rec,
     return log2f(get_numerator(dna_length, gap_size, arr[curr_conn * 2], arr[curr_conn * 2 + 1]) / 
                  get_denominator(gap_size + 1, num_rec, effective_length));
   }
-  
+  /*
   return arr[curr_conn * max_length + gap_size] - 
           (
             (
@@ -94,6 +103,7 @@ float get_score(float *arr, int dna_length, int effective_length, int num_rec,
               NUMERATORS[effective_length - num_rec - 1]
             )
           );
+  */
 }
 
 int get_forward_offset(int index, int cols[], int num_rec) {

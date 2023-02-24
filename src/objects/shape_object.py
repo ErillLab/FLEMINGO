@@ -67,15 +67,11 @@ class ShapeObject:
     def set_alt_model(self):
         alt_model = []
         for i in self.bins:
-            #print(i)
             score = norm_pf(i + 0.05, self._mu, self._sigma)
             if score < 0.001:
                 score = 0.0001
             alt_model.append(score)
         self.alt_model = np.array(alt_model, dtype=np.dtype("f"))
-        #print(self.type, self.length, self._mu, self._sigma)
-        #print("NULL_MODEL:",self.null_model)
-        #print("ALT_MODEL:",alt_model) 
 
     def mutate(self, org_fac):
         # SIGMA MUTATION

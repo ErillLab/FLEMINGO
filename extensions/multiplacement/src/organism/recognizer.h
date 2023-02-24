@@ -40,7 +40,7 @@ void parse_shape(Recognizer* rec, float* null_f, float* alt_f, float* edges, int
 void pssm_row( Recognizer* rec,  char* seq,  int len, float* row){
   float score = 0.0;
   float* matrix = rec->matrix;
-  for (int i = 0; i < len + 1; i++) {
+  for (int i = 0; i < len; i++) {
     score = 0.0;
     for (int j = 0; j < rec->len; j++) {
       switch(seq[i + j]) {
@@ -81,7 +81,7 @@ void mgw_row( Recognizer* rec,  char* seq,  int len, float* row){
   float* pent_s = (float*)malloc(n_pent * sizeof(float));
   float score = 0.0;
   int idx = 0;
-  for (int i = 0; i < len + 1; i++){
+  for (int i = 0; i < len; i++){
     for (int j = 0; j < n_pent; j++){
       score = 0.0;
       idx = 0;
@@ -114,9 +114,14 @@ void mgw_row( Recognizer* rec,  char* seq,  int len, float* row){
     score = shape_average(pent_s, n_pent);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
-    row[i] = log2f(alt_f / null_f);
-    row[i] = 1.2;
+    score = log2f(alt_f / null_f);
+    if (score < BIG_NEGATIVE)
+      score = BIG_NEGATIVE;
 
+    if (score > BIG_POSITIVE)
+      score = BIG_POSITIVE;
+
+    row[i] = score;
   }
   free(pent_s);
 }
@@ -133,7 +138,7 @@ void prot_row( Recognizer* rec,  char* seq,  int len, float* row){
   float score = 0.0;
   int idx = 0;
 
-  for (int i = 0; i < len + 1; i++){
+  for (int i = 0; i < len; i++){
     for (int j = 0; j < n_pent; j++){
       score = 0.0;
       idx = 0;
@@ -166,9 +171,14 @@ void prot_row( Recognizer* rec,  char* seq,  int len, float* row){
     score = shape_average(pent_s, n_pent);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
-    row[i] = log2f(alt_f / null_f);
-    row[i] = 1.2;
+    score = log2f(alt_f / null_f);
+    if (score < BIG_NEGATIVE)
+      score = BIG_NEGATIVE;
 
+    if (score > BIG_POSITIVE)
+      score = BIG_POSITIVE;
+
+    row[i] = score;
   }
   free(pent_s);
 
@@ -186,7 +196,7 @@ void roll_row( Recognizer* rec,  char* seq,  int len, float* row){
   float score = 0.0;
   int idx = 0;
 
-  for (int i = 0; i < len + 1; i++){
+  for (int i = 0; i < len; i++){
     for (int j = 0; j < n_pent; j++){
       score = 0.0;
       idx = 0;
@@ -220,8 +230,14 @@ void roll_row( Recognizer* rec,  char* seq,  int len, float* row){
     score = shape_average(pent_s, n_pent);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
-    row[i] = log2f(alt_f / null_f);
-    row[i] = 1.2;
+    score = log2f(alt_f / null_f);
+    if (score < BIG_NEGATIVE)
+      score = BIG_NEGATIVE;
+
+    if (score > BIG_POSITIVE)
+      score = BIG_POSITIVE;
+
+    row[i] = score;
   }
   free(pent_s);
 
@@ -239,7 +255,7 @@ void helt_row( Recognizer* rec,  char* seq,  int len, float* row){
   float score = 0.0;
   int idx = 0;
 
-  for (int i = 0; i < len + 1; i++){
+  for (int i = 0; i < len; i++){
     for (int j = 0; j < n_pent; j++){
       score = 0.0;
       idx = 0;
@@ -273,8 +289,14 @@ void helt_row( Recognizer* rec,  char* seq,  int len, float* row){
     score = shape_average(pent_s, n_pent);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
-    row[i] = log2f(alt_f / null_f);
-    row[i] = 1.2;
+    score = log2f(alt_f / null_f);
+    if (score < BIG_NEGATIVE)
+      score = BIG_NEGATIVE;
+
+    if (score > BIG_POSITIVE)
+      score = BIG_POSITIVE;
+
+    row[i] = score;
   }
   free(pent_s);
 
