@@ -668,7 +668,8 @@ class OrganismObject:
             # that the index is not -1.
             if conn_index >= 0:
                 # Adjust mu
-                self.connectors[conn_index]._mu += left_bound_shift
+                new_mu = self.connectors[conn_index]._mu + left_bound_shift
+                self.connectors[conn_index].set_mu(max(0, new_mu))
                 
                 # Update connector's PDF and CDF values
                 self.connectors[conn_index].set_precomputed_pdfs_cdfs()
@@ -683,7 +684,8 @@ class OrganismObject:
             # to the number of connectors
             if conn_index < self.count_connectors():
                 # Adjust mu
-                self.connectors[conn_index]._mu -= right_bound_shift
+                new_mu = self.connectors[conn_index]._mu - right_bound_shift
+                self.connectors[conn_index].set_mu(max(0, new_mu))
                 
                 # Update connector's PDF and CDF values
                 self.connectors[conn_index].set_precomputed_pdfs_cdfs()
