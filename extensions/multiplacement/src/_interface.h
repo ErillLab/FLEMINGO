@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "_multiplacement.h"
+#include <stdbool.h>
+#include "organism/organism.h"
 
 #endif

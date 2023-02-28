@@ -1,5 +1,4 @@
 #include "_interface.h"
-#include "organism/organism.h"
 static int matrix_converter(PyObject *object, void *address) {
   const int flags = PyBUF_C_CONTIGUOUS | PyBUF_FORMAT;
   char datatype;
@@ -134,7 +133,7 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
             con_matrices_ptr, 
             max_length, 
             is_precomputed);
-
+  //print_org(&org);
   place_org(&org, 
              seq, len_seq, 
              rec_scores_ptr, 

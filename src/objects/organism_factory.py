@@ -236,6 +236,7 @@ class OrganismFactory:
         organism_list = []
 
         with open(file_name) as json_file:
+            print("here")
             organism_json = json.load(json_file)
 
         for organism in organism_json:
@@ -248,8 +249,12 @@ class OrganismFactory:
             new_org_connectors = []  # The connectors are collected here
             
             for element in organism:
+                print("hi")
                 if element["objectType"] == "pssm":
                     new_org_recognizers.append(self.import_pssm(element))
+                if element["objectType"] == "shape":
+                    print("hi")
+                    new_org_recognizers.append(self.import_shape(element))
                 elif element["objectType"] == "connector":
                     new_org_connectors.append(self.import_connector(element))
             
@@ -279,6 +284,8 @@ class OrganismFactory:
             org = imported_organisms[idx]
             for i in range(len(org.recognizers)):
                 rec = org.recognizers[i]
+                if rec.type != 'p':
+                    break
                 for p in range(rec.length):
                     for b in ['a','c','g','t']:
                         freq = rec.pwm[p][b]
@@ -328,6 +335,9 @@ class OrganismFactory:
 
         """
         return PssmObject(np.array(pssm["pwm"]), self.conf_pssm)
+
+    def import_shape(self, shape: dict) -> ShapeObject:
+        return ShapeObject(shape["recType"], shape["length"], shape["mu"], shape["sigma"], self.conf_shape, self.shape_null_models)
 
     def export_organisms(self, a_organisms: list, filename: str) -> None:
         """Export a list of organisms to JSON format

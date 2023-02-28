@@ -1094,8 +1094,8 @@ class OrganismObject:
         # gathered by the _calculatePlacement module
         #print(self.recognizer_types);
         gaps = np.empty(number_PSSM, dtype = np.dtype('i'))
-        gap_scores = np.empty(number_PSSM - 1, dtype = np.dtype('f'))
-        PSSM_scores = np.empty(number_PSSM + 1, dtype = np.dtype('f'))
+        gap_scores = np.empty(number_PSSM - 1, dtype = np.dtype('d'))
+        PSSM_scores = np.empty(number_PSSM + 1, dtype = np.dtype('d'))
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), self.recognizers_flat, self.recognizer_lengths,  self.connectors_scores_flat, PSSM_scores, gap_scores, gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
         # parse data from the _calculatePlacement module and put it
         # into a PlacementObject to be returned
@@ -1162,18 +1162,19 @@ class OrganismObject:
             self.recognizer_types += recognizer.type
 
         # organism holds a numpy array of the flattened lists
-        self.recognizers_flat = np.array(flat_recognizers, dtype = np.dtype('f')) 
+        self.recognizers_flat = np.array(flat_recognizers, dtype = np.dtype('d')) 
         self.recognizer_lengths = np.array(recognizer_lengths, dtype = np.dtype('i'))
-        self.recognizer_models = np.array(flat_rec_models, dtype = np.dtype('f'))
+        self.recognizer_models = np.array(flat_rec_models, dtype = np.dtype('d'))
         self.recognizer_bin_nums = np.array(rec_bin_nums, dtype = np.dtype('i'))
-        self.recognizer_bin_edges = np.array(rec_bin_edges, dtype = np.dtype('f'))
+        self.recognizer_bin_edges = np.array(rec_bin_edges, dtype = np.dtype('d'))
         if self.is_precomputed == True:
             for connector in self.connectors:
+                flat_connector_scores += [connector._mu, connector._sigma]
                 flat_connector_scores += (connector.stored_pdfs + connector.stored_cdfs)
 #               for i in range(connector.expected_seq_length):
 
             # organism holds a numpy array of the flattened lists
-            self.connectors_scores_flat = np.array(flat_connector_scores, dtype = np.dtype('f'))
+            self.connectors_scores_flat = np.array(flat_connector_scores, dtype = np.dtype('d'))
 
         else:
             con_mu_sigma = []
@@ -1181,4 +1182,4 @@ class OrganismObject:
                 con_mu_sigma.append(connector._mu)
                 con_mu_sigma.append(connector._sigma)
 
-            self.connectors_scores_flat = np.array(con_mu_sigma, dtype=np.dtype('f'))
+            self.connectors_scores_flat = np.array(con_mu_sigma, dtype=np.dtype('d'))
