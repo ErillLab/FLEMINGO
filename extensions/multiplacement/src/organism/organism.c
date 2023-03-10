@@ -5,6 +5,10 @@ void print_scores(Organism* org, double* r_scores, double* c_scores, int* c_lens
     if (i < n_rec - 1){
       printf("+|(%i)", c_lens[i + 1]);
       printf("c[%5.2f]|+", c_scores[i]);
+      if (c_scores[i] < -10000){
+        fflush(stdout);
+        exit(1);
+      }
     }
   }
   printf("=%5.2f\n", r_scores[n_rec]);
@@ -47,11 +51,10 @@ void print_placement(Organism* org, const char* seq, int s_len, int* pos){
 
 }
 
-void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models, double* edges, int* model_lengths, const char* rec_types, int num_recs, double* con_matrix, int max_len, bool precomputed){
+void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models, double* edges, int* model_lengths, const char* rec_types, int num_recs, double* con_matrix, int max_len){
   org->len = num_recs;
   org->recs = (Recognizer*)malloc(num_recs * sizeof(Recognizer));
   org->cons = (Connector*)malloc((num_recs - 1) * sizeof(Connector));
-  org->precomputed = precomputed;
   int m_offset = 0;
   int a_offset = 0;
   int c_offset = 0;
@@ -59,22 +62,29 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models, 
 
   for (int i = 0; i < num_recs; i++){
     if (rec_types[i] == 'p') {
-      parse_pssm(&org->recs[i], matrix + m_offset, rec_lengths[i]);
+      parse_pssm(&org->recs[i], 
+                 matrix + m_offset, 
+                 rec_lengths[i]);
       m_offset += rec_lengths[i] * 4;
     } else { 
-      parse_shape(&org->recs[i], models + a_offset, models + a_offset + model_lengths[shape_i], edges + a_offset + shape_i, model_lengths[shape_i], rec_lengths[i], rec_types[i]);
+      parse_shape(&org->recs[i], 
+                  models + a_offset, 
+                  models + a_offset + model_lengths[shape_i], 
+                  edges + a_offset + shape_i, 
+                  model_lengths[shape_i], 
+                  rec_lengths[i], 
+                  rec_types[i]);
       a_offset += model_lengths[shape_i] * 2;
       shape_i += 1;
     }
 
     if (i != num_recs - 1){
-      if (precomputed) {
-        parse_con(&org->cons[i], con_matrix + 2 + c_offset, *(con_matrix + c_offset), *(con_matrix + c_offset + 1), max_len, precomputed);      
+        parse_con(&org->cons[i], 
+                  con_matrix + 2 + c_offset, 
+                  *(con_matrix + c_offset), 
+                  *(con_matrix + c_offset + 1), 
+                  max_len);      
         c_offset += 2 * max_len + 2;
-      }else {
-        parse_con(&org->cons[i], NULL, con_matrix[c_offset], con_matrix[c_offset + 1], max_len, precomputed);      
-        c_offset += 2; 
-      }
     }
 
   }
@@ -110,15 +120,15 @@ void print_org(Organism *org) {
       printf("Connector:\n mu: %f\n sigma: %f\n\n", org->cons[i].mu, org->cons[i].sigma);
       if (org->cons[i].max_len > 0){
         printf("Precomputed pdfs:\n");
-        print_matrixf(org->cons[i].pdf, org->len - 1, org->cons[i].max_len);
+        print_matrixf(org->cons[i].pdf, 1, org->cons[i].max_len);
         printf("\nPrecomputed cdfs:\n");
-        print_matrixf(org->cons[i].cdf, org->len - 1, org->cons[i].max_len);
+        print_matrixf(org->cons[i].cdf, 1, org->cons[i].max_len);
       }
     }
   }  
 }
 
-void place_org( Organism* org,  const char* seq,  int s_len, double* r_scores, double* c_scores, int* c_lens, bool precomputed) {
+void place_org( Organism* org,  const char* seq,  int s_len, double* r_scores, double* c_scores, int* c_lens) {
 
   int n_rec = org->len;
   int* r_lens = (int*)malloc(n_rec * sizeof(int));
@@ -204,6 +214,6 @@ void place_org( Organism* org,  const char* seq,  int s_len, double* r_scores, d
   free(gs_matrix);
   free(tr_matrix);
 
-  //print_scores(org, r_scores, c_scores, c_lens, n_rec);
-  //print_placement(org, seq, s_len, c_lens);
+  print_scores(org, r_scores, c_scores, c_lens, n_rec);
+  print_placement(org, seq, s_len, c_lens);
 }

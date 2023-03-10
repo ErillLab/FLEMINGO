@@ -121,7 +121,10 @@ class ShapeObject:
             self.length -= 1
             self.set_null_model(self.nulls)
             self.set_alt_model()
-
+    def print(self) -> None:
+        print("Shape recognizer: ")
+        print("Type:", self.type, "Length:", self.length)
+        print("mu:", self._mu, "sigma", self._sigma)
     def export(self, export_file) -> None:
         """Exports pssm to a file
 

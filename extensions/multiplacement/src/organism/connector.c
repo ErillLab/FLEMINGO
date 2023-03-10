@@ -1,11 +1,13 @@
 #include "connector.h"
-void parse_con(Connector *con, double* matrix, double mu, double sigma, int max_len, bool precomputed){
-  if (precomputed) {
+void parse_con(Connector *con, double* matrix, double mu, double sigma, int max_len){
+  //if (precomputed) {
     con->pdf = matrix;
     con->cdf = matrix + max_len;
     con->mu = mu;
     con->sigma = sigma;
     con->max_len = max_len;
+    printf("%i\n", max_len);
+  /*
   } else {
     con->pdf = NULL;
     con->cdf = NULL;
@@ -13,6 +15,7 @@ void parse_con(Connector *con, double* matrix, double mu, double sigma, int max_
     con->sigma = sigma;
     con->max_len = 0;
   }
+  */
 }
 
 double score_con(Connector* con, int gap, int s_len, int eff_len, int n_recs, bool precomputed) {

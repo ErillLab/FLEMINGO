@@ -1084,19 +1084,19 @@ class OrganismObject:
         #print(self.recognizer_types)
         number_PSSM = len(self.recognizers)
         max_length = 0
-        if number_PSSM < 2:
-            max_length = len(sequence)
-        else:
+        if number_PSSM > 1:
             max_length = self.connectors[0].expected_seq_length
         # Get an array of lengths of each recognizer in the organism
 
         # instantiation of numpy arrays that will hold placement info
         # gathered by the _calculatePlacement module
         #print(self.recognizer_types);
+            
         gaps = np.empty(number_PSSM, dtype = np.dtype('i'))
         gap_scores = np.empty(number_PSSM - 1, dtype = np.dtype('d'))
         PSSM_scores = np.empty(number_PSSM + 1, dtype = np.dtype('d'))
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), self.recognizers_flat, self.recognizer_lengths,  self.connectors_scores_flat, PSSM_scores, gap_scores, gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
+
         # parse data from the _calculatePlacement module and put it
         # into a PlacementObject to be returned
         placement = PlacementObject(self._id, sequence)

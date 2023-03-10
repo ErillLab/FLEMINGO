@@ -114,11 +114,9 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   float *bin_freqs_ptr = bin_freqs.buf;
   float *bin_edges_ptr = bin_edges.buf;
   int *num_bins_ptr = num_bins.buf;
-  bool is_precomputed = true;
 
   if (con_matrices.shape[0] == (num_rec - 1) * 2){
-    is_precomputed = false;
-    max_length = 2;
+    max_length = 0;
   }
 
   Organism org;
@@ -131,15 +129,13 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
             rec_types, 
             num_rec, 
             con_matrices_ptr, 
-            max_length, 
-            is_precomputed);
-  //print_org(&org);
+            max_length);
+  print_org(&org);
   place_org(&org, 
              seq, len_seq, 
              rec_scores_ptr, 
              con_scores_ptr, 
-             con_lengths_ptr,
-             is_precomputed);
+             con_lengths_ptr);
 
   //print_org(&org);
   free(org.recs);
