@@ -7,6 +7,8 @@
 #include <limits.h>
 #include "_constants.h"
 
+void print_matrixi(int* matrix, int row, int col);
+void print_matrixf(double* matrix, int row, int col);
 unsigned long long bin(unsigned long long n, unsigned long long k);
 double norm_cdf(double x, double mu, double sigma);
 double norm_pf(double x, double mu, double sigma);
