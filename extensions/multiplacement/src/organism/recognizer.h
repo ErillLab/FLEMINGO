@@ -17,8 +17,11 @@ struct Recognizer {
   double* null_f;
 };
 
-void parse_pssm(Recognizer *rec, double* matrix, int len);
+void print_rec(Recognizer* rec);
+void parse_pssm(Recognizer* rec, double* matrix, int len);
+void print_pssm(Recognizer* rec);
 void parse_shape(Recognizer* rec, double* null_f, double* alt_f, double* edges, int bin_s, int len, char feat) ;
+void print_shape(Recognizer* rec);
 void pssm_row( Recognizer* rec,  const char* seq,  int len, double* row);
 void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row);
 void prot_row( Recognizer* rec,  const char* seq,  int len, double* row);

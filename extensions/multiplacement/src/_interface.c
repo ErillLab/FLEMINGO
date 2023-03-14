@@ -102,16 +102,16 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   // con_scores:   buffer used to score our calculated scores for connectors
   // con_lengths:  buffer used to store the length of each connector for our
   // placment
-  float *rec_matrices_ptr = rec_matrices.buf;
-  float *con_matrices_ptr = con_matrices.buf;
+  double *rec_matrices_ptr = rec_matrices.buf;
+  double *con_matrices_ptr = con_matrices.buf;
 
-  float *con_scores_ptr = con_scores.buf;
-  float *rec_scores_ptr = rec_scores.buf;
+  double *con_scores_ptr = con_scores.buf;
+  double *rec_scores_ptr = rec_scores.buf;
   int *rec_lengths_ptr = rec_lengths.buf;
   int *con_lengths_ptr = con_lengths.buf;
 
-  float *bin_freqs_ptr = bin_freqs.buf;
-  float *bin_edges_ptr = bin_edges.buf;
+  double *bin_freqs_ptr = bin_freqs.buf;
+  double *bin_edges_ptr = bin_edges.buf;
   int *num_bins_ptr = num_bins.buf;
 
   if (con_matrices.shape[0] == (num_rec - 1) * 2){
@@ -129,6 +129,7 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
             num_rec, 
             con_matrices_ptr, 
             max_length);
+  //print_org(&org);
   place_org(&org, 
              seq, len_seq, 
              rec_scores_ptr, 

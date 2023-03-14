@@ -97,5 +97,5 @@ double shape_average(double array[], int num_elements){
   for (int i = 0; i < num_elements; i++){
     sum += array[i];
   }
-  return sum/(num_elements + 2);
+  return sum/((double)(num_elements + 2));
 }

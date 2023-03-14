@@ -5,10 +5,6 @@ void print_scores(Organism* org, double* r_scores, double* c_scores, int* c_lens
     if (i < n_rec - 1){
       printf("+|(%i)", c_lens[i + 1]);
       printf("c[%5.2f]|+", c_scores[i]);
-      if (c_scores[i] < -10000){
-        fflush(stdout);
-        exit(1);
-      }
     }
   }
   printf("=%5.2f\n", r_scores[n_rec]);

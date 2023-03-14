@@ -19,6 +19,39 @@ void parse_shape(Recognizer* rec, double* null_f, double* alt_f, double* edges, 
   rec->feat = feat;
 }
 
+void print_rec(Recognizer *rec){
+  if (rec->feat != 'p'){
+    print_shape(rec);
+  }else{
+    print_pssm(rec);
+  }
+}
+
+void print_pssm(Recognizer *rec){
+  for (int j = 0; j < 4; j++){
+    printf(" ");
+    for (int k = 0; k < rec->len; k++){
+      printf("%3.2f ", rec->matrix[k * 4 + j]);
+    }
+    printf("\n");
+  }
+}
+
+void print_shape(Recognizer *rec){
+  
+  printf("Null frequencies:\n");
+  for (int j = 0; j < rec->bin_s - 1; j++){
+    printf(" [%5.2f, %5.2f]: %3.2f\n", rec->edges[j], rec->edges[j+1], rec->null_f[j]);
+  }
+
+
+  printf("Alt frequencies:\n");
+  for (int j = 0; j < rec->bin_s - 1; j++){
+    printf(" [%5.2f, %5.2f]: %3.2f\n", rec->edges[j], rec->edges[j+1], rec->alt_f[j]);
+  }
+  
+}
+
 void pssm_row( Recognizer* rec,  const char* seq,  int len, double* row){
   double score = 0.0;
   double* matrix = rec->matrix;
@@ -64,7 +97,7 @@ void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
   double score = 0.0;
   int idx = 0;
   for (int i = 0; i < len; i++){
-    for (int j = 0; j < n_pent; j++){
+    for (int j = i; j < i + n_pent; j++){
       score = 0.0;
       idx = 0;
       for (int k = j; k < j + 5; k++){
@@ -90,8 +123,7 @@ void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
             break;
         }
       }
-      pent_s[j] = MGW_SCORES[idx];
-
+      pent_s[j - i] = MGW_SCORES[idx];
     }
     score = shape_average(pent_s, n_pent);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
@@ -121,7 +153,7 @@ void prot_row( Recognizer* rec,  const char* seq,  int len, double* row){
   int idx = 0;
 
   for (int i = 0; i < len; i++){
-    for (int j = 0; j < n_pent; j++){
+    for (int j = i; j < i + n_pent; j++){
       score = 0.0;
       idx = 0;
       for (int k = j; k < j + 5; k++){
@@ -147,7 +179,7 @@ void prot_row( Recognizer* rec,  const char* seq,  int len, double* row){
             break;
         }
       }
-      pent_s[j] = PROT_SCORES[idx];
+      pent_s[j - i] = PROT_SCORES[idx];
 
     }
     score = shape_average(pent_s, n_pent);
@@ -179,7 +211,7 @@ void roll_row( Recognizer* rec,  const char* seq,  int len, double* row){
   int idx = 0;
 
   for (int i = 0; i < len; i++){
-    for (int j = 0; j < n_pent; j++){
+    for (int j = i; j < i + n_pent; j++){
       score = 0.0;
       idx = 0;
       for (int k = j; k < j + 5; k++){
@@ -205,9 +237,8 @@ void roll_row( Recognizer* rec,  const char* seq,  int len, double* row){
             break;
         }
       }
-      pent_s[j] = ROLL_SCORES[idx];
-      pent_s[j + n_pent] = ROLL_SCORES[idx + 1024];
-
+      pent_s[j - i] = ROLL_SCORES[idx];
+      pent_s[j - i + n_pent] = ROLL_SCORES[idx + 1024];
     }
     score = shape_average(pent_s, n_pent);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
@@ -238,7 +269,7 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
   int idx = 0;
 
   for (int i = 0; i < len; i++){
-    for (int j = 0; j < n_pent; j++){
+    for (int j = i; j < i + n_pent; j++){
       score = 0.0;
       idx = 0;
       for (int k = j; k < j + 5; k++){
@@ -264,8 +295,8 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
             break;
         }
       }
-      pent_s[j] = HELT_SCORES[idx];
-      pent_s[j + n_pent] = HELT_SCORES[idx + 1024];
+      pent_s[j - i] = HELT_SCORES[idx];
+      pent_s[j - i + n_pent] = HELT_SCORES[idx + 1024];
 
     }
     score = shape_average(pent_s, n_pent);
