@@ -92,7 +92,6 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
           matrix_converter, &num_bins))
     return NULL;
 
-  //printf("hi\n");
   // sequence:     DNA sequence used for placement
   // rec_matrices: one dimensional flattened representation of the
   //               scoring matrices for all recognizers
@@ -130,14 +129,12 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
             num_rec, 
             con_matrices_ptr, 
             max_length);
-  print_org(&org);
   place_org(&org, 
              seq, len_seq, 
              rec_scores_ptr, 
              con_scores_ptr, 
              con_lengths_ptr);
 
-  //print_org(&org);
   free(org.recs);
   free(org.cons);
   Py_INCREF(Py_None);
