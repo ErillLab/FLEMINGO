@@ -129,7 +129,18 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
             num_rec, 
             con_matrices_ptr, 
             max_length);
-  //print_org(&org);
+  /*
+  this is for testing purposes only
+  int num_not_pssm = 0;
+  for (int i = 0; i < org.len; i++){
+    if (org.recs[i].feat != 'p')
+      num_not_pssm += 1;
+  }
+  if (num_not_pssm > 1){
+    print_org(&org);
+    exit(-1);
+  }
+  */
   place_org(&org, 
              seq, len_seq, 
              rec_scores_ptr, 

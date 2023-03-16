@@ -20,6 +20,8 @@ void parse_shape(Recognizer* rec, double* null_f, double* alt_f, double* edges, 
 }
 
 void print_rec(Recognizer *rec){
+  printf("Recognizer Feature: %c\n", rec->feat);
+  printf("Recognizer Length %i\n", rec->len);
   if (rec->feat != 'p'){
     print_shape(rec);
   }else{
@@ -86,6 +88,7 @@ void pssm_row( Recognizer* rec,  const char* seq,  int len, double* row){
 }
 
 void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
+  //print_rec(rec);
   int n_pent = rec->len - 4;
   int n_bins = rec->bin_s;
   double alt_f = 0.0;
@@ -129,12 +132,18 @@ void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
     score = log2f(alt_f / null_f);
+    double t_score = score;
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 
     if (score > BIG_POSITIVE)
       score = BIG_POSITIVE;
 
+    if (score != t_score){
+      print_rec(rec);
+      printf("t_score: %f\nn_score: %f\n", t_score, score);
+      exit(-1);      
+    }
     row[i] = score;
   }
   free(pent_s);

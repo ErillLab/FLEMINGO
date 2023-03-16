@@ -54,6 +54,7 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models, 
   int m_offset = 0;
   int a_offset = 0;
   int c_offset = 0;
+  int e_offset = 0;
   int shape_i = 0;
 
   for (int i = 0; i < num_recs; i++){
@@ -66,11 +67,12 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models, 
       parse_shape(&org->recs[i], 
                   models + a_offset, 
                   models + a_offset + model_lengths[shape_i], 
-                  edges + a_offset + shape_i, 
+                  edges + e_offset, 
                   model_lengths[shape_i], 
                   rec_lengths[i], 
                   rec_types[i]);
       a_offset += model_lengths[shape_i] * 2;
+      e_offset += model_lengths[shape_i] + 2;
       shape_i += 1;
     }
 
@@ -87,41 +89,14 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models, 
 }
 
 void print_org(Organism *org) {
-  for (int i = 0; i < org->len; i++) {
-    printf("Recognizer: \n");
-    if (org->recs[i].feat == 'p') {
-      for (int j = 0; j < 4; j++){
-        printf(" ");
-        for (int k = 0; k < org->recs[i].len; k++){
-          printf("%3.2f ", org->recs[i].matrix[k * 4 + j]);
-        }
-        printf("\n");
-      }
-      printf("\n");
-    } else {
-      Recognizer* c = &org->recs[i];
-      printf("Null frequencies:\n");
-      for (int j = 0; j < org->recs[i].bin_s - 1; j++){
-        printf(" [%5.2f, %5.2f]: %3.2f\n", c->edges[j], c->edges[j+1], c->null_f[j]);
-      }
-
-
-      printf("Alt frequencies:\n");
-      for (int j = 0; j < org->recs[i].bin_s - 1; j++){
-        printf(" [%5.2f, %5.2f]: %3.2f\n", c->edges[j], c->edges[j+1], c->alt_f[j]);
-      }
-    }
-
+  for (int i = 0; i < org->len; i++){
+    print_rec(&org->recs[i]);
+    printf("\n");
     if (i < org->len - 1){
-      printf("Connector:\n mu: %f\n sigma: %f\n\n", org->cons[i].mu, org->cons[i].sigma);
-      if (org->cons[i].max_len > 0){
-        printf("Precomputed pdfs:\n");
-        print_matrixf(org->cons[i].pdf, 1, org->cons[i].max_len);
-        printf("\nPrecomputed cdfs:\n");
-        print_matrixf(org->cons[i].cdf, 1, org->cons[i].max_len);
-      }
+      print_con(&org->cons[i]);
+      printf("\n");
     }
-  }  
+  }
 }
 
 void place_org( Organism* org,  const char* seq,  int s_len, double* r_scores, double* c_scores, int* c_lens) {
@@ -210,6 +185,6 @@ void place_org( Organism* org,  const char* seq,  int s_len, double* r_scores, d
   free(gs_matrix);
   free(tr_matrix);
 
-  print_scores(org, r_scores, c_scores, c_lens, n_rec);
-  print_placement(org, seq, s_len, c_lens);
+  //print_scores(org, r_scores, c_scores, c_lens, n_rec);
+  //print_placement(org, seq, s_len, c_lens);
 }
