@@ -1,4 +1,14 @@
 #include "_aux.h"
+
+/* 
+name:            print_matrixi
+pre-conditions:  populated matrix of integers
+post-conditions: .
+parameters:      matrix: array of integers
+                 row:    number of rows
+                 col:    number columns
+notes:           .
+*/
 void print_matrixi(int* matrix, int row, int col){
   for (int i = 0; i < row; i++){
     for (int j = 0; j < col; j++){
@@ -8,6 +18,15 @@ void print_matrixi(int* matrix, int row, int col){
   }
 }
 
+/* 
+name:            print_matrixf
+pre-conditions:  populated matrix of doubles
+post-conditions: .
+parameters:      matrix: array of doubles
+                 row:    number of rows
+                 col:    number of columns
+notes:           .
+*/
 void print_matrixf(double* matrix, int row, int col){
   for (int i = 0; i < row; i++){
     for (int j = 0; j < col; j++){
@@ -17,6 +36,14 @@ void print_matrixf(double* matrix, int row, int col){
   }
 }
 
+/* 
+name:            bin
+pre-conditions:  n and k are positive integers
+post-conditions: returns the binomial coefficient of n and k
+parameters:      n: some positive integer
+                 k: some positive integer
+notes:           overflow can happen, but it would be pretty unlikely
+*/
 unsigned long long bin(unsigned long long n, unsigned long long k){
   if (n == k)
     return 1;
@@ -32,11 +59,31 @@ unsigned long long bin(unsigned long long n, unsigned long long k){
   return c; 
 }
 
+/* 
+name:            norm_cdf
+pre-conditions:  mu and sigma describe a normal distribution, x is a value
+post-conditions: returns the cumulitive distribution around x in a 
+                 normal distribution
+parameters:      x:     a value in a normal distribution
+                 mu:    the mean of the normal distribution
+                 sigma: the standard deviation of the normal distribution
+notes:           .
+*/
 double norm_cdf(double x, double mu, double sigma){
   double z = (x - mu) / fabs(sigma);
-  return (1 + erff(z / sqrtf(2.0))) / 2.00;
+  return (1 + erff(z / sqrtf(2.00))) / 2.00;
 }
 
+/* 
+name:            norm_pf
+pre-conditions:  mu and sigma describe a normal distribution, x is a value
+post-conditions: returns the probability function for a value x
+                 returns 0.00 if sigma if 
+parameters:      x:     a value in the normal distribution
+                 mu:    the mean of the normal distribution
+                 sigma: the standard deviation of the normal distribution
+notes:           .
+*/
 double norm_pf(double x, double mu, double sigma){
   if (sigma != 0)
     return norm_cdf(x + 0.5, mu, sigma) - norm_cdf(x - 0.5, mu, sigma);
@@ -45,28 +92,60 @@ double norm_pf(double x, double mu, double sigma){
   return 0.00;
 }
 
+/* 
+name:            get_numerator
+pre-conditions:  dna_length > 0, distance > -1, mu is real, sigma > 0.00
+post-conditions: returns the numerator value for computing the probability
+                 given the model
+parameters:      dna_length: the length of the DNA
+                 distance:   the length of the gap
+                 mu:         the average of the normal distribution
+                             of the connector
+                 sigma:      the standard deviation of the nomral distribution
+                             of the connector
+notes:           .
+*/
 double get_numerator(int dna_length, int distance, double mu, double sigma){
   double numerator = norm_pf(distance, mu, sigma);
   if (sigma == 0.00)
     return numerator;
 
   double auc = norm_cdf(dna_length - 1, mu, sigma) - norm_cdf(0, mu, sigma);
-  if (auc < 0.000001)
-    auc = 0.000001;
+  if (auc < SMALL_POSITIVE)
+    auc = SMALL_POSITIVE;
 
-  if (numerator < 0.00001)
-    numerator = 0.00001;
+  if (numerator < SMALL_POSITIVE)
+    numerator = SMALL_POSITIVE;
 
-  return numerator /= auc;
+  return numerator / auc;
 
 }
 
+/* 
+name:            get_denominator
+pre-conditions:  attributes about the gap have been calculated
+post-conditions: returns the denominator for calculating the
+                 probability given d, N, and L
+parameters:      d: the length of the gap plus 1
+                 N: the number of recognizers
+                 L: the length of the DNA strand minus the 
+                    sum of the lengths of the recognizers plus 1
+notes:           .
+*/
 double get_denominator(int d, int N, int L){
   if (1 <= d && d <= L - N + 1)
     return (double) bin(L - d, N - 1) / (double) bin(L, N);
-  return 0.0001;
+  return SMALL_POSITIVE;
 }
 
+/* 
+name:            max_index
+pre-conditions:  array is populated with doubles, size is > 0
+post-conditions: returns the index of the max element in arr
+parameters:      arr:  array of doubles
+                 size: the number of elements in arr
+notes:           .
+*/
 int max_index(double *arr, int size) {
   int max_index = 0;
   for (int i = 0; i < size; i++) {
@@ -78,6 +157,21 @@ int max_index(double *arr, int size) {
   return max_index;
 }
 
+/* 
+name:            get_bin_frequency
+pre-conditions:  score is calcualted from constant arrays of of shape scores
+                 described in _constants.h
+                 bin frequencies and edges are populated with appropriate 
+                 information for null and alternative models
+post-conditions: returns the index of the bin that the calculated score fits
+                 in the range of 
+parameters:      score:           the calculated score from sliding the pentamers
+                                  over the sequence
+                 bin_frequencies: the frequencies of the scores in each bin
+                 bin_edges:       the range of each bin
+                 num_bins:        the number of bins for the model
+notes:           .
+*/
 double get_bin_frequency(double score, double bin_frequencies[], double bin_edges[], int num_bins){
   for (int i = 1; i < num_bins; i++){
     if (score < bin_edges[i]){
@@ -92,10 +186,21 @@ double get_bin_frequency(double score, double bin_frequencies[], double bin_edge
   return bin_frequencies[num_bins - 1];
 }
 
-double shape_average(double array[], int num_elements){
-  double sum = array[0] + array[num_elements - 1]; 
+/* 
+name:            shape_average
+pre-conditions:  array of pentamer scores is populated
+post-conditions: returns the average of all elements in the array
+parameters:      pentamer_scores: the scores for each pentamer in the
+                                  shape recognizer
+                 num_elements:    the number of pentamers in the shape
+                                  recognizer
+notes:           the terminal elements are counted twice to weight
+                 terminal scores for Roll and HelT the same as internal ones
+*/
+double shape_average(double pentamer_scores[], int num_elements){
+  double sum = pentamer_scores[0] + pentamer_scores[num_elements - 1]; 
   for (int i = 0; i < num_elements; i++){
-    sum += array[i];
+    sum += pentamer_scores[i];
   }
   return sum/((double)(num_elements + 2));
 }
