@@ -208,7 +208,7 @@ notes:           .
 */
 int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores, 
                double* c_scores, int* c_lens) {
-
+  
   //n_rec and r_lens are instantiated as variables to make code more readable
   //m_len is the sum of the lengths of all recognizers
   int n_rec = org->len;
@@ -274,6 +274,9 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
   Recognizer* rec = NULL;
   Connector* con = NULL;
 
+  clock_t rec_scoring_total;
+  clock_t gap_calculating_total;
+  clock_t traceback_total;
   for (int i = 0; i < n_rec; i++) {
     rec = &org->recs[i];
 

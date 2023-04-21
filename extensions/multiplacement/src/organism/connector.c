@@ -35,15 +35,11 @@ double score_con(Connector* con, int gap, int s_len, int eff_len, int n_recs, bo
   double res;
   if (precomputed){
     num = con->pdf[gap];
-    auc = con->cdf[s_len - 1] - con->cdf[0];
-    if (num < SMALL_POSITIVE) {
-      num = SMALL_POSITIVE;
+    auc = con->cdf[s_len - 1];
+    if (num < BIG_NEGATIVE) {
+      num = BIG_NEGATIVE;
     }
-    if (auc > SMALL_POSITIVE) {
-      num /= auc;
-    } else {
-      num /= SMALL_POSITIVE;
-    }
+    num -= auc;
     den = 0.0;
     if (gap > -1 && gap <= eff_len)
       den = (DEN_EXPANSION[(eff_len - (gap + 1)) - 1] -
@@ -52,17 +48,17 @@ double score_con(Connector* con, int gap, int s_len, int eff_len, int n_recs, bo
             (DEN_EXPANSION[eff_len - 1] -
              DEN_EXPANSION[n_recs - 1] -
              DEN_EXPANSION[eff_len - n_recs - 1]);
-    res = log2f(num) - den;
+    res = num - den;
     if (res < BIG_NEGATIVE)
       return BIG_NEGATIVE;
+    if (res > BIG_POSITIVE)
+      return BIG_POSITIVE;
     return res;
   }
 
 
-
   num = get_numerator(s_len, gap, con->mu, con->sigma);
   den = get_denominator(gap + 1, n_recs, eff_len);
-
   return log2f(num/den);
 }
 

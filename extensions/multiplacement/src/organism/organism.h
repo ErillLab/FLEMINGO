@@ -5,9 +5,11 @@
 #include <limits.h>
 #include <math.h>
 #include <string.h>
+#include <time.h>
 #include "../_aux.h"
 #include "recognizer.h"
 #include "connector.h"
+
 
 typedef struct Organism Organism;
 
