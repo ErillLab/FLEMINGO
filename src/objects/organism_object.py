@@ -1096,9 +1096,7 @@ class OrganismObject:
         gaps = np.empty(number_PSSM, dtype = np.dtype('i'))
         gap_scores = np.empty(number_PSSM - 1, dtype = np.dtype('d'))
         PSSM_scores = np.empty(number_PSSM + 1, dtype = np.dtype('d'))
-        #print(self.recognizer_models)
-        #print(self.recognizer_bin_edges)
-        #print(self.recognizer_bin_nums)
+
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), self.recognizers_flat, self.recognizer_lengths,  self.connectors_scores_flat, PSSM_scores, gap_scores, gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
         # parse data from the _calculatePlacement module and put it
         # into a PlacementObject to be returned

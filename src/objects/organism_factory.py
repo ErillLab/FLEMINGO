@@ -235,7 +235,6 @@ class OrganismFactory:
         organism_list = []
 
         with open(file_name) as json_file:
-            print("here")
             organism_json = json.load(json_file)
 
         for organism in organism_json:

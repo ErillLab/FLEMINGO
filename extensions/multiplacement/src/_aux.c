@@ -117,7 +117,7 @@ double get_numerator(int dna_length, int distance, double mu, double sigma){
   if (numerator < SMALL_POSITIVE)
     numerator = SMALL_POSITIVE;
 
-  return numerator / auc;
+  return (numerator / auc);
 
 }
 

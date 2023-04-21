@@ -364,6 +364,6 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
   free(gs_matrix);
   free(tr_matrix);
 
-  debug_placement(org, seq, s_len, c_lens, r_scores, c_scores);
+  //debug_placement(org, seq, s_len, c_lens, r_scores, c_scores);
   return 0;
 }

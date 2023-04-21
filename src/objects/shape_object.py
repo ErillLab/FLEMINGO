@@ -51,15 +51,25 @@ class ShapeObject:
         self.max_columns = config["MAX_COLUMNS"]
 
     def set_null_model(self):
+        """
+        sets the null model corresponding to shape recognizer's feature
+        and length
+        """
         self.null_model = models.models[self.type][self.length]["frequencies"]
         self.bins = models.models[self.type][self.length]["bins"]
 
     def set_alt_model(self):
+        """
+        sets the array of frequencies corresponding to the distribution of the
+        shape recognizer 
+        """
         alt_model = []
+        #bin array is one longer than frequency array
+        #computed in the same way that null model for connectors is computed
         for i in range(0, len(self.bins) - 1):
             score = norm_pf(i + 0.05, self._mu, self._sigma)
-            if score < 0.001:
-                score = 0.0001
+            if score < 1E-10:
+                score = 1E-10
             alt_model.append(score)
         self.alt_model = np.array(alt_model, dtype=np.dtype("f"))
 
@@ -102,12 +112,12 @@ class ShapeObject:
             elif self.mu_mutator=="standard":
                 self._mu = abs(random.gauss(self._mu, self._sigma))
 
-        if random.random() < self.mutate_probability_increase_size and self.length + 1 < self.max_columns:
+        if random.random() < self.mutate_probability_increase_size and self.length < self.max_columns:
             self.length += 1 
             self.set_null_model(self.nulls)
             self.set_alt_model()
 
-        if random.random() < self.mutate_probability_decrease_size and self.length > self.min_columns + 1:
+        if random.random() < self.mutate_probability_decrease_size and self.length > self.min_columns:
             self.length -= 1
             self.set_null_model(self.nulls)
             self.set_alt_model()
@@ -126,6 +136,10 @@ class ShapeObject:
         export_file.write("\n" + str(self._mu) + " " + str(self._sigma) + " " + self.type)
 
     def get_type(self):
+        """
+        returns the one character definiton of a recognizers type
+        used for generating string of recognizer types
+        """
         if self.type == "mgw":
             return 'm'
         if self.type == "prot":

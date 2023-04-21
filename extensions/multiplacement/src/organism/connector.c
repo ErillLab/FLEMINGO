@@ -29,49 +29,39 @@ void print_gap(Connector* con, int gap, int s_len, int eff_len, int n_recs, bool
 }
 
 double score_con(Connector* con, int gap, int s_len, int eff_len, int n_recs, bool precomputed) {
+  double num;
+  double auc;
+  double den;
+  double res;
   if (precomputed){
-    double num = con->pdf[gap];
-    double auc = con->cdf[s_len - 1] - con->cdf[0];
+    num = con->pdf[gap];
+    auc = con->cdf[s_len - 1] - con->cdf[0];
+    if (num < SMALL_POSITIVE) {
+      num = SMALL_POSITIVE;
+    }
     if (auc > SMALL_POSITIVE) {
       num /= auc;
     } else {
       num /= SMALL_POSITIVE;
     }
-
-    double den = 0.0;
-    if (gap > -1 && gap <= eff_len){
+    den = 0.0;
+    if (gap > -1 && gap <= eff_len)
       den = (DEN_EXPANSION[(eff_len - (gap + 1)) - 1] -
              DEN_EXPANSION[(n_recs - 1) - 1] -
-             DEN_EXPANSION[eff_len - (gap + 1) - (n_recs) - 1]) -
+             DEN_EXPANSION[eff_len - (gap + 1) - (n_recs - 1) - 1]) -
             (DEN_EXPANSION[eff_len - 1] -
              DEN_EXPANSION[n_recs - 1] -
              DEN_EXPANSION[eff_len - n_recs - 1]);
-    } else {
-      fflush(stdout);
-      printf("case 1\n");
-      print_con(con);
-      print_gap(con, gap, s_len, eff_len, n_recs, precomputed, num, den);
-      den = BIG_NEGATIVE;
-      exit(-1);
-    }
-
-    if (num - den > BIG_POSITIVE){
-      fflush(stdout);
-      printf("case 2\n");
-      print_con(con);
-      print_gap(con, gap, s_len, eff_len, n_recs, precomputed, num, den);
-      exit(-1);
-    }
-
-    if (num - den > BIG_NEGATIVE){
-      return num - den;
-    }else{
+    res = log2f(num) - den;
+    if (res < BIG_NEGATIVE)
       return BIG_NEGATIVE;
-    }
+    return res;
   }
 
-  double num = get_numerator(s_len, gap, con->mu, con->sigma);
-  double den = get_denominator(gap + 1, n_recs, eff_len);
+
+
+  num = get_numerator(s_len, gap, con->mu, con->sigma);
+  den = get_denominator(gap + 1, n_recs, eff_len);
 
   return log2f(num/den);
 }
