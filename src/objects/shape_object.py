@@ -2,7 +2,7 @@ import random
 import numpy as np
 import math
 import copy
-
+import models.models as models
 def norm_cdf(x, mu, sigma):
     ''' Cumulative distribution function for the normal distribution. '''
     z = (x-mu)/abs(sigma)
@@ -27,7 +27,7 @@ def norm_pf(x, mu, sigma):
 
 
 class ShapeObject:
-    def __init__(self, rec_type, rec_size, mu, sigma, config, null_models):
+    def __init__(self, rec_type, rec_size, mu, sigma, config):
         self.type = rec_type
         self.length = rec_size
         self._mu = mu
@@ -35,8 +35,7 @@ class ShapeObject:
         self.null_model = []
         self.bins = []
         self.alt_model = []
-        self.nulls = null_models
-        self.set_null_model(null_models)
+        self.set_null_model()
         self.set_alt_model()
 
         self.mutate_probability_sigma = config["MUTATE_PROBABILITY_SIGMA"]
@@ -51,22 +50,13 @@ class ShapeObject:
         self.min_columns = config["MIN_COLUMNS"]
         self.max_columns = config["MAX_COLUMNS"]
 
-    def set_null_model(self, null_models):
-        rec_type = ''
-        if self.type == 'm':
-            rec_type = "mgw"
-        if self.type == 't':
-            rec_type = "prot"
-        if self.type == 'r':
-            rec_type = "roll"
-        if self.type == 'h':
-            rec_type = "helt"
-        self.null_model = null_models[rec_type][self.length]["values"]
-        self.bins = null_models[rec_type][self.length]["bins"]
+    def set_null_model(self):
+        self.null_model = models.models[self.type][self.length]["frequencies"]
+        self.bins = models.models[self.type][self.length]["bins"]
 
     def set_alt_model(self):
         alt_model = []
-        for i in self.bins:
+        for i in range(0, len(self.bins) - 1):
             score = norm_pf(i + 0.05, self._mu, self._sigma)
             if score < 0.001:
                 score = 0.0001
@@ -112,27 +102,35 @@ class ShapeObject:
             elif self.mu_mutator=="standard":
                 self._mu = abs(random.gauss(self._mu, self._sigma))
 
-        if random.random() < self.mutate_probability_increase_size and self.length < self.max_columns:
+        if random.random() < self.mutate_probability_increase_size and self.length + 1 < self.max_columns:
             self.length += 1 
             self.set_null_model(self.nulls)
             self.set_alt_model()
 
-        if random.random() < self.mutate_probability_decrease_size and self.length > self.min_columns:
+        if random.random() < self.mutate_probability_decrease_size and self.length > self.min_columns + 1:
             self.length -= 1
             self.set_null_model(self.nulls)
             self.set_alt_model()
+
     def print(self) -> None:
         print("Shape recognizer: ")
         print("Type:", self.type, "Length:", self.length)
         print("mu:", self._mu, "sigma", self._sigma)
+
     def export(self, export_file) -> None:
         """Exports pssm to a file
 
         Args:
             export_file: File to write the output
         """
-        
-        
         export_file.write("\n" + str(self._mu) + " " + str(self._sigma) + " " + self.type)
 
-
+    def get_type(self):
+        if self.type == "mgw":
+            return 'm'
+        if self.type == "prot":
+            return 't'
+        if self.type == "helt":
+            return 'h'
+        if self.type == "roll":
+            return 'r'

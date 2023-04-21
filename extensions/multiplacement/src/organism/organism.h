@@ -21,5 +21,5 @@ void print_scores(Organism* org, double* r_scores, double* c_scores, int* c_lens
 void print_placement(Organism* org, const char* seq, int s_len, int* pos);
 void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models, double* edges, int* model_lengths, const char* rec_types, int num_recs, double* con_matrix, int max_len);
 void print_org(Organism *org);
-void place_org(Organism* org, const char* seq,  int s_len, double* r_scores, double* c_scores, int* c_lens);
+int place_org(Organism* org, const char* seq,  int s_len, double* r_scores, double* c_scores, int* c_lens);
 #endif

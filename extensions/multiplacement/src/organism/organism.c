@@ -73,6 +73,10 @@ void print_placement(Organism* org, const char* seq, int s_len, int* pos){
 
 }
 
+void debug_placement(Organism* org, const char* seq, int s_len, int* pos, double* r_scores, double* c_scores){
+  print_scores(org, r_scores, c_scores, pos);
+  print_placement(org, seq, s_len, pos);
+}
 /*
 name:            parse_org
 pre-conditions:  all information for recognizers and connectors has been loaded
@@ -139,7 +143,7 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models,
                   model_lengths[shape_i], 
                   rec_lengths[i], 
                   rec_types[i]);
-      a_offset += model_lengths[shape_i] * 2;
+      a_offset += model_lengths[shape_i] * 2 - 2;
       e_offset += model_lengths[shape_i];
       shape_i  += 1;
     }
@@ -202,7 +206,7 @@ parameters:      org:      a populated organism
                            first recognzier and the length of each gap
 notes:           .
 */
-void place_org(Organism* org,  const char* seq,  int s_len, double* r_scores, 
+int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores, 
                double* c_scores, int* c_lens) {
 
   //n_rec and r_lens are instantiated as variables to make code more readable
@@ -217,6 +221,9 @@ void place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
     r_lens[i] = org->recs[i].len;
     m_len += r_lens[i];
   }
+
+  if (m_len > s_len)
+    return -1;
 
   //calcualtion of the effective length and number of alignments
   int eff_len = s_len - m_len + n_rec;
@@ -356,4 +363,7 @@ void place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
   free(rs_matrix);
   free(gs_matrix);
   free(tr_matrix);
+
+  debug_placement(org, seq, s_len, c_lens, r_scores, c_scores);
+  return 0;
 }

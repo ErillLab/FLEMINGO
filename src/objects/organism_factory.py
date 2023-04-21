@@ -18,7 +18,7 @@ class OrganismFactory:
     """Factory class
     """
 
-    def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank, shape_null_models, conf_shape) -> None:
+    def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank, conf_shape) -> None:
         """
         Instantiates an OrganismFactory object.
         Reads in the configuration paramaters for the factory and for all object
@@ -32,7 +32,6 @@ class OrganismFactory:
         # Process rank (used to esure unique organism IDs when running in parallel mode)
         self._process_rank = p_rank
         #self._id = 0
-        self.shape_null_models = shape_null_models
         self.conf_shape = conf_shape
         # lambda parameter for Poisson distribution that will instantiate
         # organism. lambda is the expected number of recognizers in the
@@ -174,14 +173,14 @@ class OrganismFactory:
         rec_type = ''
         y = random.random()
         if y >= 0.00 and y < 0.25:
-            rec_type  = 'm'
+            rec_type  = 'mgw'
         if y >= 0.25 and y < 0.50:
-            rec_type  = 't'
+            rec_type  = 'prot'
         if y >= 0.50 and y < 0.75:
-            rec_type  = 'r'
+            rec_type  = 'roll'
         if y >= 0.75 and y <= 1.00:
-            rec_type  = 'h'
-        return ShapeObject(rec_type, length, mu, sigma, self.conf_shape, self.shape_null_models)
+            rec_type  = 'helt'
+        return ShapeObject(rec_type, length, mu, sigma, self.conf_shape)
 
 
     def get_pwm_column(self) -> dict:
@@ -249,11 +248,9 @@ class OrganismFactory:
             new_org_connectors = []  # The connectors are collected here
             
             for element in organism:
-                print("hi")
                 if element["objectType"] == "pssm":
                     new_org_recognizers.append(self.import_pssm(element))
                 if element["objectType"] == "shape":
-                    print("hi")
                     new_org_recognizers.append(self.import_shape(element))
                 elif element["objectType"] == "connector":
                     new_org_connectors.append(self.import_connector(element))
@@ -337,7 +334,7 @@ class OrganismFactory:
         return PssmObject(np.array(pssm["pwm"]), self.conf_pssm)
 
     def import_shape(self, shape: dict) -> ShapeObject:
-        return ShapeObject(shape["recType"], shape["length"], shape["mu"], shape["sigma"], self.conf_shape, self.shape_null_models)
+        return ShapeObject(shape["recType"], shape["length"], shape["mu"], shape["sigma"], self.conf_shape )
 
     def export_organisms(self, a_organisms: list, filename: str) -> None:
         """Export a list of organisms to JSON format

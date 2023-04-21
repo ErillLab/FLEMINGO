@@ -33,7 +33,7 @@ void print_pssm(Recognizer *rec){
   for (int j = 0; j < 4; j++){
     printf(" ");
     for (int k = 0; k < rec->len; k++){
-      printf("%3.2f ", rec->matrix[k * 4 + j]);
+      printf("%5.2f ", rec->matrix[k * 4 + j]);
     }
     printf("\n");
   }
@@ -220,10 +220,10 @@ void roll_row( Recognizer* rec,  const char* seq,  int len, double* row){
   int idx = 0;
 
   for (int i = 0; i < len; i++){
-    for (int j = i; j < i + n_pent; j++){
+    for (int j = i; j < (i + n_pent); j++){
       score = 0.0;
       idx = 0;
-      for (int k = j; k < j + 5; k++){
+      for (int k = j; k < (j + 5); k++){
         switch(seq[k]){
           case 'a':
           case 'A':
@@ -249,7 +249,7 @@ void roll_row( Recognizer* rec,  const char* seq,  int len, double* row){
       pent_s[j - i] = ROLL_SCORES[idx];
       pent_s[j - i + n_pent] = ROLL_SCORES[idx + 1024];
     }
-    score = shape_average(pent_s, n_pent);
+    score = shape_average(pent_s, n_pent * 2);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
     score = log2f(alt_f / null_f);

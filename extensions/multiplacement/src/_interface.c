@@ -115,7 +115,7 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   int *num_bins_ptr = num_bins.buf;
 
   if (con_matrices.shape[0] == (num_rec - 1) * 2){
-    max_length = 0;
+    max_length = -1;
   }
 
   Organism org;
@@ -129,23 +129,17 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
             num_rec, 
             con_matrices_ptr, 
             max_length);
-  /*
-  this is for testing purposes only
-  int num_not_pssm = 0;
-  for (int i = 0; i < org.len; i++){
-    if (org.recs[i].feat != 'p')
-      num_not_pssm += 1;
-  }
-  if (num_not_pssm > 1){
-    print_org(&org);
-    exit(-1);
-  }
-  */
-  place_org(&org, 
+   int ret = place_org(&org, 
              seq, len_seq, 
              rec_scores_ptr, 
              con_scores_ptr, 
              con_lengths_ptr);
+
+  switch(ret){
+    case -1:
+      PyErr_SetString(PyExc_RuntimeError, "organism is too large to be placed on sequence");    
+      break;
+  }
 
   free(org.recs);
   free(org.cons);

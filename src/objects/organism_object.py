@@ -9,6 +9,7 @@ import numpy as np
 from scipy.stats import ks_2samp
 import copy
 from .placement_object import PlacementObject
+from .shape_object import ShapeObject
 import _multiplacement
 
 class OrganismObject:
@@ -1083,9 +1084,9 @@ class OrganismObject:
         """
         #print(self.recognizer_types)
         number_PSSM = len(self.recognizers)
-        max_length = 0
+        max_length = -1
         if number_PSSM > 1:
-            max_length = self.connectors[0].expected_seq_length
+            max_length = self.connectors[0].expected_seq_length - 1
         # Get an array of lengths of each recognizer in the organism
 
         # instantiation of numpy arrays that will hold placement info
@@ -1095,8 +1096,10 @@ class OrganismObject:
         gaps = np.empty(number_PSSM, dtype = np.dtype('i'))
         gap_scores = np.empty(number_PSSM - 1, dtype = np.dtype('d'))
         PSSM_scores = np.empty(number_PSSM + 1, dtype = np.dtype('d'))
+        #print(self.recognizer_models)
+        #print(self.recognizer_bin_edges)
+        #print(self.recognizer_bin_nums)
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), self.recognizers_flat, self.recognizer_lengths,  self.connectors_scores_flat, PSSM_scores, gap_scores, gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
-
         # parse data from the _calculatePlacement module and put it
         # into a PlacementObject to be returned
         placement = PlacementObject(self._id, sequence)
@@ -1144,13 +1147,15 @@ class OrganismObject:
         self.recognizer_types = ""
         
         for recognizer in self.recognizers:
-            if recognizer.type == 'p':
+            if recognizer.get_type() == 'p':
                 for column in recognizer.pssm:
                     for base in ['a','g','c','t']:
                         flat_recognizers.append(column[base])
             else:
                 if recognizer.length < 5:
                     recognizer.length = 5
+                    recognizer.set_null_model(recognizer.null_models)
+                    recognizer.set_alt_model()
                 for prob in recognizer.null_model:
                     flat_rec_models.append(prob)
                 for prob in recognizer.alt_model:
@@ -1159,7 +1164,7 @@ class OrganismObject:
                     rec_bin_edges.append(edge)
                 rec_bin_nums.append(len(recognizer.bins))
             recognizer_lengths.append(recognizer.length)
-            self.recognizer_types += recognizer.type
+            self.recognizer_types += recognizer.get_type()
 
         # organism holds a numpy array of the flattened lists
         self.recognizers_flat = np.array(flat_recognizers, dtype = np.dtype('d')) 
