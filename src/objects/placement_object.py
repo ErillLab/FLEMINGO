@@ -34,7 +34,7 @@ class PlacementObject:
         self.connectors_scores = []
         self.recognizers_positions = []
         self.connectors_positions = []
-    
+        self.recognizer_types = ""
     # Compile placement features
     
     def set_energy(self, energy):
@@ -84,7 +84,7 @@ class PlacementObject:
             
             # write recognizer placement
             for pos in range(start, stop):
-                recog_positions_line[pos] = str(i)
+                recog_positions_line[pos] = str(self.recognizer_types[i])
             
             # write recognizer score
             for c in range(len(recog_score_str)):
@@ -130,28 +130,9 @@ class PlacementObject:
             print("".join(recog_scores_line), file=outfile)
             print("".join(conn_scores_line), file=outfile)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def set_recognizer_types(self, rec_types):
+        #print(rec_types)
+        self.recognizer_types = rec_types
 
 
 

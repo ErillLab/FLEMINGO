@@ -88,7 +88,6 @@ void pssm_row( Recognizer* rec,  const char* seq,  int len, double* row){
 }
 
 void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
-  //print_rec(rec);
   int n_pent = rec->len - 4;
   int n_bins = rec->bin_s;
   double alt_f = 0.0;
@@ -136,13 +135,10 @@ void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 
-    if (score > BIG_POSITIVE)
+    if (score > BIG_POSITIVE){
       score = BIG_POSITIVE;
-
-    if (score != t_score){
       print_rec(rec);
-      printf("t_score: %f\nn_score: %f\n", t_score, score);
-      exit(-1);      
+      exit(1);
     }
     row[i] = score;
   }
@@ -198,9 +194,13 @@ void prot_row( Recognizer* rec,  const char* seq,  int len, double* row){
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 
-    if (score > BIG_POSITIVE)
+    if (score > BIG_POSITIVE){
+      printf("null_f = %f\n", null_f);
+      printf("alt_f = %f\n", alt_f);
+      print_rec(rec);
       score = BIG_POSITIVE;
-
+      exit(1);
+    } 
     row[i] = score;
   }
   free(pent_s);
@@ -275,6 +275,8 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
   double* edges = rec->edges;
   double* pent_s = (double*)malloc((n_pent * 2) * sizeof(double));
   double score = 0.0;
+  char* rec_seq = (char*)malloc(rec->len * sizeof(char) + 1);
+  rec_seq[rec->len] = '\0';
   int idx = 0;
 
   for (int i = 0; i < len; i++){
@@ -282,6 +284,7 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
       score = 0.0;
       idx = 0;
       for (int k = j; k < j + 5; k++){
+        rec_seq[k - j] = seq[k];
         switch(seq[k]){
           case 'a':
           case 'A':
@@ -306,17 +309,21 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
       }
       pent_s[j - i] = HELT_SCORES[idx];
       pent_s[j - i + n_pent] = HELT_SCORES[idx + 1024];
-
     }
-    score = shape_average(pent_s, n_pent);
+    score = shape_average(pent_s, n_pent * 2);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
     score = log2f(alt_f / null_f);
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 
-    if (score > BIG_POSITIVE)
+    if (score > BIG_POSITIVE){
       score = BIG_POSITIVE;
+      printf("%s\n", rec_seq);
+      printf("null_f = %f\n", null_f);
+      printf("alt_f = %f\n", alt_f);
+      print_rec(rec);
+    }
 
     row[i] = score;
   }

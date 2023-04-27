@@ -46,6 +46,7 @@
     "RECOMBINATION_PROBABILITY": 0.33,
     "NUM_RECOGNIZERS_LAMBDA_PARAM": 2.5,
     "MIN_MU": 0,
+    "MIN_MU_SHAPE": -50,
     "MAX_MU": 50,
     "MIN_SIGMA": 1,
     "MAX_SIGMA": 3,
@@ -60,7 +61,7 @@
     "MUTATE_VARIANCE_MU": 5,
     "SIGMA_MUTATOR": "linear",
     "MU_MUTATOR": "standard",
-    "EXPECTED_SEQ_LENGTH": 200
+    "EXPECTED_SEQ_LENGTH": 100
   },
   "pssm": {
     "MUTATE_PROBABILITY_RANDOM_COL": 0.075,

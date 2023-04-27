@@ -116,15 +116,17 @@ class ConnectorObject():
         self._sigma = sigma
     
     def set_precomputed_pdfs_cdfs(self) -> None:
+        return
         """Set stored_pdfs variable and stored_cdfs variable
         """
         
         # Delete previous values
         self.stored_pdfs = []
         self.stored_cdfs = []
-        
+        import time
         # Compute new values
         cdf0 = norm_cdf(0, self._mu, self._sigma)
+        s = time.monotonic_ns()
         for dist in range(self.expected_seq_length):
             
             # Precompute PDF
@@ -147,6 +149,9 @@ class ConnectorObject():
                     self.stored_cdfs.append(-1E10)
                 else:
                     self.stored_cdfs.append(0.00)
+    
+        e = time.monotonic_ns()
+        print("precomputeing took:", (e - s) * 10E-9)
 
     def mutate(self, org_factory) -> None:
         """mutation for a connector

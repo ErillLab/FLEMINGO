@@ -4,8 +4,15 @@ import models.models as models
 
    
 def test_placement(organism, sequence):
+    print("")
+    print("---------------------TESTING---------------------")
+    print("Num Recognizers:", len(organism.recognizers))
+    print("Sequence Length:", len(sequence))
+    print("-----------------    RESULTS    -----------------")
     placement = organism.get_placement(sequence)
-    placement.print_placement(stdout=True)
+    print("-------------------------------------------------")
+    print("")
+    #placement.print_placement(stdout=True)
     return placement
 
 def build_organism():
@@ -26,12 +33,17 @@ def build_organism():
 
 def main():
     org = build_organism()
+    print("ONLY LOOK AT AFTER THIS STATEMENT")
     org.flatten()
-    placement = test_placement(org, "AAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTTAAGGTT")
-    try:
-        placement = test_placement(org, "AAGG")
-    except:
-        pass
+    scores1 = org.connectors_scores_flat
+    placement = test_placement(org, "gtacaacatg" * 10)
+    placement.print_placement(stdout=True)
+    org.set_pdf_cdf()
+    scores2 = org.connectors_scores_flat
+    placement = test_placement(org, "gtacaacatg" * 10)
+    placement.print_placement(stdout=True)
+    #placement = test_placement(org, "gtacaacatg" * 1000)
+
     return
 
 if __name__ == '__main__':

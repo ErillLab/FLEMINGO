@@ -5,11 +5,13 @@ It allocates the full data structure
 """
 import math
 import random
+import time
 import numpy as np
 from scipy.stats import ks_2samp
 import copy
 from .placement_object import PlacementObject
 from .shape_object import ShapeObject
+from .connector_object import norm_cdf
 import _multiplacement
 
 class OrganismObject:
@@ -43,6 +45,7 @@ class OrganismObject:
         self.recognizer_models = []
         self.recognizer_bin_edges = []
         self.recognizer_bin_nums = []
+        self.minimum_length = 0
         # assign organism-specific parameters
 	
         # whether fitness is computed over sequences as sum or average
@@ -1083,6 +1086,7 @@ class OrganismObject:
             PlacementObject containing information of optimal placement
         """
         #print(self.recognizer_types)
+        s = time.monotonic_ns()
         number_PSSM = len(self.recognizers)
         max_length = -1
         if number_PSSM > 1:
@@ -1097,7 +1101,10 @@ class OrganismObject:
         gap_scores = np.empty(number_PSSM - 1, dtype = np.dtype('d'))
         PSSM_scores = np.empty(number_PSSM + 1, dtype = np.dtype('d'))
 
+        e = time.monotonic_ns()
+        t1 = e - s
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), self.recognizers_flat, self.recognizer_lengths,  self.connectors_scores_flat, PSSM_scores, gap_scores, gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
+        s = time.monotonic_ns()
         # parse data from the _calculatePlacement module and put it
         # into a PlacementObject to be returned
         placement = PlacementObject(self._id, sequence)
@@ -1106,7 +1113,7 @@ class OrganismObject:
         placement.set_connectors_scores([float(score) for score in gap_scores])
 
         current_position = gaps[0]
-
+        placement.set_recognizer_types(self.recognizer_types)
         for i in range(number_PSSM):
 
             stop = current_position + self.recognizer_lengths[i]
@@ -1119,9 +1126,75 @@ class OrganismObject:
                 current_position += gaps[i + 1]
         
         #placement.print_placement(stdout=True)
+        e = time.monotonic_ns()
+        t2 = e - s
+        #print("python overhead took {} seconds".format((t2 + t1) *10E-9))
+        for i in ['m', 't', 'h', 'r']:
+            if i in self.recognizer_types:
+                placement.print_placement(stdout=True)
         return placement
 
-    def flatten(self):
+    def set_minimum_length(self) -> None:
+        self.minimum_length = sum([i.length for i in self.recognizers])
+
+    def set_pdf_cdf(self) -> None:
+        #if we have no connectors, empty connectors info
+        n_con = len(self.connectors)
+        if n_con == 0:
+            self.connectors_scores_flat = np.zeros(0, dtype=np.dtype('d'))
+            return
+
+        #allocate all of the space needed for the whole flat array
+        e_len  = self.connectors[0].expected_seq_length
+        self.connectors_scores_flat = np.zeros(n_con * (2 * e_len + 2), dtype=np.dtype('d'))
+        offset = 0
+        pdf = 0
+        auc = 0
+
+        #for each connector we need to:
+        #    add mu and sigma
+        #    compute the cdf(-0.5) for normalization
+
+        for i in range(n_con):
+            con = self.connectors[i]
+            prev_cdf = norm_cdf(-0.5, con._mu, con._sigma)
+            if prev_cdf < 1E-100:
+                prev_cdf = 1E-100
+            cdf_0 = prev_cdf
+            self.connectors_scores_flat[offset] = np.double(con._mu)
+            self.connectors_scores_flat[offset + 1] = np.double(con._sigma)
+            offset += 2
+
+            #range is 1 to e_len + 1 because first pdf is cdf(0.5) - cdf(-0.5)
+            #and the last pdf should be cdf(e_len + 0.5) - cdf(e_len - 0.5)
+            #since we're starting at 1, for each index in the cdf array we need
+            #to actually use the previous iteration of the cdf since the first index
+            #should be cdf(-0.5) - cdf(-0.5)
+            for j in range(1, e_len + 1):
+                cdf = norm_cdf(j - 0.5, con._mu, con._sigma)
+
+                if prev_cdf - cdf_0 > 1E-100:
+                    auc = np.log2(prev_cdf - cdf_0)
+                else:
+                    auc = -1E10
+
+                if cdf - prev_cdf > 1E-100:
+                    pdf = np.log2(cdf - prev_cdf)
+                else:
+                    pdf = -1E10
+
+                self.connectors_scores_flat[offset] = np.double(pdf)
+                self.connectors_scores_flat[offset + e_len] = np.double(auc)
+                offset += 1
+                prev_cdf = cdf
+
+            #our offset to get to the start of the next connector will be e_len since
+            #we have alread iterated e_len times and each connector takes (2 * e_len + 2)
+            #indices
+            offset += e_len
+                
+        
+    def flatten(self) -> None:
         """
         Flattens an organisms recognizers into a 1D array
         computes gap scores and forms a 1D array out of them.
@@ -1134,8 +1207,9 @@ class OrganismObject:
         Returns:
             None
         """
-        
+        import time
         # instantiation of lists to hold flattened info
+        s = time.monotonic_ns()
         flat_recognizers = []
         flat_connector_scores = []
         flat_rec_models = []
@@ -1150,10 +1224,6 @@ class OrganismObject:
                     for base in ['a','g','c','t']:
                         flat_recognizers.append(column[base])
             else:
-                if recognizer.length < 5:
-                    recognizer.length = 5
-                    recognizer.set_null_model(recognizer.null_models)
-                    recognizer.set_alt_model()
                 for prob in recognizer.null_model:
                     flat_rec_models.append(prob)
                 for prob in recognizer.alt_model:
@@ -1163,13 +1233,17 @@ class OrganismObject:
                 rec_bin_nums.append(len(recognizer.bins))
             recognizer_lengths.append(recognizer.length)
             self.recognizer_types += recognizer.get_type()
-
         # organism holds a numpy array of the flattened lists
         self.recognizers_flat = np.array(flat_recognizers, dtype = np.dtype('d')) 
         self.recognizer_lengths = np.array(recognizer_lengths, dtype = np.dtype('i'))
         self.recognizer_models = np.array(flat_rec_models, dtype = np.dtype('d'))
         self.recognizer_bin_nums = np.array(rec_bin_nums, dtype = np.dtype('i'))
         self.recognizer_bin_edges = np.array(rec_bin_edges, dtype = np.dtype('d'))
+
+        self.set_pdf_cdf()
+        return
+
+        g_s = time.monotonic_ns()
         if self.is_precomputed == True:
             for connector in self.connectors:
                 flat_connector_scores += [connector._mu, connector._sigma]
@@ -1186,3 +1260,6 @@ class OrganismObject:
                 con_mu_sigma.append(connector._sigma)
 
             self.connectors_scores_flat = np.array(con_mu_sigma, dtype=np.dtype('d'))
+        e = time.monotonic_ns()
+        print("full gap precomputation and population took:", (e-g_s) * 10E-9)
+        #print("flattening organism took {} seconds".format((e - s) *10E-9))

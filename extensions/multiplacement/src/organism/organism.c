@@ -138,12 +138,12 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models,
     } else { 
       parse_shape(&org->recs[i], 
                   models + a_offset, 
-                  models + a_offset + model_lengths[shape_i], 
+                  models + a_offset + model_lengths[shape_i] - 1, 
                   edges + e_offset, 
                   model_lengths[shape_i], 
                   rec_lengths[i], 
                   rec_types[i]);
-      a_offset += model_lengths[shape_i] * 2 - 2;
+      a_offset += (model_lengths[shape_i] - 1) * 2;
       e_offset += model_lengths[shape_i];
       shape_i  += 1;
     }
@@ -214,6 +214,8 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
   int n_rec = org->len;
   int* r_lens = (int*)malloc(n_rec * sizeof(int));
   int m_len = 0;
+  double auc;
+
 
   //iteration of each recognizer to calculate the minimum length of a sequence
   //and to write the length of each recognizer to the r_lens array
@@ -274,37 +276,57 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
   Recognizer* rec = NULL;
   Connector* con = NULL;
 
-  clock_t rec_scoring_total;
-  clock_t gap_calculating_total;
-  clock_t traceback_total;
+  clock_t rec_scoring_total = 0;
+  clock_t gap_scoring_total = 0;
+  clock_t traceback_total = 0;
+  clock_t auc_total = 0;
+  clock_t s;
+  clock_t e;
+
+  clock_t auc_s;
+  clock_t auc_e;
   for (int i = 0; i < n_rec; i++) {
     rec = &org->recs[i];
 
     //populates the row for the current recognizer with the score for
     //each possible placement along the sequence
+    s = clock();
     score_row(rec, seq + f_offset, n_align, rs_matrix + (i * n_align));
+    e = clock();
+    rec_scoring_total += (e - s);
 
     //on the first iteration we dont need to do any cumulative score
     //calculations because there are no connectors involved yet
     if (i > 0) {
+      s = clock();
       con = &org->cons[i - 1];
       max_len = con->max_len;
 
+      //sometimes the length of the sequence is greater than the max precomputed length
+      //if this is the case then we need to compute the cdf to used for the placement
+      auc_s = clock();
+      if (s_len - m_len > max_len)
+        auc = log2f(norm_cdf(eff_len - n_rec + 0.5, con->mu, con->sigma) 
+                  - norm_cdf(-0.5, con->mu, con->sigma));
+      else
+        auc = con->cdf[s_len - m_len];      
+      auc_e = clock();
+      auc_total += (auc_e - auc_s);
       //j current position in the temp score row
       //k is the current position in the cumulative score array
       //we compare the score currently stored in our array
       //of temporary scores at j to each possible placement of the previous
       //recognizer, which are held in our array for cumulative scores at k
-      for (int j = 0; j < n_align; j++){
+      for (int j = 0; j < n_align; j++)
         for (int k = 0; k < j + 1; k++){
           gap = j - k;
 
           //this determines whether we can compute the score using passed
           //pdfs and cdfs, or if we need to compute it right now
           if (gap > max_len)
-            g_score = score_con(con, gap, s_len, eff_len, n_rec, false);
+            g_score = score_con(con, gap, s_len, eff_len, n_rec, auc, false);
           else 
-            g_score = score_con(con, gap, s_len, eff_len, n_rec, true);
+            g_score = score_con(con, gap, s_len, eff_len, n_rec, auc, true);
 
           //if the score at some position k in the cumulative scores +
           //the score from the gap of lenght j - k is greater than the 
@@ -316,9 +338,8 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
           }
 
         }
-
-      }
-
+      e = clock();
+      gap_scoring_total += (e - s);
       //each position in the cumulative array is overwritten with the 
       //corresponding position in the temp array since the best possible
       //score for each posiiton was obtained by the end of the current
@@ -345,6 +366,7 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
   //m_idx:    index that keeps track of the current position in the traceback
   //r_scores: is the array that we write the cumulative score to in the last
   //          position and the score for the corresponding recognizer
+  s = clock();
   int m_idx = max_index(c_row, n_align);
   r_scores[n_rec] = c_row[m_idx];
 
@@ -359,7 +381,13 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
     }
     c_lens[0] = m_idx;
   }
+  e = clock();
+  traceback_total += (e - s);
 
+  //printf("scoring recs took: %f\n", (double)(rec_scoring_total) / (double)(CLOCKS_PER_SEC));
+  //printf("scoring gaps took: %f\n", (double)(gap_scoring_total) / (double)(CLOCKS_PER_SEC));
+  //printf("traceback took:    %f\n", (double)(traceback_total) / (double)(CLOCKS_PER_SEC));
+  //printf("auc took:          %f\n", (double)(auc_total) / (double)(CLOCKS_PER_SEC));
   free(r_lens);
   free(t_row);
   free(c_row);

@@ -97,10 +97,8 @@ class ShapeObject:
             #determine type of mutation (linear or log)
             if self.mu_mutator=="linear":
                 # Update mu with a random permutation within allowed interval
-                self._mu = abs(
-                    self._mu + random.uniform(-self.mutate_variance_mu,
-                                              self.mutate_variance_mu)
-                )
+                self._mu = self._mu + random.uniform(-self.mutate_variance_mu, self.mutate_variance_mu)
+
             elif self.mu_mutator=="log":
                 base = self.mutate_variance_mu
                 logb_mu = np.log(self._mu) / np.log(base)
@@ -110,16 +108,16 @@ class ShapeObject:
                 self._mu = base**logb_mu
             
             elif self.mu_mutator=="standard":
-                self._mu = abs(random.gauss(self._mu, self._sigma))
+                self._mu = random.gauss(self._mu, self._sigma)
 
         if random.random() < self.mutate_probability_increase_size and self.length < self.max_columns:
             self.length += 1 
-            self.set_null_model(self.nulls)
+            self.set_null_model()
             self.set_alt_model()
 
         if random.random() < self.mutate_probability_decrease_size and self.length > self.min_columns:
             self.length -= 1
-            self.set_null_model(self.nulls)
+            self.set_null_model()
             self.set_alt_model()
 
     def print(self) -> None:

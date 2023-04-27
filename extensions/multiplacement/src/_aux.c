@@ -112,10 +112,10 @@ double get_numerator(int dna_length, int distance, double mu, double sigma){
 
   double auc = norm_cdf(dna_length - 1, mu, sigma) - norm_cdf(0, mu, sigma);
   if (auc < SMALL_POSITIVE)
-    auc = SMALL_POSITIVE;
+    auc = 1E-10;
 
   if (numerator < SMALL_POSITIVE)
-    numerator = SMALL_POSITIVE;
+    numerator = 1E-10;
 
   return (numerator / auc);
 
