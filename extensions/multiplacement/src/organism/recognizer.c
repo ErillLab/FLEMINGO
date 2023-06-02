@@ -43,13 +43,13 @@ void print_shape(Recognizer *rec){
   
   printf("Null frequencies:\n");
   for (int j = 0; j < rec->bin_s - 1; j++){
-    printf(" [%5.2f, %5.2f]: %3.2f\n", rec->edges[j], rec->edges[j+1], rec->null_f[j]);
+    printf(" [%5.2f, %5.2f]: %8.5f\n", rec->edges[j], rec->edges[j+1], rec->null_f[j]);
   }
 
 
   printf("Alt frequencies:\n");
   for (int j = 0; j < rec->bin_s - 1; j++){
-    printf(" [%5.2f, %5.2f]: %3.2f\n", rec->edges[j], rec->edges[j+1], rec->alt_f[j]);
+    printf(" [%5.2f, %5.2f]: %8.5f\n", rec->edges[j], rec->edges[j+1], rec->alt_f[j]);
   }
   
 }
@@ -127,7 +127,7 @@ void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
       }
       pent_s[j - i] = MGW_SCORES[idx];
     }
-    score = shape_average(pent_s, n_pent);
+    score = shape_average_mgw_prot(pent_s, n_pent);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
     score = log2f(alt_f / null_f);
@@ -156,12 +156,18 @@ void prot_row( Recognizer* rec,  const char* seq,  int len, double* row){
   double* pent_s = (double*)malloc(n_pent * sizeof(double));
   double score = 0.0;
   int idx = 0;
+  char** seqs = (char**)malloc(n_pent * sizeof(char*));
+  for (int i = 0; i < n_pent; i++){
+    seqs[i] = (char*)malloc(6 * sizeof(char));
+    seqs[i][5] = '\0';
+  }
 
   for (int i = 0; i < len; i++){
     for (int j = i; j < i + n_pent; j++){
       score = 0.0;
       idx = 0;
       for (int k = j; k < j + 5; k++){
+        seqs[j - i][k - j] = seq[k];
         switch(seq[k]){
           case 'a':
           case 'A':
@@ -187,7 +193,8 @@ void prot_row( Recognizer* rec,  const char* seq,  int len, double* row){
       pent_s[j - i] = PROT_SCORES[idx];
 
     }
-    score = shape_average(pent_s, n_pent);
+    score = shape_average_mgw_prot(pent_s, n_pent);
+    double t_score = score;
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
     score = log2f(alt_f / null_f);
@@ -197,6 +204,11 @@ void prot_row( Recognizer* rec,  const char* seq,  int len, double* row){
     if (score > BIG_POSITIVE){
       printf("null_f = %f\n", null_f);
       printf("alt_f = %f\n", alt_f);
+      printf("t_score: %f\n", t_score);
+      printf("sequences pentamers\n");
+      for (int i = 0; i < n_pent; i++){
+        printf("%s, %6.3f\n", seqs[i], pent_s[i]);
+      }
       print_rec(rec);
       score = BIG_POSITIVE;
       exit(1);
@@ -275,16 +287,20 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
   double* edges = rec->edges;
   double* pent_s = (double*)malloc((n_pent * 2) * sizeof(double));
   double score = 0.0;
-  char* rec_seq = (char*)malloc(rec->len * sizeof(char) + 1);
-  rec_seq[rec->len] = '\0';
   int idx = 0;
+
+  char** seqs = (char**)malloc(n_pent * sizeof(char*));
+  for (int i = 0; i < n_pent; i++){
+    seqs[i] = (char*)malloc(6 * sizeof(char));
+    seqs[i][5] = '\0';
+  }
 
   for (int i = 0; i < len; i++){
     for (int j = i; j < i + n_pent; j++){
       score = 0.0;
       idx = 0;
       for (int k = j; k < j + 5; k++){
-        rec_seq[k - j] = seq[k];
+        seqs[j - i][k - j] = seq[k];
         switch(seq[k]){
           case 'a':
           case 'A':
@@ -311,6 +327,7 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
       pent_s[j - i + n_pent] = HELT_SCORES[idx + 1024];
     }
     score = shape_average(pent_s, n_pent * 2);
+    double t_score = score;
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
     score = log2f(alt_f / null_f);
@@ -318,11 +335,17 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
       score = BIG_NEGATIVE;
 
     if (score > BIG_POSITIVE){
-      score = BIG_POSITIVE;
-      printf("%s\n", rec_seq);
+
       printf("null_f = %f\n", null_f);
       printf("alt_f = %f\n", alt_f);
+      printf("t_score: %f\n", t_score);
+      printf("sequences pentamers\n");
+      for (int i = 0; i < n_pent; i++){
+        printf("%s: %6.3f, %6.3f\n", seqs[i], pent_s[i], pent_s[i + n_pent]);
+      }
       print_rec(rec);
+      score = BIG_POSITIVE;
+      exit(1);
     }
 
     row[i] = score;

@@ -12,6 +12,7 @@ import copy
 from .placement_object import PlacementObject
 from .shape_object import ShapeObject
 from .connector_object import norm_cdf
+from .connector_object import g
 import _multiplacement
 
 class OrganismObject:
@@ -1073,6 +1074,42 @@ class OrganismObject:
         placement = self.get_placement(s_dna)
         placement.print_placement(stdout = True)
 
+    def adjust_connector_scores(self, c_idx, c_scores, sequence_length):
+        #get to the start in the array of connector info
+        offset = sum([(self.connectors[i].expected_seq_length * 2 + 2) for i in range(0, c_idx)])
+
+        #get to first precomputed position
+        offset += 2
+
+        #get to the length of the sequence
+        offset += sequence_length
+
+        con = self.connectors[i]
+        g_curr = g(sequence_length, con._mu, con._sigma)
+        h_curr = 1
+
+        h_list = [1 + con.pseudo_count]
+        tot_sum =  h_list[0]
+
+        for i in range(sequence_length - 1, -1, -1):
+            g_next = g(i, mu, sigma)
+            h_next = h_curr * math.exp(g_next - g_curr)
+
+            h_list.append(h_next + con.pseudo_count)
+            tot_sum += h_next + con.pseudo_count
+
+            g_curr = g_next
+            h_curr = h_next
+
+        h_list_sorted = h_list[::-1]
+        p_list = [h/tot_sum for h in h_list_sorted]
+
+        prob_sum = 0.0
+        for i in range(len(p_list)):
+            prob_sum += p_list[i]
+            c_scores[offset + i] = np.log(p_list[i])
+            c_scores[offset + con.expected_seq_length + i] = np.log(prob_sum)
+
     def get_placement(self, sequence: str) -> PlacementObject:
 
         """
@@ -1085,26 +1122,38 @@ class OrganismObject:
         Returns:
             PlacementObject containing information of optimal placement
         """
-        #print(self.recognizer_types)
-        s = time.monotonic_ns()
+        if self.minimum_length > len(sequence):
+            placement = Placement(self._id, sequence)
+            placement.set_energy(-1E100)
+            return placement
+
         number_PSSM = len(self.recognizers)
         max_length = -1
         if number_PSSM > 1:
             max_length = self.connectors[0].expected_seq_length - 1
+            for i in range(len(self.connectors)):
+                if len(sequence) < self.connectors[i].adjust_score_threshold:
+                   self.adjust_connector_scores(i, len(sequence))
+                     
         # Get an array of lengths of each recognizer in the organism
 
         # instantiation of numpy arrays that will hold placement info
         # gathered by the _calculatePlacement module
-        #print(self.recognizer_types);
             
+        
         gaps = np.empty(number_PSSM, dtype = np.dtype('i'))
         gap_scores = np.empty(number_PSSM - 1, dtype = np.dtype('d'))
         PSSM_scores = np.empty(number_PSSM + 1, dtype = np.dtype('d'))
 
-        e = time.monotonic_ns()
-        t1 = e - s
-        _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), self.recognizers_flat, self.recognizer_lengths,  self.connectors_scores_flat, PSSM_scores, gap_scores, gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
-        s = time.monotonic_ns()
+        c_scores = np.copy(self.connectors_scores_flat)
+        if number_PSSM > 1:
+            max_length = self.connectors[0].expected_seq_length - 1
+            for i in range(len(self.connectors)):
+                if len(sequence) < self.connectors[i].adjust_score_threshold:
+                   self.adjust_connector_scores(i, c_scores)
+            
+        _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), self.recognizers_flat, self.recognizer_lengths,  c_scores, PSSM_scores, gap_scores, gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
+
         # parse data from the _calculatePlacement module and put it
         # into a PlacementObject to be returned
         placement = PlacementObject(self._id, sequence)
@@ -1126,18 +1175,19 @@ class OrganismObject:
                 current_position += gaps[i + 1]
         
         #placement.print_placement(stdout=True)
-        e = time.monotonic_ns()
-        t2 = e - s
         #print("python overhead took {} seconds".format((t2 + t1) *10E-9))
+        """
         for i in ['m', 't', 'h', 'r']:
             if i in self.recognizer_types:
                 placement.print_placement(stdout=True)
+        """
         return placement
 
     def set_minimum_length(self) -> None:
         self.minimum_length = sum([i.length for i in self.recognizers])
 
-    def set_pdf_cdf(self) -> None:
+    def set_pf_auc(self) -> None:
+        s = time.monotonic_ns()
         #if we have no connectors, empty connectors info
         n_con = len(self.connectors)
         if n_con == 0:
@@ -1145,54 +1195,56 @@ class OrganismObject:
             return
 
         #allocate all of the space needed for the whole flat array
-        e_len  = self.connectors[0].expected_seq_length
-        self.connectors_scores_flat = np.zeros(n_con * (2 * e_len + 2), dtype=np.dtype('d'))
+        exp_len  = self.connectors[0].expected_seq_length
+        self.connectors_scores_flat = np.zeros(n_con * (2 * exp_len + 2), dtype=np.dtype('d'))
         offset = 0
-        pdf = 0
+        pf = 0
         auc = 0
 
-        #for each connector we need to:
-        #    add mu and sigma
-        #    compute the cdf(-0.5) for normalization
+        #this value keeps track of the the length n that a sequence must be
+        #such that all values from index 0 to index n in the precomputed scores
+        #are all rounded to con.pseudo_count
+        adjust_score_threshold = 0
+        """
+        for each connector we need to:
+            add mu and sigma
+            compute the cdf(-0.5) for normalization
+        """
 
         for i in range(n_con):
             con = self.connectors[i]
             prev_cdf = norm_cdf(-0.5, con._mu, con._sigma)
-            if prev_cdf < 1E-100:
-                prev_cdf = 1E-100
             cdf_0 = prev_cdf
             self.connectors_scores_flat[offset] = np.double(con._mu)
             self.connectors_scores_flat[offset + 1] = np.double(con._sigma)
             offset += 2
 
-            #range is 1 to e_len + 1 because first pdf is cdf(0.5) - cdf(-0.5)
-            #and the last pdf should be cdf(e_len + 0.5) - cdf(e_len - 0.5)
-            #since we're starting at 1, for each index in the cdf array we need
-            #to actually use the previous iteration of the cdf since the first index
-            #should be cdf(-0.5) - cdf(-0.5)
-            for j in range(1, e_len + 1):
+            """
+            range is 1 to e_len + 1 because first pdf is cdf(0.5) - cdf(-0.5)
+            and the last pf should be cdf(e_len + 0.5) - cdf(e_len - 0.5)
+            since we're starting at 1, for each index in the auc array we need
+            to actually use the previous iteration of the auc since the first index
+            should be cdf(-0.5) - cdf(-0.5)
+            """
+
+            for j in range(1, exp_len + 1):
                 cdf = norm_cdf(j - 0.5, con._mu, con._sigma)
+                if cdf == prev_cdf and cdf <= con.pseudo_count:
+                    con.adjust_score_threshold = j
+                auc = np.log2(prev_cdf - cdf_0 + (con.pseudo_count * j))
 
-                if prev_cdf - cdf_0 > 1E-100:
-                    auc = np.log2(prev_cdf - cdf_0)
-                else:
-                    auc = -1E10
+                pf = np.log2(cdf - prev_cdf + con.pseudo_count)
 
-                if cdf - prev_cdf > 1E-100:
-                    pdf = np.log2(cdf - prev_cdf)
-                else:
-                    pdf = -1E10
-
-                self.connectors_scores_flat[offset] = np.double(pdf)
-                self.connectors_scores_flat[offset + e_len] = np.double(auc)
+                self.connectors_scores_flat[offset] = np.double(pf)
+                self.connectors_scores_flat[offset + exp_len] = np.double(auc)
                 offset += 1
                 prev_cdf = cdf
 
             #our offset to get to the start of the next connector will be e_len since
             #we have alread iterated e_len times and each connector takes (2 * e_len + 2)
             #indices
-            offset += e_len
-                
+            offset += exp_len
+        #print("setting stuff took:", (time.monotonic_ns() - s) * 1E-9)
         
     def flatten(self) -> None:
         """
@@ -1240,9 +1292,10 @@ class OrganismObject:
         self.recognizer_bin_nums = np.array(rec_bin_nums, dtype = np.dtype('i'))
         self.recognizer_bin_edges = np.array(rec_bin_edges, dtype = np.dtype('d'))
 
-        self.set_pdf_cdf()
+        self.set_pf_auc()
         return
 
+        """
         g_s = time.monotonic_ns()
         if self.is_precomputed == True:
             for connector in self.connectors:
@@ -1263,3 +1316,4 @@ class OrganismObject:
         e = time.monotonic_ns()
         print("full gap precomputation and population took:", (e-g_s) * 10E-9)
         #print("flattening organism took {} seconds".format((e - s) *10E-9))
+        """

@@ -157,6 +157,15 @@ int max_index(double *arr, int size) {
   return max_index;
 }
 
+
+
+bool compare_doubles(double a, double b, double epsilon){
+  if (fabs(a - b) < epsilon){
+    return true;
+  }
+
+  return false;
+}
 /* 
 name:            get_bin_frequency
 pre-conditions:  score is calcualted from constant arrays of of shape scores
@@ -174,12 +183,9 @@ notes:           .
 */
 double get_bin_frequency(double score, double bin_frequencies[], double bin_edges[], int num_bins){
   for (int i = 1; i < num_bins; i++){
-    if (score < bin_edges[i]){
-      if (bin_frequencies[num_bins - 1] == 0.00) {
-        return bin_frequencies[i];
-      }else{
-        return bin_frequencies[i - 1];
-      }
+    if (score < bin_edges[i] && fabs(score - bin_edges[i]) > 0.001){
+      //printf("bin edge %i is %f, score is: %f, freq is: %f\n", i, bin_edges[i], score, bin_frequencies[i - 1]);
+      return bin_frequencies[i - 1];
     }
   } 
 
@@ -203,4 +209,13 @@ double shape_average(double pentamer_scores[], int num_elements){
     sum += pentamer_scores[i];
   }
   return sum/((double)(num_elements + 2));
+}
+
+double shape_average_mgw_prot(double pentamer_scores[], int num_elements){
+  double sum = 0.00;
+  for (int i = 0; i < num_elements; i++){
+    sum += pentamer_scores[i];
+  }
+  return sum/((double)(num_elements));  
+  
 }

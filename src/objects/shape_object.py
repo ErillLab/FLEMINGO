@@ -3,6 +3,9 @@ import numpy as np
 import math
 import copy
 import models.models as models
+global null_models
+null_models = {}
+
 def norm_cdf(x, mu, sigma):
     ''' Cumulative distribution function for the normal distribution. '''
     z = (x-mu)/abs(sigma)
@@ -27,17 +30,29 @@ def norm_pf(x, mu, sigma):
 
 
 class ShapeObject:
-    def __init__(self, rec_type, rec_size, mu, sigma, config):
+    def __init__(self, rec_type, rec_size, config, mu = None, sigma = None):
+        #print(null_models)
+        #print(models.models)
         self.type = rec_type
         self.length = rec_size
-        self._mu = mu
-        self._sigma = sigma
+
         self.null_model = []
         self.bins = []
         self.alt_model = []
         self.set_null_model()
+
+        self.min_mu = self.bins[0]
+        self.max_mu = self.bins[-1]
+        self._mu = mu
+        self._sigma = sigma
+
+        if mu == None or sigma == None:
+            self._mu = np.random.uniform(self.min_mu, self.max_mu)
+            self._sigma = np.random.uniform(0, 1)
+
         self.set_alt_model()
 
+        
         self.mutate_probability_sigma = config["MUTATE_PROBABILITY_SIGMA"]
         self.mutate_probability_mu = config["MUTATE_PROBABILITY_MU"]
         self.sigma_mutator = config["SIGMA_MUTATOR"]
@@ -55,8 +70,10 @@ class ShapeObject:
         sets the null model corresponding to shape recognizer's feature
         and length
         """
-        self.null_model = models.models[self.type][self.length]["frequencies"]
-        self.bins = models.models[self.type][self.length]["bins"]
+        self.null_model = null_models[self.type][self.length]["frequencies"]
+        self.bins = null_models[self.type][self.length]["bins"]
+        self.min_mu = self.bins[0]
+        self.max_mu = self.bins[-1]
 
     def set_alt_model(self):
         """
@@ -71,7 +88,7 @@ class ShapeObject:
             if score < 1E-10:
                 score = 1E-10
             alt_model.append(score)
-        self.alt_model = np.array(alt_model, dtype=np.dtype("f"))
+        self.alt_model = np.array(alt_model, dtype=np.dtype("d"))
 
     def mutate(self, org_fac):
         # SIGMA MUTATION
@@ -119,6 +136,12 @@ class ShapeObject:
             self.length -= 1
             self.set_null_model()
             self.set_alt_model()
+
+        if self._mu < self.min_mu:
+            self._mu = self.min_mu
+
+        if self._mu > self.max_mu:
+            self._mu = self.max_mu
 
     def print(self) -> None:
         print("Shape recognizer: ")

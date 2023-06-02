@@ -13,9 +13,13 @@ import numpy as np
 import math
 
 
+def g(x, mu, sigma):
+    return -(1/2) * ((x-mu)/sigma)**2
+
 def norm_cdf(x, mu, sigma):
     ''' Cumulative distribution function for the normal distribution. '''
     z = (x-mu)/abs(sigma)
+
     return (1.0 + math.erf(z / math.sqrt(2.0))) / 2.0
 
 def norm_pf(x, mu, sigma):
@@ -91,11 +95,14 @@ class ConnectorObject():
         self.expected_seq_length = config["EXPECTED_SEQ_LENGTH"]
         self.sigma_mutator = config["SIGMA_MUTATOR"] #log or linear
         self.mu_mutator = config["MU_MUTATOR"] #log or linear
+        self.pseudo_count = config["PSEUDO_COUNT"]
         
         # precompute connector energies for expected length range
         self.stored_pdfs = []
         self.stored_cdfs = []
         self.set_precomputed_pdfs_cdfs()
+
+        self.adjust_score_threshold = 0
     
     # Setters
     def set_mu(self, _mu: int) -> None:
@@ -314,10 +321,12 @@ class ConnectorObject():
         
         return e_connector
 
-    def print(self) -> None:
+    def print(self, debug=False) -> None:
         """Prints the connector mu and sigma values
         """
         print(" m: {} s: {}".format(self._mu, self._sigma))
+        if debug:
+            print(" adjust_score_threshold: {}".format(self.adjust_score_threshold))
 
     def export(self, export_file) -> None:
         """Exports Connector data to the given file
