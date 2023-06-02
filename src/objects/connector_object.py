@@ -13,9 +13,13 @@ import numpy as np
 import math
 
 
+def g(x, mu, sigma):
+    return -(1/2) * ((x-mu)/sigma)**2
+
 def norm_cdf(x, mu, sigma):
     ''' Cumulative distribution function for the normal distribution. '''
     z = (x-mu)/abs(sigma)
+
     return (1.0 + math.erf(z / math.sqrt(2.0))) / 2.0
 
 def norm_pf(x, mu, sigma):
@@ -91,11 +95,14 @@ class ConnectorObject():
         self.expected_seq_length = config["EXPECTED_SEQ_LENGTH"]
         self.sigma_mutator = config["SIGMA_MUTATOR"] #log or linear
         self.mu_mutator = config["MU_MUTATOR"] #log or linear
+        self.pseudo_count = config["PSEUDO_COUNT"]
         
         # precompute connector energies for expected length range
         self.stored_pdfs = []
         self.stored_cdfs = []
         self.set_precomputed_pdfs_cdfs()
+
+        self.adjust_score_threshold = 0
     
     # Setters
     def set_mu(self, _mu: int) -> None:
@@ -116,28 +123,43 @@ class ConnectorObject():
         self._sigma = sigma
     
     def set_precomputed_pdfs_cdfs(self) -> None:
+        return
         """Set stored_pdfs variable and stored_cdfs variable
         """
         
         # Delete previous values
         self.stored_pdfs = []
         self.stored_cdfs = []
-        
+        import time
         # Compute new values
+        cdf0 = norm_cdf(0, self._mu, self._sigma)
+        s = time.monotonic_ns()
         for dist in range(self.expected_seq_length):
             
             # Precompute PDF
-            self.stored_pdfs.append(norm_pf(dist, self._mu, self._sigma))
-            
+            pdf = np.log2(norm_pf(dist, self._mu, self._sigma))
+            if pdf > -1E10:
+                self.stored_pdfs.append(pdf)            
+            else:
+                self.stored_pdfs.append(-1E10)
             # Precompute CDF
+
             if self._sigma != 0:
-                self.stored_cdfs.append(norm_cdf(dist, self._mu, self._sigma))
+                cdf = np.log2(norm_cdf(dist, self._mu, self._sigma) - cdf0)
+                if cdf > -1E10:
+                    self.stored_cdfs.append(cdf)
+                else:
+                    self.stored_cdfs.append(-1E10)
+
             else:
                 if dist<self._mu:
-                    self.stored_cdfs.append(0.0)
+                    self.stored_cdfs.append(-1E10)
                 else:
-                    self.stored_cdfs.append(1.0)
+                    self.stored_cdfs.append(0.00)
     
+        e = time.monotonic_ns()
+        print("precomputeing took:", (e - s) * 10E-9)
+
     def mutate(self, org_factory) -> None:
         """mutation for a connector
 
@@ -197,8 +219,39 @@ class ConnectorObject():
         # The length to be used as input is the effective length
         # Number of recognizers is the length of the list of recog sizes
         return prob_of_d(gap_size+1, effective_len, len(recog_sizes))
-    
-    
+
+    def get_numerator(self, d, s_dna_len, recog_sizes) -> float:
+        if d<self.expected_seq_length:
+            numerator = self.stored_pdfs[d]
+        else:
+            numerator = norm_pf(d, self._mu, self._sigma)
+        
+        # Normalize by AUC within the range of observable d values
+        max_d = s_dna_len - 1  # Maximum d observable
+        # min_d = -1 * max_d  # Minimum d observable
+        
+        if self._sigma == 0:
+            auc = 1.0  # all the gaussian is within the (-(L-1), +(L-1)) range
+        else:
+            if max_d<self.expected_seq_length:
+                auc = self.stored_cdfs[max_d] - self.stored_cdfs[0]
+            else:
+                auc = (norm_cdf(max_d, self._mu, self._sigma) -
+                       norm_cdf(0, self._mu, self._sigma))
+        
+        # Avoid zero-division error
+        # This will never happen, unless an organism evolves an extremely large sigma
+        if auc < 1e-100:
+            auc = 1e-100 
+            print("AUC was 0 with mu =", self._mu, "and sigma =", self._sigma)                
+        
+        # avoid log(0) error when computing e_connector
+        if numerator < 1e-100:
+            numerator = 1e-100        
+
+        # Apply normalization
+        return np.log2(numerator / auc)
+
     def get_score(self, d, s_dna_len, recog_sizes) -> float:
         """ Returns the score of the connector, given the observed distance
             and the length of the DNA sequence on which it is being evaluated.
@@ -268,10 +321,12 @@ class ConnectorObject():
         
         return e_connector
 
-    def print(self) -> None:
+    def print(self, debug=False) -> None:
         """Prints the connector mu and sigma values
         """
         print(" m: {} s: {}".format(self._mu, self._sigma))
+        if debug:
+            print(" adjust_score_threshold: {}".format(self.adjust_score_threshold))
 
     def export(self, export_file) -> None:
         """Exports Connector data to the given file
@@ -297,3 +352,4 @@ class ConnectorObject():
             False because is a connector
         """
         return False
+

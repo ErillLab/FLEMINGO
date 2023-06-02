@@ -37,7 +37,6 @@ MIN_ITERATIONS = 0
 MIN_FITNESS = 0
 RECOMBINATION_PROBABILITY = 0.0
 THRESHOLD = 0.0
-
 JSON_CONFIG_FILENAME = "config.json"
 """
 Configuration of the object types
@@ -47,6 +46,7 @@ configOrganism: dict = {}
 configOrganismFactory: dict = {}
 configConnector: dict = {}
 configPssm: dict = {}
+configShape: dict = {}
 
 
 # list that holds the population
@@ -101,7 +101,7 @@ def main():
     """
     # Instantiate organism Factory object with object configurations
     organism_factory = OrganismFactory(
-        configOrganism, configOrganismFactory, configConnector, configPssm, rank
+        configOrganism, configOrganismFactory, configConnector, configPssm, rank, configShape
     )
     
     # Initialize the population of organisms
@@ -878,6 +878,7 @@ def set_up():
     global configOrganismFactory
     global configConnector
     global configPssm
+    global configShape
     
     # MPI variables  # XXX
     global comm
@@ -933,7 +934,7 @@ def set_up():
     PERIODIC_POP_EXPORT = config["main"]["PERIODIC_POP_EXPORT"]
     MAX_NODES = config["organism"]["MAX_NODES"]
     MIN_NODES = config["organism"]["MIN_NODES"]
-    
+
     # Create directory where the output and results will be stored
     if i_am_main_process():  # XXX
         check_dir(RESULT_BASE_PATH_DIR)
@@ -945,6 +946,7 @@ def set_up():
     configOrganismFactory = config["organismFactory"]
     configConnector = config["connector"]
     configPssm = config["pssm"]
+    configShape = config["shape"]
 
     # Throw config on a file
     if i_am_main_process():  # XXX
@@ -960,6 +962,7 @@ def set_up():
         )
         print_config_json(configConnector, "Connector Config", parameters_path)
         print_config_json(configPssm, "PSSM Config", parameters_path)
+        print_config_json(configShape, "Shape Config", parameters_path)
     
         print_ln("-" * 50, parameters_path)
 
@@ -1146,10 +1149,6 @@ def flatten_population(population):
         for item in sublist:
             flat_population.append(item)
     return flat_population
-
-
-# Entry point to app execution
-# It calculates the time, but could include other app stats
 
 if __name__ == "__main__":
     

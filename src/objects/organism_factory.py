@@ -6,18 +6,24 @@
 import random
 import json
 import numpy as np
+from .shape_object import ShapeObject
+from objects import shape_object
+from models import null
 from .organism_object import OrganismObject
 from .connector_object import ConnectorObject
 from .pssm_object import PssmObject
 from .aligned_organisms_representation_object import AlignedOrganismsRepresentation
 import copy
 import decimal as dec
+import pickle
+import os
+
 
 class OrganismFactory:
     """Factory class
     """
 
-    def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank) -> None:
+    def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank, conf_shape) -> None:
         """
         Instantiates an OrganismFactory object.
         Reads in the configuration paramaters for the factory and for all object
@@ -31,7 +37,6 @@ class OrganismFactory:
         # Process rank (used to esure unique organism IDs when running in parallel mode)
         self._process_rank = p_rank
         #self._id = 0
-        
         # lambda parameter for Poisson distribution that will instantiate
         # organism. lambda is the expected number of recognizers in the
         # organism (and also its variance)
@@ -53,11 +58,37 @@ class OrganismFactory:
         
         # Number of binding sites used to generate the PWM
         self.pwm_number_of_binding_sites = conf_org_fac["PWM_NUM_OF_BINDING_SITES"]
+        self.pssm_vs_shape_probability = conf_org_fac["PSSM_VS_SHAPE_PROBABILITY"]
         
         # assign organism, connector and pssm configurations
         self.conf_org = conf_org
         self.conf_con = conf_con
         self.conf_pssm = conf_pssm
+        self.conf_shape = conf_shape
+        self.load_shape_null_models()
+        self.check_shape_null_models()
+
+    def load_shape_null_models(self):
+        if not os.path.isfile("models/models"):
+            shape_object.null_models = {}
+            return
+        
+        if os.path.getsize("models/models") == 0:
+            shape_object.null_models = {}
+            return
+        
+        with open("models/models", "rb") as infile:
+            shape_object.null_models = pickle.load(infile)
+            return
+
+    def check_shape_null_models(self):
+
+        if shape_object.null_models == {}:
+            null.generate_range(5, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models)
+
+        if max(shape_object.null_models["mgw"].keys()) < self.conf_shape["MAX_COLUMNS"]:
+            null.generate_range(max(shape_object.null_models["mgw"].keys()) + 1, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models)
+        
 
     def get_id(self) -> int:
         """ Returns a new unique organism ID (as a string). If the program is
@@ -136,6 +167,13 @@ class OrganismFactory:
 
         return new_connector
 
+
+    def create_recognizer(self, length = None):
+        if random.random() < self.pssm_vs_shape_probability:
+            return self.create_pssm(length)
+        else:
+            return self.create_shape(length)
+
     def create_pssm(self, length = None) -> PssmObject:
         """It return a PSSM object with a specific length
 
@@ -155,6 +193,23 @@ class OrganismFactory:
             pwm.append(self.get_pwm_column())
 
         return PssmObject(np.array(pwm), self.conf_pssm)
+    
+    def create_shape(self, length = None):
+        if length == None or length < 5:
+            length = 5
+
+        rec_type = ''
+        y = random.random()
+        if y >= 0.00 and y < 0.25:
+            rec_type  = 'mgw'
+        if y >= 0.25 and y < 0.50:
+            rec_type  = 'prot'
+        if y >= 0.50 and y < 0.75:
+            rec_type  = 'roll'
+        if y >= 0.75 and y <= 1.00:
+            rec_type  = 'helt'
+        return ShapeObject(rec_type, length, self.conf_shape)
+
 
     def get_pwm_column(self) -> dict:
         """Generates a single column for a PWM
@@ -222,6 +277,8 @@ class OrganismFactory:
             for element in organism:
                 if element["objectType"] == "pssm":
                     new_org_recognizers.append(self.import_pssm(element))
+                if element["objectType"] == "shape":
+                    new_org_recognizers.append(self.import_shape(element))
                 elif element["objectType"] == "connector":
                     new_org_connectors.append(self.import_connector(element))
             
@@ -251,6 +308,8 @@ class OrganismFactory:
             org = imported_organisms[idx]
             for i in range(len(org.recognizers)):
                 rec = org.recognizers[i]
+                if rec.type != 'p':
+                    break
                 for p in range(rec.length):
                     for b in ['a','c','g','t']:
                         freq = rec.pwm[p][b]
@@ -301,6 +360,9 @@ class OrganismFactory:
         """
         return PssmObject(np.array(pssm["pwm"]), self.conf_pssm)
 
+    def import_shape(self, shape: dict) -> ShapeObject:
+        return ShapeObject(shape["recType"], shape["length"], self.conf_shape, shape["mu"], shape["sigma"])
+
     def export_organisms(self, a_organisms: list, filename: str) -> None:
         """Export a list of organisms to JSON format
 
@@ -313,9 +375,11 @@ class OrganismFactory:
         for o_organism in a_organisms:
             organism = []
             for i in range(o_organism.count_recognizers() - 1):
-                organism.append(self.export_pssm(o_organism.recognizers[i]))
-                organism.append(self.export_connector(o_organism.connectors[i]))
-            organism.append(self.export_pssm(o_organism.recognizers[-1]))
+                if o_organism.recognizers[i].type == 'p':
+                    organism.append(self.export_pssm(o_organism.recognizers[i]))
+                    organism.append(self.export_connector(o_organism.connectors[i]))
+            if o_organism.recognizers[-1].type == 'p':
+                organism.append(self.export_pssm(o_organism.recognizers[-1]))
             list_json_organisms.append(organism)
         
         with open(filename, "w+") as json_file:
