@@ -69,13 +69,12 @@ def main():
     Main function for the motif seek
     """
     
-    if i_am_main_process():  # XXX
+    if i_am_main_process():
         print("Loading parameters...")
     
     # Read positive set from specified file
     positive_dataset = read_fasta_file(DATASET_BASE_PATH_DIR + POSITIVE_FILENAME)
     
-    # XXX
     if NEGATIVE_FILENAME is not None:
         # Read negative set from specified file
         negative_dataset = read_fasta_file(DATASET_BASE_PATH_DIR + NEGATIVE_FILENAME)
@@ -93,7 +92,7 @@ def main():
     mean_nodes = 0
     mean_fitness = 0
     
-    if i_am_main_process():  # XXX
+    if i_am_main_process():
         print("Instantiating population...")
     
     """
@@ -105,7 +104,7 @@ def main():
     )
     
     # Initialize the population of organisms
-    if i_am_main_process():  # XXX
+    if i_am_main_process():
         
         # Initialize list
         organism_population = []
@@ -173,7 +172,7 @@ def main():
     )
     timeformat = "%Y-%m-%d--%H-%M-%S"
     
-    if i_am_main_process():  # XXX
+    if i_am_main_process():
         print("Starting execution...")
 
     # Main loop, it iterates until organisms do not get a significant change
@@ -182,13 +181,13 @@ def main():
     while not is_finished(END_WHILE_METHOD, iterations, max_score, 
                           last_max_score):
         
-        # XXX
+        
         if i_am_main_process():
             # Shuffle population
             # Organisms are shuffled for deterministic crowding selection
             random.shuffle(organism_population)        
         
-        # XXX
+        
         if RUN_MODE == 'parallel':
             # FRAGMENT AND SCATTER THE POPULATION
             organism_population = fragment_population(organism_population)
@@ -198,7 +197,6 @@ def main():
             # my_ids = [org._id for org in organism_population]
             # print("From process " + str(rank) + ": loc pop is " + str(my_ids))
         
-        # XXX
         # Shuffle datasets (if required)
         if RANDOM_SHUFFLE_SAMPLING_POS:
             positive_dataset = shuffle_dataset(positive_dataset)
@@ -471,7 +469,7 @@ def main():
 
             # END FOR i
         
-        if RUN_MODE == 'parallel':  # XXX
+        if RUN_MODE == 'parallel':
             # GATHER AND FLATTEN THE POPULATION
             organism_population = comm.gather(organism_population, root=0)
             organism_population = flatten_population(organism_population)
@@ -526,12 +524,14 @@ def main():
             )
             
             # Print against a random positive sequence
-            pos_seq_index = random.randint(0, len(positive_dataset)-1)
-            placement = max_organism[0].get_placement(positive_dataset[pos_seq_index])
+            placement = max_organism[0].get_placement(random.choice(positive_dataset))
+            placement.print_placement(stdout = True)
+            
+            # Print against a random negative sequence
+            placement = max_organism[0].get_placement(random.choice(negative_dataset))
             placement.print_placement(stdout = True)
             
             
-            # XXX
             if RANDOM_SHUFFLE_SAMPLING_POS:
                 # If the dataset is shuffled, prepare a sorted version for the
                 # 'export' functions, so that regardless of the current status of
@@ -845,7 +845,7 @@ def set_up():
     # specify as global variable so it can be accesed in local
     # contexts outside setUp
 
-    global RUN_MODE  # XXX
+    global RUN_MODE
     global END_WHILE_METHOD
     global POPULATION_LENGTH
     global DATASET_BASE_PATH_DIR
@@ -880,7 +880,7 @@ def set_up():
     global configPssm
     global configShape
     
-    # MPI variables  # XXX
+    # MPI variables
     global comm
     global rank
     global p
@@ -891,7 +891,7 @@ def set_up():
     if POPULATION_LENGTH % 2 != 0:
         raise Exception("POPULATION_LENGTH must be an even number.")
     
-    RUN_MODE = config["main"]["RUN_MODE"]  # XXX
+    RUN_MODE = config["main"]["RUN_MODE"]
     if RUN_MODE == "parallel":
         from mpi4py import MPI  # mpi4py is only imported if needed
         comm = MPI.COMM_WORLD
@@ -905,7 +905,6 @@ def set_up():
     
     
     DATASET_BASE_PATH_DIR = config["main"]["DATASET_BASE_PATH_DIR"]
-    # XXX
     if i_am_main_process():
         print('\n==================\nRUN_MODE: {}\n==================\n'.format(
             RUN_MODE))  # Remind the user about the chosen RUN_MODE
@@ -936,7 +935,7 @@ def set_up():
     MIN_NODES = config["organism"]["MIN_NODES"]
 
     # Create directory where the output and results will be stored
-    if i_am_main_process():  # XXX
+    if i_am_main_process():
         check_dir(RESULT_BASE_PATH_DIR)
         check_dir(RESULT_BASE_PATH_DIR + "population")
         check_dir(RESULT_BASE_PATH_DIR + "plots")
@@ -949,7 +948,7 @@ def set_up():
     configShape = config["shape"]
 
     # Throw config on a file
-    if i_am_main_process():  # XXX
+    if i_am_main_process():
         parameters_path = RESULT_BASE_PATH_DIR + "parameters.txt"
         print_ln("-" * 50, parameters_path)
         print_ln(" " * 20 + "PARAMETERS", parameters_path)
