@@ -296,7 +296,37 @@ class OrganismObject:
             _id: ID to to set in the organism
         """
         self._id = _id
+    
+    def compress_connectors(self, total_span_avg, total_span_var):
+        '''
+        When a new recognizer is inserted, two connectors do the work that was
+        previously done by one connector. That connector is called the
+        "old connector". Both the old connector and the newly inserted connector
+        are compressed (mu and sigma are shrinked) so that together they model an
+        overall distance equivalently to how the old connector was modeling it
+        (assuming they are two independent normally distributed random variables).
         
+        Args:
+            total_span_avg:
+                the sum of the two mu values should be equal to `total_span_avg`
+            total_span_var:
+                the sum of the two variances should be equal to `total_span_var`
+        
+        Returns:
+            the adjusted parameters (mu and sigma) for the two connectors
+        '''
+        
+        # Randomly chose two mu values such that the sum is old_mu
+        mu_left = random.random() * total_span_avg
+        mu_right = total_span_avg - mu_left
+        # Randomly chose two var values such that the sum is old_var
+        var_left = random.random() * total_span_var
+        var_right = total_span_var - var_left
+        # sigma values
+        sigma_left = np.sqrt(var_left)
+        sigma_right = np.sqrt(var_right)
+        return [(mu_left, sigma_left), (mu_right, sigma_right)]
+    
     def mutate(self, org_factory) -> None:
         """Mutates an organism based on JSON configured probabilities
 
@@ -505,12 +535,12 @@ class OrganismObject:
                     '''Ideally, we would like the sum of the mus of the two
                     connectors (the old one and the inserted one) + the length
                     of the inserted recognizer to be equal to the gap spanned
-                    by the old recognizer, so that the insertion doesn't heavily
-                    affect the placement of the nodes to the sides of the
-                    insertion point. So we need to scale down the mus and sigmas
-                    accordingly.'''
+                    by the pre-existing connector, so that the insertion
+                    doesn't heavily affect the placement of the nodes to the
+                    sides of the insertion point. So we need to shrink the
+                    mus and sigmas accordingly.'''
                     
-                    # Adjust MUs
+                    # Adjust MUs approach
                     ''' If the legth of the inserted recognizer alone is larger
                     than the gap (i.e. larger than the mu of the already present
                     connector) we can't reach the goal entirely and the best
@@ -520,29 +550,7 @@ class OrganismObject:
                     the old connector) minus the length of the inserted
                     recognizer.'''
                     
-                    mu_old_connector = self.connectors[connector_to_compress]._mu
-                    mu_new_connector = new_connector._mu                    
-                    current_sum_mus = mu_old_connector + mu_new_connector
-                    expected_sum_mus = mu_old_connector - new_recognizer.length
-                    # If the inserted recognizer alone is larger than the gap
-                    if expected_sum_mus < 0:
-                        # best thing we can do is to maximally shrink mus
-                        expected_sum_mus = 0
-                    
-                    if current_sum_mus == 0:  # To avoid 0/0 case
-                        mu_scaling_factor = 1
-                    else:
-                        mu_scaling_factor =  expected_sum_mus / current_sum_mus
-                    # Compress the neighbour connector
-                    self.connectors[connector_to_compress].set_mu(
-                        mu_old_connector * mu_scaling_factor
-                    )
-                    # Compress the new inserted connector
-                    new_connector.set_mu(
-                        mu_new_connector * mu_scaling_factor
-                    )
-                    
-                    # Adjust SIGMAs
+                    # Adjust SIGMAs approach
                     ''' Variances are additive (under assumption of independence
                     between the two random variables). Therefore, the overall
                     variance will be the sum of the variances of the two
@@ -551,23 +559,25 @@ class OrganismObject:
                     present before the insertion. The standard deviations,
                     which are the square root of the variances, will be adjusted
                     accordingly.'''
-                    var_old_connector = self.connectors[connector_to_compress]._sigma ** 2
-                    var_new_connector = new_connector._sigma**2
-                    current_sum_variances = var_old_connector + var_new_connector
-                    expected_sum_variances = var_old_connector
                     
-                    if current_sum_variances == 0:  # To avoid 0/0 case
-                        var_scaling_factor = 1
-                    else:
-                        var_scaling_factor =  expected_sum_variances / current_sum_variances
-                    # Compress the neighbour connector
-                    self.connectors[connector_to_compress].set_sigma(
-                        np.sqrt(var_old_connector * var_scaling_factor)
-                    )
-                    # Compress the new inserted connector
-                    new_connector.set_sigma(
-                        np.sqrt(var_new_connector * var_scaling_factor)
-                    )
+                    # Define what the sum of the two mu values should be (expected_sum_mus)
+                    mu_old_connector = self.connectors[connector_to_compress]._mu
+                    expected_sum_mus = mu_old_connector - new_recognizer.length
+                    # If the inserted recognizer alone is larger than the gap
+                    if expected_sum_mus < 0:
+                        # best thing we can do is to maximally shrink mus
+                        expected_sum_mus = 0
+                    # Define what the variance of the total span should be (it
+                    # should be equal to the variance of the pre-existing connector)
+                    expected_var = self.connectors[connector_to_compress]._sigma ** 2
+                    # Updated values for the two connectors that need compression
+                    preexisting, inserted = self.compress_connectors(expected_sum_mus, expected_var)
+                    # Update parameters of pre-existing connector
+                    self.connectors[connector_to_compress].set_mu(preexisting[0])
+                    self.connectors[connector_to_compress].set_sigma(preexisting[1])
+                    # Update paramters of inserted connector
+                    new_connector.set_mu(inserted[0])
+                    new_connector.set_sigma(inserted[1])
                 
 				# recreate vector of connectors/recognizers, adding
 				# the newly minted recognizer+connector and containing
