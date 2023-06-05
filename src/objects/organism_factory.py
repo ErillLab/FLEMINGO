@@ -138,7 +138,7 @@ class OrganismFactory:
         # for each recognizer in the organism
         for i in range(number_of_recognizers - 1):
             # instantiate new recognizer and append it to organism's recognizer list
-            new_recognizer = self.create_pssm(self.pwm_length)
+            new_recognizer = self.create_recognizer(self.pwm_length)
             new_organism.recognizers.append(new_recognizer)
             # instantiate new connector and append it to organism's connector list
             _mu = random.randint(self.min_mu, self.max_mu)
@@ -146,7 +146,7 @@ class OrganismFactory:
             new_connector = ConnectorObject(_mu, _sigma, self.conf_con)
             new_organism.connectors.append(new_connector)
         # insert last recognizer in the chain and add it to list
-        new_recognizer = self.create_pssm(self.pwm_length)
+        new_recognizer = self.create_recognizer(self.pwm_length)
         new_organism.recognizers.append(new_recognizer)
         # Set attribute that will map organism nodes to alignment matrix rows
         new_organism.set_row_to_pssm()

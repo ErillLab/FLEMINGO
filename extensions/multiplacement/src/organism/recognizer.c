@@ -130,7 +130,7 @@ void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
     score = shape_average_mgw_prot(pent_s, n_pent);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
-    score = log2f(alt_f / null_f);
+    score = alt_f - null_f;
     double t_score = score;
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
@@ -197,7 +197,7 @@ void prot_row( Recognizer* rec,  const char* seq,  int len, double* row){
     double t_score = score;
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
-    score = log2f(alt_f / null_f);
+    score = alt_f - null_f;
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 
@@ -264,7 +264,7 @@ void roll_row( Recognizer* rec,  const char* seq,  int len, double* row){
     score = shape_average(pent_s, n_pent * 2);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
-    score = log2f(alt_f / null_f);
+    score = alt_f - null_f;
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 
@@ -330,7 +330,7 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
     double t_score = score;
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
-    score = log2f(alt_f / null_f);
+    score = alt_f - null_f;
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 

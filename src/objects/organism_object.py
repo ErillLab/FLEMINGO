@@ -1078,23 +1078,24 @@ class OrganismObject:
 
     def adjust_connector_scores(self, c_idx, c_scores, sequence_length):
         #get to the start in the array of connector info
-        offset = sum([(self.connectors[i].expected_seq_length * 2 + 2) for i in range(0, c_idx)])
+        offset = sum([(self.connectors[c_idx].expected_seq_length * 2 + 2) for i in range(0, c_idx)])
 
         #get to first precomputed position
         offset += 2
 
         #get to the length of the sequence
-        offset += sequence_length
+        #offset += sequence_length - self.minimum_length
 
-        con = self.connectors[i]
-        g_curr = g(sequence_length, con._mu, con._sigma)
+        con = self.connectors[c_idx]
+        g_curr = g(sequence_length - self.minimum_length, con._mu, con._sigma)
         h_curr = 1
 
         h_list = [1 + con.pseudo_count]
         tot_sum =  h_list[0]
 
-        for i in range(sequence_length - 1, -1, -1):
-            g_next = g(i, mu, sigma)
+        print(sequence_length, self.minimum_length)
+        for i in range(sequence_length - 1 - self.minimum_length, -1, -1):
+            g_next = g(i, con._mu, con._sigma)
             h_next = h_curr * math.exp(g_next - g_curr)
 
             h_list.append(h_next + con.pseudo_count)
@@ -1131,18 +1132,6 @@ class OrganismObject:
 
         number_PSSM = len(self.recognizers)
         max_length = -1
-        if number_PSSM > 1:
-            max_length = self.connectors[0].expected_seq_length - 1
-            for i in range(len(self.connectors)):
-                if len(sequence) < self.connectors[i].adjust_score_threshold:
-                   self.adjust_connector_scores(i, len(sequence))
-                     
-        # Get an array of lengths of each recognizer in the organism
-
-        # instantiation of numpy arrays that will hold placement info
-        # gathered by the _calculatePlacement module
-            
-        
         gaps = np.empty(number_PSSM, dtype = np.dtype('i'))
         gap_scores = np.empty(number_PSSM - 1, dtype = np.dtype('d'))
         PSSM_scores = np.empty(number_PSSM + 1, dtype = np.dtype('d'))
@@ -1150,10 +1139,13 @@ class OrganismObject:
         c_scores = np.copy(self.connectors_scores_flat)
         if number_PSSM > 1:
             max_length = self.connectors[0].expected_seq_length - 1
-            for i in range(len(self.connectors)):
-                if len(sequence) < self.connectors[i].adjust_score_threshold:
-                   self.adjust_connector_scores(i, c_scores)
-            
+            if False:
+                for i in range(len(self.connectors)):
+                    if float(len(sequence)) + 0.5 < self.connectors[i]._mu:
+                        if self.connectors_scores_flat[sum([self.connectors[i].expected_seq_length * 2 + 2 for i in range(0, i)]) + 2 + len(sequence) - self.minimum_length] <= np.log(self.connectors[i].pseudo_count):
+                            print("rescaling...")
+                            self.adjust_connector_scores(i, c_scores, len(sequence))
+                            #pass
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), self.recognizers_flat, self.recognizer_lengths,  c_scores, PSSM_scores, gap_scores, gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
 
         # parse data from the _calculatePlacement module and put it
@@ -1175,14 +1167,7 @@ class OrganismObject:
                 stop = current_position + gaps[i + 1]
                 placement.append_connector_position([int(current_position), int(stop)])
                 current_position += gaps[i + 1]
-        
-        #placement.print_placement(stdout=True)
-        #print("python overhead took {} seconds".format((t2 + t1) *10E-9))
-        """
-        for i in ['m', 't', 'h', 'r']:
-            if i in self.recognizer_types:
-                placement.print_placement(stdout=True)
-        """
+       
         return placement
 
     def set_minimum_length(self) -> None:
@@ -1295,6 +1280,7 @@ class OrganismObject:
         self.recognizer_bin_edges = np.array(rec_bin_edges, dtype = np.dtype('d'))
 
         self.set_pf_auc()
+        self.set_minimum_length()
         return
 
         """

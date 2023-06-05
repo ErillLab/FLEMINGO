@@ -27,7 +27,7 @@ def build_organism():
     configShape = config["shape"]
     
     org_fac = organism_factory.OrganismFactory( configOrganism, configOrganismFactory, configConnector, configPssm, 0, configShape )
-    org_list = org_fac.import_organisms("organism.json")
+    org_list = org_fac.import_organisms("organism2.json")
     return org_list[0]
 
 
@@ -36,9 +36,10 @@ def main():
     print("ONLY LOOK AT AFTER THIS STATEMENT")
     org.flatten()
     scores1 = org.connectors_scores_flat
-    placement = test_placement(org, "gtacaacatg" * 10)
+    placement = test_placement(org, "gtacaacatg" * 3)
     placement.print_placement(stdout=True)
-    org.set_pdf_cdf()
+    exit()
+    org.set_pf_auc()
     scores2 = org.connectors_scores_flat
     placement = test_placement(org, "gtacaacatg" * 10)
     placement.print_placement(stdout=True)
