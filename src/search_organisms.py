@@ -297,104 +297,12 @@ def main():
                 first_organism = pair_children[j][0]  # Parent Organism
                 second_organism = pair_children[j][1]  # Child Organism
                 
-                # Boltzmannian fitness
-                if FITNESS_FUNCTION == "boltzmannian":
-                    performance1 = first_organism.get_boltz_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                    negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                                    GENOME_LENGTH)
-                    fitness1 = performance1["score"]
-                    
-                    performance2 = second_organism.get_boltz_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                     negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                                     GENOME_LENGTH)
-                    fitness2 = performance2["score"]
-                    
-                    fitness1 = round(fitness1, 8)
-                    fitness2 = round(fitness2, 8)
-                
-                # Kolmogorov fitness
-                # Computes Kolmogorov-Smirnov test on positive/negative set scores
-                elif FITNESS_FUNCTION == "kolmogorov":
-                    performance1 = first_organism.get_kolmogorov_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                    negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
-                    fitness1 = performance1["score"]
-                    
-                    performance2 = second_organism.get_kolmogorov_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                    negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
-
-                    fitness2 = performance2["score"]
-                    
-                    fitness1 = round(fitness1, 8)
-                    fitness2 = round(fitness2, 8)
-
-                # Discriminative fitness
-                elif FITNESS_FUNCTION == "discriminative":
-                    positive_performance1 = first_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS])
-                    negative_performance1 = first_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
-                    p_1 = positive_performance1["score"]
-                    n_1 = negative_performance1["score"]
-                    fitness1 =  p_1 - n_1
-                    
-                    positive_performance2 = second_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS])
-                    negative_performance2 = second_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
-                    p_2 = positive_performance2["score"]
-                    n_2 = negative_performance2["score"]
-                    fitness2 =  p_2 - n_2
-                
-                elif FITNESS_FUNCTION == "welchs":
-                    # First organism
-                    positive_performance1 = first_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS])
-                    negative_performance1 = first_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
-                    p_1 = positive_performance1["score"]
-                    n_1 = negative_performance1["score"]
-                    
-                    # Standard deviations
-                    sigma_p_1 = positive_performance1["stdev"]
-                    sigma_n_1 = negative_performance1["stdev"]
-                    
-                    # Lower bound to sigma
-                    # (Being more consistent than that on the sets will not help
-                    # your fitness)
-                    if sigma_p_1 < 1:
-                        sigma_p_1 = 1
-                    if sigma_n_1 < 1:
-                        sigma_n_1 = 1
-                    
-                    # Standard errors
-                    sterr_p_1 = sigma_p_1 / MAX_SEQUENCES_TO_FIT_POS**(1/2)
-                    sterr_n_1 = sigma_n_1 / MAX_SEQUENCES_TO_FIT_NEG**(1/2)
-                    
-                    # Welch's t score
-                    fitness1 =  (p_1 - n_1) / (sterr_p_1**2 + sterr_n_1**2)**(1/2)
-                    
-                    # Second organism
-                    positive_performance2 = second_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS])
-                    negative_performance2 = second_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
-                    p_2 = positive_performance2["score"]
-                    n_2 = negative_performance2["score"]
-                    
-                    # Standard deviations
-                    sigma_p_2 = positive_performance2["stdev"]
-                    sigma_n_2 = negative_performance2["stdev"]
-                    
-                    # Lower bound to sigma
-                    # (Being more consistent than that on the sets will not help
-                    # your fitness)
-                    if sigma_p_2 < 1:
-                        sigma_p_2 = 1
-                    if sigma_n_2 < 1:
-                        sigma_n_2 = 1
-                    
-                    # Standard errors
-                    sterr_p_2 = sigma_p_2 / MAX_SEQUENCES_TO_FIT_POS**(1/2)
-                    sterr_n_2 = sigma_n_2 / MAX_SEQUENCES_TO_FIT_NEG**(1/2)
-                    
-                    # Welch's t score
-                    fitness2 =  (p_2 - n_2) / (sterr_p_2**2 + sterr_n_2**2)**(1/2)
-                                    
-                else:
-                    raise Exception("Not a valid fitness function name, "
-                                    + "check the configuration file.")
+                fitness1 = first_organism.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
+                                                      negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
+                                                      FITNESS_FUNCTION, GAMMA)
+                fitness2 = second_organism.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
+                                                       negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
+                                                       FITNESS_FUNCTION, GAMMA)
                 
                 if MAX_NODES != None:  # Upper_bound to complexity
                     
@@ -860,6 +768,7 @@ def set_up():
     global RANDOM_SHUFFLE_SAMPLING_POS
     global RANDOM_SHUFFLE_SAMPLING_NEG
     global FITNESS_FUNCTION
+    global GAMMA
     global GENOME_LENGTH
     global MIN_ITERATIONS
     global MIN_FITNESS
@@ -920,6 +829,7 @@ def set_up():
     RANDOM_SHUFFLE_SAMPLING_POS = config["main"]["RANDOM_SHUFFLE_SAMPLING_POS"]
     RANDOM_SHUFFLE_SAMPLING_NEG = config["main"]["RANDOM_SHUFFLE_SAMPLING_NEG"]
     FITNESS_FUNCTION = config["main"]["FITNESS_FUNCTION"]
+    GAMMA = config["main"]["GAMMA"]
     GENOME_LENGTH = config["main"]["GENOME_LENGTH"]
     MIN_ITERATIONS = config["main"]["MIN_ITERATIONS"]
     MIN_FITNESS = config["main"]["MIN_FITNESS"]

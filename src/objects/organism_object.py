@@ -7,7 +7,6 @@ import math
 import random
 import time
 import numpy as np
-from scipy.stats import ks_2samp
 import copy
 from .placement_object import PlacementObject
 from .shape_object import ShapeObject
@@ -710,172 +709,148 @@ class OrganismObject:
                 self.connectors[conn_index].set_precomputed_pdfs_cdfs()
         self.flatten()
 
-    def get_additive_fitness(self, a_dna: list) -> dict:
-        """
-
-        Args:
-            a_dna: list of dna sequences
-
-        Returns:
-            average/sum of the energy of the organism on the sequences
-        """
-
-        scores = []
-		# for each sequence in the provided sequence set
-        for s_dna in a_dna:
-            placement = self.get_placement(s_dna)
-            energy = placement.energy  # energy          
-            scores.append(energy)
+    def get_M_and_SE_on_DNA_set(self, dna_set, method, gamma):
+        '''
+        Returns the mean and standard error to be used as input for the
+        statistical test that we use as fitness function. Several variants of
+        this test are possible. Depending on the variant of choice, the mean
+        and standard error could be computed on a trimmed set.
         
-        score_stdev = np.std(scores)
-        if self.cumulative_fit_method == "sum":
-            # Compute fitness score as sum over the positive scores
-            score = np.sum(scores)
+        A lower bound of 1 unit is applied to the standard deviation (used to
+        calculate the standard error). Being more consistent than that on a set
+        of DNA sequences doesn't further improve fitness. This means that if the
+        difference between averages (P - N) is small, the organism can not
+        improve fitness indefinitely by only reducing the variances. [this would
+        also make sense under the assumptino that discrimination happens in a
+        noise-prone system where a very small P-N would be unreliable and
+        ultimately wouldn't work].
         
-        elif self.cumulative_fit_method == "mean":
-            # Compute fitness score as average positive score
-            score = np.mean(scores)
-            
-        elif self.cumulative_fit_method == "median":
-            # Compute fitness score as median positive score
-            score = np.median(scores)
+        Methods description
+        -------------------
         
-        return {"score": score, "stdev" : score_stdev}
+        Welch:
+            NO TRIMMING
+        Yuen:
+            TRIMMED MEAN.
+            gamma*100 is the percentage of discarded elements from each tail of
+            the distribution (both left and right)
+        Trim-left-M:
+            TRIMMED MEAN.
+            gamma*100 is the percentage of discarded elements from the left tail of
+            the distribution
+        Trim-left-M-SD:
+            TRIMMED MEAN AND TRIMMED STANDARD ERROR.
+            gamma*100 is the percentage of discarded elements from the left tail of
+            the distribution
+        
+        Parameters
+        ----------
+        dna_set : list
+            Array of DNA sequences.
+        method : str
+            The fitness function of choice.
+        gamma : float
+            Number between 0 and 0.5.
+        '''
+        energy_scores = self.get_binding_energies(dna_set)
+        n_to_trim = round(gamma * len(energy_scores))  # defalut gamma: 0.2
+        # Make sure that `n_to_trim` doesn't exceed the maximum due to rounding
+        # (when gamma=0.5 and len(energy_scores) is an odd number)
+        # We should never trim more than half of the elements from one side.
+        if n_to_trim > len(energy_scores)/2:
+            n_to_trim = int(len(energy_scores)/2)
+        
+        if n_to_trim == 0:
+            mean = np.mean(energy_scores)
+            stdev = np.std(energy_scores)
+            stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
+            sterr = stdev / np.sqrt(len(energy_scores))
+        if method == "Welch":
+            mean = np.mean(energy_scores)
+            stdev = np.std(energy_scores)
+            stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
+            sterr = stdev / np.sqrt(len(energy_scores))
+        elif method == "Yuen":
+            energy_scores.sort()
+            energy_scores_trimmed = energy_scores[n_to_trim:-n_to_trim]
+            mean = np.mean(energy_scores_trimmed)
+            stdev = np.std(energy_scores)
+            stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
+            sterr = stdev / np.sqrt(len(energy_scores))
+        elif method == "Trim-left-M":
+            energy_scores.sort()
+            energy_scores_trimmed = energy_scores[n_to_trim:]
+            mean = np.mean(energy_scores_trimmed)
+            stdev = np.std(energy_scores)
+            stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
+            sterr = stdev / np.sqrt(len(energy_scores))
+        elif method == "Trim-left-M-SD":
+            energy_scores.sort()
+            energy_scores_trimmed = energy_scores[n_to_trim:]
+            mean = np.mean(energy_scores_trimmed)
+            stdev = np.std(energy_scores_trimmed)
+            stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
+            sterr = stdev / np.sqrt(len(energy_scores_trimmed))
+        else:
+            raise ValueError('Unknown method "' + method + '". Please check ' +
+                             'the FITNESS_FUNCTION paramter in the config file.')
+        return mean, sterr
     
-    def get_binding_energies(self, a_dna: list, traceback=False) -> list:
-        """Return the binding energies for an array of DNA sequences.
+    def get_fitness(self, pos_set, neg_set, method, gamma=0.2):
+        '''
+        Returns the fitness of the organism.
 
-        Args:
-            a_dna: list of dna sequences
-
-        Returns:
-            list of binding eneregies
-        """
-
+        Parameters
+        ----------
+        pos_set : list
+            The positive set of DNA sequences.
+        neg_set : list
+            The negative set of DNA sequences.
+        method : str
+            The fitness function of choice.
+        gamma : float, optional
+            Number between 0 and 0.5, used for trimming (used if required by
+            the fitness function). The default is 0.2.
+        '''
+        M_p, SE_p = self.get_M_and_SE_on_DNA_set(pos_set, method, gamma)
+        M_n, SE_n = self.get_M_and_SE_on_DNA_set(neg_set, method, gamma)
+        return (M_p - M_n) / (SE_p**2 + SE_n**2)**(1/2)
+    
+    def get_binding_energies(self, dna_set):
+        '''
+        Returns a list of binding energies for all the sequences in `dna_set`.
+        '''
         binding_energies = []
-		# for each sequence in the provided sequence set
-        for s_dna in a_dna:
-            placement = self.get_placement(s_dna)
-            energy = placement.energy
-            binding_energies.append(energy)
-        
+        for seq in dna_set:
+            placement = self.get_placement(seq)
+            binding_energies.append(placement.energy)
         return binding_energies
 
-    def get_kolmogorov_fitness(self, pos_dataset: list, neg_dataset: list,
-                               traceback=False) -> float:
-        """Returns the organism's fitness, defined as the Kolmogorov-Smirnov
-           test statistic. This is bounded in [0,1].
-           Test null assumes the samples are drawn from the same (continuous)
-           distribution.
-           The statistic is sensitive to differences in both location and shape 
-           of the empirical cumulative distribution functions of the two samples.
-        Args:
-            pos_dataset: list of dna sequences in the positive dataset
-            neg_dataset: list of dna sequences in the negative dataset
-        Returns:
-            fitness assigned to the organism
-        """       
-        # Values on the positive set
-        pos_values = []
-        for s_dna in pos_dataset:
-            placement = self.get_placement(s_dna)
-            pos_values.append(placement.energy)  # append sequence energy score
-        
-        # Values on the negative set
-        neg_values = []
-        for s_dna in neg_dataset:
-            placement = self.get_placement(s_dna)
-            neg_values.append(placement.energy)  # get sequence energy score
-        
-        # Compute fitness score as a Boltzmannian probability
-        kolmogorov_fitness = ks_2samp(pos_values, neg_values).statistic
-        
-        return {"score": kolmogorov_fitness}
-    
-    def get_boltz_fitness(self, pos_dataset: list, neg_dataset: list,
-                          genome_length: int) -> float:
-        """Returns the organism's fitness, defined as the probability that the regulator binds a
-        positive sequence. All the binding energies are turned into probabilities according to a
-        Boltzmannian distribution. The probability of binding a particular sequence, given the binding
-        energy on that sequence, is p = e**binding_energy / Z
-        where Z is the partition function.
-        A high number of negative sequences is assumed to be present (emulating the environment of a
-        regulator that needs to find its targets on an entire genome).
-        A coefficient called neg_factor is computed, so that the value of Z can be as high as if there
-        were as	many negative sequences as required to cover the entire genome.
-
-        Args:
-            pos_dataset: list of dna sequences in the positive dataset
-            neg_dataset: list of dna sequences in the negative dataset
-            genome_length: integer representing the length of the genome
-
-        Returns:
-            fitness assigned to the organism
-        """
-        
-        # Values on the positive set
-        pos_values = []
-        for s_dna in pos_dataset:
-            placement = self.get_placement(s_dna)
-            boltz_exp = np.e**placement.energy  # exp(energy)
-            pos_values.append(boltz_exp)
-        
-        # Values on the negative set
-        neg_values = []
-        neg_lengths = []
-        for s_dna in neg_dataset:
-            placement = self.get_placement(s_dna)
-            boltz_exp = np.e**placement.energy  # exp(energy)
-            neg_values.append(boltz_exp)
-            neg_lengths.append(len(s_dna))
-        
-        # Scaling factor, used to over-represent the negative scores, so that
-        # it simulates a genome of specified length
-        neg_factor = genome_length//sum(neg_lengths)
-        
-        # Partition function
-        Z = sum(pos_values) + neg_factor * sum(neg_values)
-        
-        # Compute fitness score as a Boltzmannian probability
-        boltz_fitness = sum(pos_values) / Z
-        
-        return {"score": boltz_fitness}
-
     def count_nodes(self) -> int:
-        """Returns the number of nodes of the organism
-
-        Returns:
-            Number of nodes of the organism
-        """
-
+        '''
+        Returns the number of nodes of the organism
+        '''
         return 2 * len(self.recognizers) - 1
     
     def count_connectors(self) -> int:
-        """Returns the number of connectors of the organism
-
-        Returns:
-            Number of connectors.
-        """
-        
+        '''
+        Returns the number of connectors of the organism
+        '''
         return len(self.connectors)
 
     def count_recognizers(self) -> int:
-        """Returns the number of recognizers of the organism
-
-        Returns:
-            Number of recognizers.
-        """
-        
+        '''
+        Returns the number of recognizers of the organism
+        '''
         return len(self.recognizers)
     
     def sum_pssm_lengths(self) -> int:
-        """Returns the sum of the lengths of all the PSSMs of the organism.
-        """
-        
+        '''
+        Returns the sum of the lengths of all the PSSMs of the organism.
+        '''
         sum_lengths = 0
         for pssm in self.recognizers:
             sum_lengths += pssm.length
-        
         return sum_lengths
     
     def get_gap_score(self, connector_idx, d, s_dna_len):
@@ -931,7 +906,7 @@ class OrganismObject:
         return diag_score
     
     def is_first(self, row_idx_from_placement_matrix):
-        """Returns true if we are on the first element of a PSSM recognizer
+        """Returns True if we are on the first element of a PSSM recognizer
 		"""
         pssm_col = self.row_to_pssm[row_idx_from_placement_matrix][1]
         if pssm_col == 0:
