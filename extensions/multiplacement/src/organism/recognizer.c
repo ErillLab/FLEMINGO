@@ -99,11 +99,6 @@ void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
   double score = 0.0;
   int idx = 0;
 
-  char** seqs = (char**)malloc(n_pent * sizeof(char*));
-  for (int i = 0; i < n_pent; i++){
-    seqs[i] = (char*)malloc(6 * sizeof(char));
-    seqs[i][5] = '\0';
-  }
 
   for (int i = 0; i < len; i++){
     for (int j = i; j < i + n_pent; j++){
@@ -111,7 +106,6 @@ void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
       idx = 0;
       for (int k = j; k < j + 5; k++){
         switch(seq[k]){
-          seqs[j - i][k - j] = seq[k];
           case 'a':
           case 'A':
             idx += pow(4, 4 - (k - j)) * 0;
@@ -143,19 +137,9 @@ void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 
-    if (score > BIG_POSITIVE){
-
-      printf("null_f = %f\n", null_f);
-      printf("alt_f = %f\n", alt_f);
-      printf("t_score: %f\n", t_score);
-      printf("sequences pentamers\n");
-      for (int i = 0; i < n_pent; i++){
-        printf("%s, %6.3f\n", seqs[i], pent_s[i]);
-      }
-      print_rec(rec);
-      score = BIG_POSITIVE;
+    if (score > BIG_POSITIVE)
       exit(1);
-    }
+
     row[i] = score;
   }
   free(pent_s);
@@ -173,18 +157,11 @@ void prot_row( Recognizer* rec,  const char* seq,  int len, double* row){
   double score = 0.0;
   int idx = 0;
 
-  char** seqs = (char**)malloc(n_pent * sizeof(char*));
-  for (int i = 0; i < n_pent; i++){
-    seqs[i] = (char*)malloc(6 * sizeof(char));
-    seqs[i][5] = '\0';
-  }
-
   for (int i = 0; i < len; i++){
     for (int j = i; j < i + n_pent; j++){
       score = 0.0;
       idx = 0;
       for (int k = j; k < j + 5; k++){
-        seqs[j - i][k - j] = seq[k];
         switch(seq[k]){
           case 'a':
           case 'A':
@@ -218,18 +195,9 @@ void prot_row( Recognizer* rec,  const char* seq,  int len, double* row){
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 
-    if (score > BIG_POSITIVE){
-      printf("null_f = %f\n", null_f);
-      printf("alt_f = %f\n", alt_f);
-      printf("t_score: %f\n", t_score);
-      printf("sequences pentamers\n");
-      for (int i = 0; i < n_pent; i++){
-        printf("%s, %6.3f\n", seqs[i], pent_s[i]);
-      }
-      print_rec(rec);
-      score = BIG_POSITIVE;
+    if (score > BIG_POSITIVE)
       exit(1);
-    } 
+
     row[i] = score;
   }
   free(pent_s);
@@ -286,7 +254,7 @@ void roll_row( Recognizer* rec,  const char* seq,  int len, double* row){
       score = BIG_NEGATIVE;
 
     if (score > BIG_POSITIVE)
-      score = BIG_POSITIVE;
+      exit(1);
 
     row[i] = score;
   }
@@ -306,18 +274,11 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
   double score = 0.0;
   int idx = 0;
 
-  char** seqs = (char**)malloc(n_pent * sizeof(char*));
-  for (int i = 0; i < n_pent; i++){
-    seqs[i] = (char*)malloc(6 * sizeof(char));
-    seqs[i][5] = '\0';
-  }
-
   for (int i = 0; i < len; i++){
     for (int j = i; j < i + n_pent; j++){
       score = 0.0;
       idx = 0;
       for (int k = j; k < j + 5; k++){
-        seqs[j - i][k - j] = seq[k];
         switch(seq[k]){
           case 'a':
           case 'A':
@@ -352,16 +313,6 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
       score = BIG_NEGATIVE;
 
     if (score > BIG_POSITIVE){
-
-      printf("null_f = %f\n", null_f);
-      printf("alt_f = %f\n", alt_f);
-      printf("t_score: %f\n", t_score);
-      printf("sequences pentamers\n");
-      for (int i = 0; i < n_pent; i++){
-        printf("%s: %6.3f, %6.3f\n", seqs[i], pent_s[i], pent_s[i + n_pent]);
-      }
-      print_rec(rec);
-      score = BIG_POSITIVE;
       exit(1);
     }
 
