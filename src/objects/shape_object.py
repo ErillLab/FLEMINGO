@@ -46,13 +46,7 @@ class ShapeObject:
         self._mu = mu
         self._sigma = sigma
 
-        if mu == None or sigma == None:
-            self._mu = np.random.uniform(self.min_mu, self.max_mu)
-            self._sigma = np.random.uniform(0, 1)
-
-        self.set_alt_model()
-
-        
+        self.pseudo_count = config["PSEUDO_COUNT"]
         self.mutate_probability_sigma = config["MUTATE_PROBABILITY_SIGMA"]
         self.mutate_probability_mu = config["MUTATE_PROBABILITY_MU"]
         self.sigma_mutator = config["SIGMA_MUTATOR"]
@@ -64,6 +58,14 @@ class ShapeObject:
         self.mutate_probability_decrease_size = config["MUTATE_PROBABILITY_DECREASE_SIZE"]
         self.min_columns = config["MIN_COLUMNS"]
         self.max_columns = config["MAX_COLUMNS"]
+
+        if mu == None or sigma == None:
+            self._mu = np.random.uniform(self.min_mu, self.max_mu)
+            self._sigma = np.random.uniform(0, 1)
+
+        self.set_alt_model()
+
+        
 
     def set_null_model(self):
         """
@@ -85,9 +87,7 @@ class ShapeObject:
         #computed in the same way that null model for connectors is computed
         for i in range(0, len(self.bins) - 1):
             score = norm_pf(i + 0.05, self._mu, self._sigma)
-            if score < 1E-10:
-                score = 1E-10
-            alt_model.append(score)
+            alt_model.append(np.log(score + self.pseudo_count))
         self.alt_model = np.array(alt_model, dtype=np.dtype("d"))
 
     def mutate(self, org_fac):

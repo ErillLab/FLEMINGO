@@ -136,7 +136,6 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
             max_length);
   e = clock();
   //printf("parsing organism took %f seconds\n", (double)(e - s) / (double)CLOCKS_PER_SEC);
-
   s = clock();
   int ret = place_org(&org, 
              seq, len_seq, 

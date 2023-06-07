@@ -99,8 +99,10 @@ def main():
     Generate initial population
     """
     # Instantiate organism Factory object with object configurations
+    max_seq_length = max([len(i) for i in (positive_dataset + negative_dataset)])
+    print(max_seq_length)
     organism_factory = OrganismFactory(
-        configOrganism, configOrganismFactory, configConnector, configPssm, rank, configShape
+        configOrganism, configOrganismFactory, configConnector, configPssm, rank, configShape, max_seq_length
     )
     
     # Initialize the population of organisms

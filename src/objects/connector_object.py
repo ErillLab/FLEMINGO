@@ -73,6 +73,7 @@ class ConnectorObject():
             _mu: int,
             _sigma: int,
             config: dict,
+            max_seq_length: int
     ):
         """Connector constructor: 
             - gets/sets mu and sigma
@@ -92,7 +93,7 @@ class ConnectorObject():
         self.mutate_probability_mu = config["MUTATE_PROBABILITY_MU"]
         self.mutate_variance_sigma = config["MUTATE_VARIANCE_SIGMA"]
         self.mutate_variance_mu = config["MUTATE_VARIANCE_MU"]
-        self.expected_seq_length = config["EXPECTED_SEQ_LENGTH"]
+        self.expected_seq_length = max_seq_length
         self.sigma_mutator = config["SIGMA_MUTATOR"] #log or linear
         self.mu_mutator = config["MU_MUTATOR"] #log or linear
         self.pseudo_count = config["PSEUDO_COUNT"]

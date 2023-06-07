@@ -62,6 +62,7 @@ double score_con(Connector* con, int gap, int s_len, int eff_len, int n_recs, do
     if (res > BIG_POSITIVE){
       return BIG_POSITIVE;
     }
+
     return res;
   }
 
