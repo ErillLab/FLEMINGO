@@ -221,71 +221,73 @@ def main():
             pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
             ref_seq = pos_set_sample[0]
             
-            # Decide whether the parents are going to be recombined or mutated
+            # Decide if the parents will do sexual or clonal reproduction (recombination VS mutation)
             if random.random() < organism_factory.recombination_probability:
                 # Recombination case; no mutation
                 child1, child2 = organism_factory.get_children(
-                    org1, org2, ref_seq, pos_set_sample
-                )
+                    org1, org2, ref_seq, pos_set_sample)
             
             else:
-                # Non-recomination case; the children get mutated
+                # Non-recomination case; the children are mutated
                 child1, child2 = organism_factory.clone_parents(org1, org2)
-                # Mutate the children: the children in this non-recombination
-                # case are just a mutated versions of the parents
+                # The children in this non-recombination scenario are just
+                # mutated versions of the parents
                 child1.mutate(organism_factory)
                 child2.mutate(organism_factory)
             
-            # Make two pairs: each parent is paired with the more similar child
-            # (the child with higher ratio of nodes from that parent).
-            pair_children = []
-            ''' pair_children is a list of two elements. The two parents we are
-            now working with are elements i and i+1 in  organism_population.
-            We need to pair each of them with one of the two children obtained
-            with  get_children  method.
+            # Pair parents and offspring
+            two_parent_child_pairs = pair_parents_and_children(org1, org2, child1, child2)
             
-                - The first element in  pair_children  will be a tuple where
-                  the first element is organism i, and the second one is a
-                  child
+            # # Make two pairs: each parent is paired with the more similar child
+            # # (the child with higher ratio of nodes from that parent).
+            # two_parent_child_pairs = []
+            # ''' `two_parent_child_pairs` is a list of two elements. The two parents
+            # we are now working with are elements i and i+1 in `organism_population`.
+            # We need to pair each of them with one of the two children obtained
+            # with the  get_children  method.
+            
+            #     - The first element in `two_parent_child_pairs` will be a tuple where
+            #       the first element is organism i, and the second one is a
+            #       child
                   
-                - The second element in  pair_children  will be a tuple where
-                  the first element is organism i+1, and the second one is the
-                  other child
-            '''
+            #     - The second element in `two_parent_child_pairs` will be a tuple where
+            #       the first element is organism i+1, and the second one is the
+            #       other child
+            # '''
             
-            # get parent1/parent2 ratio for the children
-            child1_p1p2_ratio = child1.get_parent1_parent2_ratio()
-            child2_p1p2_ratio = child2.get_parent1_parent2_ratio()
+            # # get parent1/parent2 ratio for the children
+            # child1_p1p2_ratio = child1.get_parent1_parent2_ratio()
+            # child2_p1p2_ratio = child2.get_parent1_parent2_ratio()
             
-            # If a parent gets paired with an empty child, the empty child is
-            # substituted by a deepcopy of the parent, i.e. the parent escapes
-            # competition
-            if child1_p1p2_ratio > child2_p1p2_ratio:
-                # org1 with child1
-                if child1.count_nodes() > 0:
-                    pair_children.append( (org1, child1) )
-                else:
-                    pair_children.append( (org1, copy.deepcopy(org1)) )
-                # org2 with child2
-                if child2.count_nodes() > 0:
-                    pair_children.append( (org2, child2) )
-                else:
-                    pair_children.append( (org2, copy.deepcopy(org2)) )
-            else:
-                # org1 with child2
-                if child2.count_nodes() > 0:
-                    pair_children.append( (org1, child2) )
-                else:
-                    pair_children.append( (org1, copy.deepcopy(org1)) )
-                # org2 with child1
-                if child1.count_nodes() > 0:
-                    pair_children.append( (org2, child1) )
-                else:
-                    pair_children.append( (org2, copy.deepcopy(org2)) )
+            # # If a parent gets paired with an empty child, the empty child is
+            # # substituted by a deepcopy of the parent, i.e. the parent escapes
+            # # competition
+            # if child1_p1p2_ratio > child2_p1p2_ratio:
+            #     # org1 with child1
+            #     if child1.count_nodes() > 0:
+            #         two_parent_child_pairs.append( (org1, child1) )
+            #     else:
+            #         two_parent_child_pairs.append( (org1, copy.deepcopy(org1)) )
+            #     # org2 with child2
+            #     if child2.count_nodes() > 0:
+            #         two_parent_child_pairs.append( (org2, child2) )
+            #     else:
+            #         two_parent_child_pairs.append( (org2, copy.deepcopy(org2)) )
+            # else:
+            #     # org1 with child2
+            #     if child2.count_nodes() > 0:
+            #         two_parent_child_pairs.append( (org1, child2) )
+            #     else:
+            #         two_parent_child_pairs.append( (org1, copy.deepcopy(org1)) )
+            #     # org2 with child1
+            #     if child1.count_nodes() > 0:
+            #         two_parent_child_pairs.append( (org2, child1) )
+            #     else:
+            #         two_parent_child_pairs.append( (org2, copy.deepcopy(org2)) )
             
             # Make the two organisms in each pair compete
             # j index is used to re insert winning organism into the population
-            for j in range(len(pair_children)):
+            for j in range(len(two_parent_child_pairs)):
                 '''
                 when j is 0 we are dealing with organism i
                 when j is 1 we are dealing with organism i+1
@@ -294,8 +296,8 @@ def main():
                 i+j in  organism_population
                 '''
 
-                first_organism = pair_children[j][0]  # Parent Organism
-                second_organism = pair_children[j][1]  # Child Organism
+                first_organism = two_parent_child_pairs[j][0]  # Parent Organism
+                second_organism = two_parent_child_pairs[j][1]  # Child Organism
                 
                 fitness1 = first_organism.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
                                                       negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
@@ -483,6 +485,50 @@ def main():
         iterations += 1
         # END WHILE
 
+
+def pair_parents_and_children(parent1, parent2, child1, child2):
+    '''
+    Returns a list of two parent-child pairs (a list of two tuples).
+    
+    The four input organisms are two parents and their two children, all
+    belonging to the OrganismObject class.
+    
+    Each parent is paired with the most similar child (the child with highest
+    ratio of nodes from that parent).
+    '''
+    
+    two_parent_child_pairs = []
+    
+    # get parent1/parent2 ratio for the children
+    child1_p1p2_ratio = child1.get_parent1_parent2_ratio()
+    child2_p1p2_ratio = child2.get_parent1_parent2_ratio()
+    
+    # If a parent gets paired with an empty child, the empty child is
+    # substituted by a deepcopy of the parent, i.e. the parent escapes
+    # competition
+    if child1_p1p2_ratio > child2_p1p2_ratio:
+        # parent1 with child1
+        if child1.count_nodes() > 0:
+            two_parent_child_pairs.append( (parent1, child1) )
+        else:
+            two_parent_child_pairs.append( (parent1, copy.deepcopy(parent1)) )
+        # parent2 with child2
+        if child2.count_nodes() > 0:
+            two_parent_child_pairs.append( (parent2, child2) )
+        else:
+            two_parent_child_pairs.append( (parent2, copy.deepcopy(parent2)) )
+    else:
+        # parent1 with child2
+        if child2.count_nodes() > 0:
+            two_parent_child_pairs.append( (parent1, child2) )
+        else:
+            two_parent_child_pairs.append( (parent1, copy.deepcopy(parent1)) )
+        # parent2 with child1
+        if child1.count_nodes() > 0:
+            two_parent_child_pairs.append( (parent2, child1) )
+        else:
+            two_parent_child_pairs.append( (parent2, copy.deepcopy(parent2)) )
+    return two_parent_child_pairs
 
 def shuffle_dataset(dataset: list) -> list:
     '''
