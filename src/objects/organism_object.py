@@ -822,18 +822,18 @@ class OrganismObject:
         '''
         energy_scores = self.get_binding_energies(dna_set)
         n_to_trim = round(gamma * len(energy_scores))  # defalut gamma: 0.2
-        # Make sure that `n_to_trim` doesn't exceed the maximum due to rounding
-        # (when gamma=0.5 and len(energy_scores) is an odd number)
-        # We should never trim more than half of the elements from one side.
-        if n_to_trim > len(energy_scores)/2:
-            n_to_trim = int(len(energy_scores)/2)
+        # Make sure that `n_to_trim` doesn't exceed the maximum. We should always
+        # trim less than half of the elements from one side, to avoid being left
+        # with an empty list
+        max_n_to_trim = int((len(energy_scores)-1)/2)
+        n_to_trim = min(n_to_trim, max_n_to_trim)
         
         if n_to_trim == 0:
             mean = np.mean(energy_scores)
             stdev = np.std(energy_scores)
             stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
             sterr = stdev / np.sqrt(len(energy_scores))
-        if method == "Welch":
+        elif method == "Welch":
             mean = np.mean(energy_scores)
             stdev = np.std(energy_scores)
             stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
