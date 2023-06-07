@@ -23,7 +23,7 @@ class OrganismFactory:
     """Factory class
     """
 
-    def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank, conf_shape) -> None:
+    def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank, conf_shape, max_seq_length) -> None:
         """
         Instantiates an OrganismFactory object.
         Reads in the configuration paramaters for the factory and for all object
@@ -36,6 +36,7 @@ class OrganismFactory:
         self._organism_counter = 0
         # Process rank (used to esure unique organism IDs when running in parallel mode)
         self._process_rank = p_rank
+        self.max_seq_length = max_seq_length
         #self._id = 0
         # lambda parameter for Poisson distribution that will instantiate
         # organism. lambda is the expected number of recognizers in the
@@ -66,7 +67,8 @@ class OrganismFactory:
         self.conf_pssm = conf_pssm
         self.conf_shape = conf_shape
         self.load_shape_null_models()
-        self.check_shape_null_models()
+        self.check_shape_null_models(conf_shape["NUM_BINS"])
+        shape_object.null_models = shape_object.null_models[conf_shape["NUM_BINS"]]
 
     def load_shape_null_models(self):
         if not os.path.isfile("models/models"):
@@ -81,13 +83,19 @@ class OrganismFactory:
             shape_object.null_models = pickle.load(infile)
             return
 
-    def check_shape_null_models(self):
+    def check_shape_null_models(self, bins):
 
         if shape_object.null_models == {}:
-            null.generate_range(5, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models)
+            null.generate_range(5, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models, bins)
+            return
 
-        if max(shape_object.null_models["mgw"].keys()) < self.conf_shape["MAX_COLUMNS"]:
-            null.generate_range(max(shape_object.null_models["mgw"].keys()) + 1, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models)
+        if bins not in shape_object.null_models.keys():
+            null.generate_range(5, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models, bins)
+            return
+
+        if max(shape_object.null_models[bins]["mgw"].keys()) < self.conf_shape["MAX_COLUMNS"]:
+            null.generate_range(max(shape_object.null_models["mgw"].keys()) + 1, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models, bins)
+            return
         
 
     def get_id(self) -> int:
@@ -143,7 +151,7 @@ class OrganismFactory:
             # instantiate new connector and append it to organism's connector list
             _mu = random.randint(self.min_mu, self.max_mu)
             _sigma = random.randint(self.min_sigma, self.max_sigma)
-            new_connector = ConnectorObject(_mu, _sigma, self.conf_con)
+            new_connector = ConnectorObject(_mu, _sigma, self.conf_con, self.max_seq_length)
             new_organism.connectors.append(new_connector)
         # insert last recognizer in the chain and add it to list
         new_recognizer = self.create_recognizer(self.pwm_length)
@@ -163,7 +171,7 @@ class OrganismFactory:
         _sigma = random.randint(self.min_sigma, self.max_sigma)
 
         # Create the new connector
-        new_connector = ConnectorObject(_mu, _sigma, self.conf_con)
+        new_connector = ConnectorObject(_mu, _sigma, self.conf_con, self.max_seq_length)
 
         return new_connector
 
@@ -343,7 +351,7 @@ class OrganismFactory:
             Connector object from given connector dictionary
         """
         new_connector = ConnectorObject(
-            connector["mu"], connector["sigma"], self.conf_con
+            connector["mu"], connector["sigma"], self.conf_con, self.max_seq_length
         )
 
         return new_connector
@@ -961,7 +969,7 @@ class OrganismFactory:
         if stdev_gap < 0.1:  # !!! temporarily hard-coded lower-bound
             stdev_gap = 0.1
         
-        synthetic_connector = ConnectorObject(avg_gap, stdev_gap, self.conf_con)
+        synthetic_connector = ConnectorObject(avg_gap, stdev_gap, self.conf_con, self.max_seq_length)
         return synthetic_connector
     
     def get_recog_pos_on_DNA_seq(self, org_placement, recog_idx):

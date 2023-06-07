@@ -182,14 +182,23 @@ parameters:      score:           the calculated score from sliding the pentamer
 notes:           .
 */
 double get_bin_frequency(double score, double bin_frequencies[], double bin_edges[], int num_bins){
-  for (int i = 1; i < num_bins; i++){
-    if (score < bin_edges[i] && fabs(score - bin_edges[i]) > 0.001){
-      //printf("bin edge %i is %f, score is: %f, freq is: %f\n", i, bin_edges[i], score, bin_frequencies[i - 1]);
-      return bin_frequencies[i - 1];
+  for (int i = 1; i < num_bins + 1; i++){
+    if (score < bin_edges[i - 1]){
+
+      if (fabs(score - bin_edges[i - 1]) > 0.000001){
+        //printf("bin edge %i is %f, score is: %f, freq is: %f\n", i - 1, bin_edges[i - 1], score, bin_frequencies[i - 1]);
+        return bin_frequencies[i - 2];
+      }
+
+      if (fabs(score - bin_edges[i - 1]) <= 0.0000001){
+        //printf("bin edge %i is %f, score is: %f, freq is: %f\n", i - 1, bin_edges[i - 1], score, bin_frequencies[i]);
+        return bin_frequencies[i - 1];
+      }
     }
   } 
-
-  return bin_frequencies[num_bins - 1];
+  //printf("wtf\n");
+  //printf("bin edge %i is %f, score is: %f, freq is: %f\n", num_bins, bin_edges[num_bins - 1], score, bin_frequencies[num_bins - 2]);
+  return bin_frequencies[num_bins - 2];
 }
 
 /* 

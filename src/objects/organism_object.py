@@ -1144,7 +1144,7 @@ class OrganismObject:
                     if float(len(sequence)) + 0.5 < self.connectors[i]._mu:
                         if self.connectors_scores_flat[sum([self.connectors[i].expected_seq_length * 2 + 2 for i in range(0, i)]) + 2 + len(sequence) - self.minimum_length] <= np.log(self.connectors[i].pseudo_count):
                             print("rescaling...")
-                            self.adjust_connector_scores(i, c_scores, len(sequence))
+                            #self.adjust_connector_scores(i, c_scores, len(sequence))
                             #pass
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), self.recognizers_flat, self.recognizer_lengths,  c_scores, PSSM_scores, gap_scores, gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
 
