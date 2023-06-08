@@ -128,36 +128,24 @@ class ConnectorObject():
         """
         
         # Delete previous values
-        self.stored_pdfs = []
-        self.stored_cdfs = []
-        import time
-        # Compute new values
-        cdf0 = norm_cdf(0, self._mu, self._sigma)
-        for dist in range(self.expected_seq_length):
-            
-            # Precompute PDF
-            pdf = np.log2(norm_pf(dist, self._mu, self._sigma))
-            if pdf > -1E10:
-                self.stored_pdfs.append(pdf)            
-            else:
-                self.stored_pdfs.append(-1E10)
-            # Precompute CDF
+        self.stored_pdfs = [None] * self.expected_seq_length
+        self.stored_cdfs = [None] * self.expected_seq_length
+       
+        prev_cdf = norm_cdf(-0.5, self._mu, self._sigma)
+        cdf_0 = prev_cdf
+        offset = 0
+        
+        for j in range(1, self.expected_seq_length + 1):
+            cdf = norm_cdf(j - 0.5, self._mu, self._sigma)
+            auc = np.log2(prev_cdf - cdf_0 + (self.pseudo_count * j))
+            pf = np.log2(cdf - prev_cdf + self.pseudo_count)
 
-            if self._sigma != 0:
-                cdf = np.log2(norm_cdf(dist, self._mu, self._sigma) - cdf0)
-                if cdf > -1E10:
-                    self.stored_cdfs.append(cdf)
-                else:
-                    self.stored_cdfs.append(-1E10)
+            self.stored_pdfs[offset] = np.double(pf)
+            self.stored_cdfs[offset] = np.double(auc)
+            offset += 1
+            prev_cdf = cdf
 
-            else:
-                if dist<self._mu:
-                    self.stored_cdfs.append(-1E10)
-                else:
-                    self.stored_cdfs.append(0.00)
     
-        e = time.monotonic_ns()
-        print("precomputeing took:", (e - s) * 10E-9)
 
     def mutate(self, org_factory) -> None:
         """mutation for a connector
