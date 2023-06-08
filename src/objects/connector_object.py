@@ -124,7 +124,6 @@ class ConnectorObject():
         self._sigma = sigma
     
     def set_precomputed_pdfs_cdfs(self) -> None:
-        return
         """Set stored_pdfs variable and stored_cdfs variable
         """
         
@@ -134,7 +133,6 @@ class ConnectorObject():
         import time
         # Compute new values
         cdf0 = norm_cdf(0, self._mu, self._sigma)
-        s = time.monotonic_ns()
         for dist in range(self.expected_seq_length):
             
             # Precompute PDF

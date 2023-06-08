@@ -1078,6 +1078,7 @@ class OrganismObject:
 
     def adjust_connector_scores(self, c_idx, c_scores, sequence_length):
         #get to the start in the array of connector info
+        #print(c_scores)
         offset = sum([(self.connectors[c_idx].expected_seq_length * 2 + 2) for i in range(0, c_idx)])
 
         #get to first precomputed position
@@ -1091,7 +1092,7 @@ class OrganismObject:
         h_list = [1 + con.pseudo_count]
         tot_sum =  h_list[0]
 
-        print(sequence_length, self.minimum_length)
+        #print(sequence_length, self.minimum_length)
         for i in range(sequence_length - 1 - self.minimum_length, -1, -1):
             g_next = g(i, con._mu, con._sigma)
             h_next = h_curr * math.exp(g_next - g_curr)
@@ -1110,6 +1111,8 @@ class OrganismObject:
             prob_sum += p_list[i]
             c_scores[offset + i] = np.log(p_list[i])
             c_scores[offset + con.expected_seq_length + i] = np.log(prob_sum)
+
+        #print(c_scores)
 
     def get_placement(self, sequence: str) -> PlacementObject:
 
@@ -1137,12 +1140,15 @@ class OrganismObject:
         c_scores = np.copy(self.connectors_scores_flat)
         if number_PSSM > 1:
             max_length = self.connectors[0].expected_seq_length - 1
-            if False:
-                for i in range(len(self.connectors)):
-                    if float(len(sequence)) + 0.5 < self.connectors[i]._mu:
-                        if self.connectors_scores_flat[sum([self.connectors[i].expected_seq_length * 2 + 2 for i in range(0, i)]) + 2 + len(sequence) - self.minimum_length] <= np.log(self.connectors[i].pseudo_count):
-                            print("rescaling...")
-                            self.adjust_connector_scores(i, c_scores, len(sequence))
+            for i in range(len(self.connectors)):
+                if float(len(sequence)) + 0.5 < self.connectors[i]._mu:
+                    idx = sum([self.connectors[i].expected_seq_length * 2 + 2 for i in range(0, i)])
+                    idx += 2
+                    idx += len(sequence) - self.minimum_length + 1
+                    if self.connectors_scores_flat[idx] <= np.log(1E-15):
+                        print("rescaling...")
+                        self.adjust_connector_scores(i, c_scores, len(sequence))
+
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), self.recognizers_flat, self.recognizer_lengths,  c_scores, PSSM_scores, gap_scores, gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
 
         # parse data from the _calculatePlacement module and put it
@@ -1276,17 +1282,12 @@ class OrganismObject:
         self.recognizer_bin_nums = np.array(rec_bin_nums, dtype = np.dtype('i'))
         self.recognizer_bin_edges = np.array(rec_bin_edges, dtype = np.dtype('d'))
 
-        self.set_pf_auc()
         self.set_minimum_length()
-        return
 
-        """
-        g_s = time.monotonic_ns()
         if self.is_precomputed == True:
             for connector in self.connectors:
                 flat_connector_scores += [connector._mu, connector._sigma]
                 flat_connector_scores += (connector.stored_pdfs + connector.stored_cdfs)
-#               for i in range(connector.expected_seq_length):
 
             # organism holds a numpy array of the flattened lists
             self.connectors_scores_flat = np.array(flat_connector_scores, dtype = np.dtype('d'))
@@ -1298,7 +1299,3 @@ class OrganismObject:
                 con_mu_sigma.append(connector._sigma)
 
             self.connectors_scores_flat = np.array(con_mu_sigma, dtype=np.dtype('d'))
-        e = time.monotonic_ns()
-        print("full gap precomputation and population took:", (e-g_s) * 10E-9)
-        #print("flattening organism took {} seconds".format((e - s) *10E-9))
-        """
