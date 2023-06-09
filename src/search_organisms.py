@@ -69,13 +69,12 @@ def main():
     Main function for the motif seek
     """
     
-    if i_am_main_process():  # XXX
+    if i_am_main_process():
         print("Loading parameters...")
     
     # Read positive set from specified file
     positive_dataset = read_fasta_file(DATASET_BASE_PATH_DIR + POSITIVE_FILENAME)
     
-    # XXX
     if NEGATIVE_FILENAME is not None:
         # Read negative set from specified file
         negative_dataset = read_fasta_file(DATASET_BASE_PATH_DIR + NEGATIVE_FILENAME)
@@ -93,7 +92,7 @@ def main():
     mean_nodes = 0
     mean_fitness = 0
     
-    if i_am_main_process():  # XXX
+    if i_am_main_process():
         print("Instantiating population...")
     
     """
@@ -107,7 +106,7 @@ def main():
     )
     
     # Initialize the population of organisms
-    if i_am_main_process():  # XXX
+    if i_am_main_process():
         
         # Initialize list
         organism_population = []
@@ -175,7 +174,7 @@ def main():
     )
     timeformat = "%Y-%m-%d--%H-%M-%S"
     
-    if i_am_main_process():  # XXX
+    if i_am_main_process():
         print("Starting execution...")
 
     # Main loop, it iterates until organisms do not get a significant change
@@ -184,13 +183,13 @@ def main():
     while not is_finished(END_WHILE_METHOD, iterations, max_score, 
                           last_max_score):
         
-        # XXX
+        
         if i_am_main_process():
             # Shuffle population
             # Organisms are shuffled for deterministic crowding selection
             random.shuffle(organism_population)        
         
-        # XXX
+        
         if RUN_MODE == 'parallel':
             # FRAGMENT AND SCATTER THE POPULATION
             organism_population = fragment_population(organism_population)
@@ -200,7 +199,6 @@ def main():
             # my_ids = [org._id for org in organism_population]
             # print("From process " + str(rank) + ": loc pop is " + str(my_ids))
         
-        # XXX
         # Shuffle datasets (if required)
         if RANDOM_SHUFFLE_SAMPLING_POS:
             positive_dataset = shuffle_dataset(positive_dataset)
@@ -225,71 +223,73 @@ def main():
             pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
             ref_seq = pos_set_sample[0]
             
-            # Decide whether the parents are going to be recombined or mutated
+            # Decide if the parents will do sexual or clonal reproduction (recombination VS mutation)
             if random.random() < organism_factory.recombination_probability:
                 # Recombination case; no mutation
                 child1, child2 = organism_factory.get_children(
-                    org1, org2, ref_seq, pos_set_sample
-                )
+                    org1, org2, ref_seq, pos_set_sample)
             
             else:
-                # Non-recomination case; the children get mutated
+                # Non-recomination case; the children are mutated
                 child1, child2 = organism_factory.clone_parents(org1, org2)
-                # Mutate the children: the children in this non-recombination
-                # case are just a mutated versions of the parents
+                # The children in this non-recombination scenario are just
+                # mutated versions of the parents
                 child1.mutate(organism_factory)
                 child2.mutate(organism_factory)
             
-            # Make two pairs: each parent is paired with the more similar child
-            # (the child with higher ratio of nodes from that parent).
-            pair_children = []
-            ''' pair_children is a list of two elements. The two parents we are
-            now working with are elements i and i+1 in  organism_population.
-            We need to pair each of them with one of the two children obtained
-            with  get_children  method.
+            # Pair parents and offspring
+            two_parent_child_pairs = pair_parents_and_children(org1, org2, child1, child2)
             
-                - The first element in  pair_children  will be a tuple where
-                  the first element is organism i, and the second one is a
-                  child
+            # # Make two pairs: each parent is paired with the more similar child
+            # # (the child with higher ratio of nodes from that parent).
+            # two_parent_child_pairs = []
+            # ''' `two_parent_child_pairs` is a list of two elements. The two parents
+            # we are now working with are elements i and i+1 in `organism_population`.
+            # We need to pair each of them with one of the two children obtained
+            # with the  get_children  method.
+            
+            #     - The first element in `two_parent_child_pairs` will be a tuple where
+            #       the first element is organism i, and the second one is a
+            #       child
                   
-                - The second element in  pair_children  will be a tuple where
-                  the first element is organism i+1, and the second one is the
-                  other child
-            '''
+            #     - The second element in `two_parent_child_pairs` will be a tuple where
+            #       the first element is organism i+1, and the second one is the
+            #       other child
+            # '''
             
-            # get parent1/parent2 ratio for the children
-            child1_p1p2_ratio = child1.get_parent1_parent2_ratio()
-            child2_p1p2_ratio = child2.get_parent1_parent2_ratio()
+            # # get parent1/parent2 ratio for the children
+            # child1_p1p2_ratio = child1.get_parent1_parent2_ratio()
+            # child2_p1p2_ratio = child2.get_parent1_parent2_ratio()
             
-            # If a parent gets paired with an empty child, the empty child is
-            # substituted by a deepcopy of the parent, i.e. the parent escapes
-            # competition
-            if child1_p1p2_ratio > child2_p1p2_ratio:
-                # org1 with child1
-                if child1.count_nodes() > 0:
-                    pair_children.append( (org1, child1) )
-                else:
-                    pair_children.append( (org1, copy.deepcopy(org1)) )
-                # org2 with child2
-                if child2.count_nodes() > 0:
-                    pair_children.append( (org2, child2) )
-                else:
-                    pair_children.append( (org2, copy.deepcopy(org2)) )
-            else:
-                # org1 with child2
-                if child2.count_nodes() > 0:
-                    pair_children.append( (org1, child2) )
-                else:
-                    pair_children.append( (org1, copy.deepcopy(org1)) )
-                # org2 with child1
-                if child1.count_nodes() > 0:
-                    pair_children.append( (org2, child1) )
-                else:
-                    pair_children.append( (org2, copy.deepcopy(org2)) )
+            # # If a parent gets paired with an empty child, the empty child is
+            # # substituted by a deepcopy of the parent, i.e. the parent escapes
+            # # competition
+            # if child1_p1p2_ratio > child2_p1p2_ratio:
+            #     # org1 with child1
+            #     if child1.count_nodes() > 0:
+            #         two_parent_child_pairs.append( (org1, child1) )
+            #     else:
+            #         two_parent_child_pairs.append( (org1, copy.deepcopy(org1)) )
+            #     # org2 with child2
+            #     if child2.count_nodes() > 0:
+            #         two_parent_child_pairs.append( (org2, child2) )
+            #     else:
+            #         two_parent_child_pairs.append( (org2, copy.deepcopy(org2)) )
+            # else:
+            #     # org1 with child2
+            #     if child2.count_nodes() > 0:
+            #         two_parent_child_pairs.append( (org1, child2) )
+            #     else:
+            #         two_parent_child_pairs.append( (org1, copy.deepcopy(org1)) )
+            #     # org2 with child1
+            #     if child1.count_nodes() > 0:
+            #         two_parent_child_pairs.append( (org2, child1) )
+            #     else:
+            #         two_parent_child_pairs.append( (org2, copy.deepcopy(org2)) )
             
             # Make the two organisms in each pair compete
             # j index is used to re insert winning organism into the population
-            for j in range(len(pair_children)):
+            for j in range(len(two_parent_child_pairs)):
                 '''
                 when j is 0 we are dealing with organism i
                 when j is 1 we are dealing with organism i+1
@@ -298,107 +298,15 @@ def main():
                 i+j in  organism_population
                 '''
 
-                first_organism = pair_children[j][0]  # Parent Organism
-                second_organism = pair_children[j][1]  # Child Organism
+                first_organism = two_parent_child_pairs[j][0]  # Parent Organism
+                second_organism = two_parent_child_pairs[j][1]  # Child Organism
                 
-                # Boltzmannian fitness
-                if FITNESS_FUNCTION == "boltzmannian":
-                    performance1 = first_organism.get_boltz_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                    negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                                    GENOME_LENGTH)
-                    fitness1 = performance1["score"]
-                    
-                    performance2 = second_organism.get_boltz_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                     negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                                     GENOME_LENGTH)
-                    fitness2 = performance2["score"]
-                    
-                    fitness1 = round(fitness1, 8)
-                    fitness2 = round(fitness2, 8)
-                
-                # Kolmogorov fitness
-                # Computes Kolmogorov-Smirnov test on positive/negative set scores
-                elif FITNESS_FUNCTION == "kolmogorov":
-                    performance1 = first_organism.get_kolmogorov_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                    negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
-                    fitness1 = performance1["score"]
-                    
-                    performance2 = second_organism.get_kolmogorov_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                                    negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
-
-                    fitness2 = performance2["score"]
-                    
-                    fitness1 = round(fitness1, 8)
-                    fitness2 = round(fitness2, 8)
-
-                # Discriminative fitness
-                elif FITNESS_FUNCTION == "discriminative":
-                    positive_performance1 = first_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS])
-                    negative_performance1 = first_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
-                    p_1 = positive_performance1["score"]
-                    n_1 = negative_performance1["score"]
-                    fitness1 =  p_1 - n_1
-                    
-                    positive_performance2 = second_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS])
-                    negative_performance2 = second_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
-                    p_2 = positive_performance2["score"]
-                    n_2 = negative_performance2["score"]
-                    fitness2 =  p_2 - n_2
-                
-                elif FITNESS_FUNCTION == "welchs":
-                    # First organism
-                    positive_performance1 = first_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS])
-                    negative_performance1 = first_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
-                    p_1 = positive_performance1["score"]
-                    n_1 = negative_performance1["score"]
-                    
-                    # Standard deviations
-                    sigma_p_1 = positive_performance1["stdev"]
-                    sigma_n_1 = negative_performance1["stdev"]
-                    
-                    # Lower bound to sigma
-                    # (Being more consistent than that on the sets will not help
-                    # your fitness)
-                    if sigma_p_1 < 1:
-                        sigma_p_1 = 1
-                    if sigma_n_1 < 1:
-                        sigma_n_1 = 1
-                    
-                    # Standard errors
-                    sterr_p_1 = sigma_p_1 / MAX_SEQUENCES_TO_FIT_POS**(1/2)
-                    sterr_n_1 = sigma_n_1 / MAX_SEQUENCES_TO_FIT_NEG**(1/2)
-                    
-                    # Welch's t score
-                    fitness1 =  (p_1 - n_1) / (sterr_p_1**2 + sterr_n_1**2)**(1/2)
-                    
-                    # Second organism
-                    positive_performance2 = second_organism.get_additive_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS])
-                    negative_performance2 = second_organism.get_additive_fitness(negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG])
-                    p_2 = positive_performance2["score"]
-                    n_2 = negative_performance2["score"]
-                    
-                    # Standard deviations
-                    sigma_p_2 = positive_performance2["stdev"]
-                    sigma_n_2 = negative_performance2["stdev"]
-                    
-                    # Lower bound to sigma
-                    # (Being more consistent than that on the sets will not help
-                    # your fitness)
-                    if sigma_p_2 < 1:
-                        sigma_p_2 = 1
-                    if sigma_n_2 < 1:
-                        sigma_n_2 = 1
-                    
-                    # Standard errors
-                    sterr_p_2 = sigma_p_2 / MAX_SEQUENCES_TO_FIT_POS**(1/2)
-                    sterr_n_2 = sigma_n_2 / MAX_SEQUENCES_TO_FIT_NEG**(1/2)
-                    
-                    # Welch's t score
-                    fitness2 =  (p_2 - n_2) / (sterr_p_2**2 + sterr_n_2**2)**(1/2)
-                                    
-                else:
-                    raise Exception("Not a valid fitness function name, "
-                                    + "check the configuration file.")
+                fitness1 = first_organism.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
+                                                      negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
+                                                      FITNESS_FUNCTION, GAMMA)
+                fitness2 = second_organism.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
+                                                       negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
+                                                       FITNESS_FUNCTION, GAMMA)
                 
                 if MAX_NODES != None:  # Upper_bound to complexity
                     
@@ -473,7 +381,7 @@ def main():
 
             # END FOR i
         
-        if RUN_MODE == 'parallel':  # XXX
+        if RUN_MODE == 'parallel':
             # GATHER AND FLATTEN THE POPULATION
             organism_population = comm.gather(organism_population, root=0)
             organism_population = flatten_population(organism_population)
@@ -528,12 +436,14 @@ def main():
             )
             
             # Print against a random positive sequence
-            pos_seq_index = random.randint(0, len(positive_dataset)-1)
-            placement = max_organism[0].get_placement(positive_dataset[pos_seq_index])
+            placement = max_organism[0].get_placement(random.choice(positive_dataset))
+            placement.print_placement(stdout = True)
+            
+            # Print against a random negative sequence
+            placement = max_organism[0].get_placement(random.choice(negative_dataset))
             placement.print_placement(stdout = True)
             
             
-            # XXX
             if RANDOM_SHUFFLE_SAMPLING_POS:
                 # If the dataset is shuffled, prepare a sorted version for the
                 # 'export' functions, so that regardless of the current status of
@@ -577,6 +487,50 @@ def main():
         iterations += 1
         # END WHILE
 
+
+def pair_parents_and_children(parent1, parent2, child1, child2):
+    '''
+    Returns a list of two parent-child pairs (a list of two tuples).
+    
+    The four input organisms are two parents and their two children, all
+    belonging to the OrganismObject class.
+    
+    Each parent is paired with the most similar child (the child with highest
+    ratio of nodes from that parent).
+    '''
+    
+    two_parent_child_pairs = []
+    
+    # get parent1/parent2 ratio for the children
+    child1_p1p2_ratio = child1.get_parent1_parent2_ratio()
+    child2_p1p2_ratio = child2.get_parent1_parent2_ratio()
+    
+    # If a parent gets paired with an empty child, the empty child is
+    # substituted by a deepcopy of the parent, i.e. the parent escapes
+    # competition
+    if child1_p1p2_ratio > child2_p1p2_ratio:
+        # parent1 with child1
+        if child1.count_nodes() > 0:
+            two_parent_child_pairs.append( (parent1, child1) )
+        else:
+            two_parent_child_pairs.append( (parent1, copy.deepcopy(parent1)) )
+        # parent2 with child2
+        if child2.count_nodes() > 0:
+            two_parent_child_pairs.append( (parent2, child2) )
+        else:
+            two_parent_child_pairs.append( (parent2, copy.deepcopy(parent2)) )
+    else:
+        # parent1 with child2
+        if child2.count_nodes() > 0:
+            two_parent_child_pairs.append( (parent1, child2) )
+        else:
+            two_parent_child_pairs.append( (parent1, copy.deepcopy(parent1)) )
+        # parent2 with child1
+        if child1.count_nodes() > 0:
+            two_parent_child_pairs.append( (parent2, child1) )
+        else:
+            two_parent_child_pairs.append( (parent2, copy.deepcopy(parent2)) )
+    return two_parent_child_pairs
 
 def shuffle_dataset(dataset: list) -> list:
     '''
@@ -847,7 +801,7 @@ def set_up():
     # specify as global variable so it can be accesed in local
     # contexts outside setUp
 
-    global RUN_MODE  # XXX
+    global RUN_MODE
     global END_WHILE_METHOD
     global POPULATION_LENGTH
     global DATASET_BASE_PATH_DIR
@@ -862,6 +816,7 @@ def set_up():
     global RANDOM_SHUFFLE_SAMPLING_POS
     global RANDOM_SHUFFLE_SAMPLING_NEG
     global FITNESS_FUNCTION
+    global GAMMA
     global GENOME_LENGTH
     global MIN_ITERATIONS
     global MIN_FITNESS
@@ -882,7 +837,7 @@ def set_up():
     global configPssm
     global configShape
     
-    # MPI variables  # XXX
+    # MPI variables
     global comm
     global rank
     global p
@@ -893,7 +848,7 @@ def set_up():
     if POPULATION_LENGTH % 2 != 0:
         raise Exception("POPULATION_LENGTH must be an even number.")
     
-    RUN_MODE = config["main"]["RUN_MODE"]  # XXX
+    RUN_MODE = config["main"]["RUN_MODE"]
     if RUN_MODE == "parallel":
         from mpi4py import MPI  # mpi4py is only imported if needed
         comm = MPI.COMM_WORLD
@@ -907,7 +862,6 @@ def set_up():
     
     
     DATASET_BASE_PATH_DIR = config["main"]["DATASET_BASE_PATH_DIR"]
-    # XXX
     if i_am_main_process():
         print('\n==================\nRUN_MODE: {}\n==================\n'.format(
             RUN_MODE))  # Remind the user about the chosen RUN_MODE
@@ -923,6 +877,7 @@ def set_up():
     RANDOM_SHUFFLE_SAMPLING_POS = config["main"]["RANDOM_SHUFFLE_SAMPLING_POS"]
     RANDOM_SHUFFLE_SAMPLING_NEG = config["main"]["RANDOM_SHUFFLE_SAMPLING_NEG"]
     FITNESS_FUNCTION = config["main"]["FITNESS_FUNCTION"]
+    GAMMA = config["main"]["GAMMA"]
     GENOME_LENGTH = config["main"]["GENOME_LENGTH"]
     MIN_ITERATIONS = config["main"]["MIN_ITERATIONS"]
     MIN_FITNESS = config["main"]["MIN_FITNESS"]
@@ -938,7 +893,7 @@ def set_up():
     MIN_NODES = config["organism"]["MIN_NODES"]
 
     # Create directory where the output and results will be stored
-    if i_am_main_process():  # XXX
+    if i_am_main_process():
         check_dir(RESULT_BASE_PATH_DIR)
         check_dir(RESULT_BASE_PATH_DIR + "population")
         check_dir(RESULT_BASE_PATH_DIR + "plots")
@@ -951,7 +906,7 @@ def set_up():
     configShape = config["shape"]
 
     # Throw config on a file
-    if i_am_main_process():  # XXX
+    if i_am_main_process():
         parameters_path = RESULT_BASE_PATH_DIR + "parameters.txt"
         print_ln("-" * 50, parameters_path)
         print_ln(" " * 20 + "PARAMETERS", parameters_path)
