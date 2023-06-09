@@ -130,20 +130,40 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models,
     //pssms are passed the matrix and the offset is update.
     //shape recognizers are passed null models, alternative models,
     //edges, length of their models, and the type of recognizer
+
     if (rec_types[i] == 'p') {
-      parse_pssm(&org->recs[i], 
-                 matrix + m_offset, 
-                 rec_lengths[i]);
+      parse_pssm(&org->recs[i],     // memory for the recognizer
+                 matrix + m_offset, // matrix pointer shifted by the offset
+                                    // so that the correct point in memory is
+                                    // passed
+                 rec_lengths[i]);   // length of the recognizer
+
+
+      // each time a pssm is loaded, our offset in the 1D concatenated array
+      // is increased by 4 * length of that recognizer
+      // which is essentially (number of based * number of columns)
       m_offset += rec_lengths[i] * 4;
     } else { 
-      parse_shape(&org->recs[i], 
-                  models + a_offset, 
-                  models + a_offset + model_lengths[shape_i] - 1, 
-                  edges + e_offset, 
-                  model_lengths[shape_i], 
-                  rec_lengths[i], 
-                  rec_types[i]);
+      parse_shape(
+        &org->recs[i],          // memory for shape recognizer
+        models + a_offset,      // null model                                           
+        models + (a_offset + model_lengths[shape_i]  - 1), // alt model
+        edges + e_offset,       //intervals for recognizers models
+        model_lengths[shape_i], // number of interval edges for the shape
+        rec_lengths[i],         // length of the recognizer
+        rec_types[i]            // type shape for the recognizer
+      );
+
+      // model_lengths[shape_i] is the number of intervals the shapes models
+      // have. null and alternative model are both (model_lengths[shape_i] - 1)
+      // long. So to go to the start of the null model for the next shape, the
+      // offset is increased by the total length occupied by the null and alt
+      // models of the current shape.
       a_offset += (model_lengths[shape_i] - 1) * 2;
+
+      // the array for intervals has exactly model_lengths[shape_i] indices
+      // so to get to the intervals for the next shape, the offset for edges
+      // is increased by that amount
       e_offset += model_lengths[shape_i];
       shape_i  += 1;
     }
@@ -151,11 +171,21 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models,
     //connectors are passed pdfs and cdfs,
     //mu, sigma, and the length that is precomputed up until
     if (i < num_recs - 1){
-        parse_con(&org->cons[i], 
-                  con_matrix + 2 + c_offset, 
-                  *(con_matrix + c_offset), 
-                  *(con_matrix + c_offset + 1), 
-                  max_len);      
+        parse_con(
+          &org->cons[i],                // memory for the connector
+          con_matrix + 2 + c_offset,    // start of the pf array
+          *(con_matrix + c_offset),     // mu
+          *(con_matrix + c_offset + 1), // sigma
+          max_len                       // max precomputed gap size
+        ); 
+
+        // each connector has mu, sigma, pfs, and aucs
+        // mu and sigma both occupy one index each
+        // pf and auc both occupy (max_len + 1) indices
+        // since they are for gap sizes [0, max_len]
+        // so getting from one connector to the next involves offsetting by
+        // 1 for mu, 1 for sigma, (max_len + 1) for pfs, and (max_len + 1) for aucs
+        // so  2 + (max_len + 1) * 2 in all
         c_offset += 2 * (max_len + 1) + 2;
     }
 
@@ -209,16 +239,16 @@ notes:           .
 int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores, 
                double* c_scores, int* c_lens) {
   
-  //n_rec and r_lens are instantiated as variables to make code more readable
-  //m_len is the sum of the lengths of all recognizers
+  // n_rec and r_lens are instantiated as variables to make code more readable
+  // m_len is the sum of the lengths of all recognizers
   int n_rec = org->len;
   int* r_lens = (int*)malloc(n_rec * sizeof(int));
   int m_len = 0;
   double auc;
 
 
-  //iteration of each recognizer to calculate the minimum length of a sequence
-  //and to write the length of each recognizer to the r_lens array
+  // iteration of each recognizer to calculate the minimum length of a sequence
+  // and to write the length of each recognizer to the r_lens array
   for (int i = 0; i < n_rec; i++){
     r_lens[i] = org->recs[i].len;
     m_len += r_lens[i];
@@ -227,15 +257,18 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
   if (m_len > s_len)
     return -1;
 
-  //calcualtion of the effective length and number of alignments
+  // calcualtion of the effective length and number of alignments
   int eff_len = s_len - m_len + n_rec;
+
+  // n_align represents the number of possible placements of a single
+  // recognizer along the sequence
   int n_align = s_len - m_len + 1;
 
-  //keeps track of first valid placement for the current recognizer
+  // keeps track of first valid placement for the current recognizer
   int f_offset = 0;
 
-  //t_row is an array for writing temporary scores to during calculation
-  //of cumulative scores
+  // t_row is an array for writing temporary scores to during calculation
+  // of cumulative scores
   double* t_row = (double*)malloc(n_align * sizeof(double));
   for (int i = 0; i < n_align; i++){
     t_row[i] = -INFINITY;
@@ -245,73 +278,57 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
   //the current recognizer can be placed
   double* c_row = (double*)calloc(n_align, sizeof(double));
 
-  //rs_matrix: is an n_align by n_rec array that holds scores for each placement
-  //           placement of each recognizer. 
-  //           row n corresponds to recognizer n
-  //           column n corresponds to the nth valid placement along the sequence
-  //gs_matrix: is an n_align by n_rec - 1 array that holds the scores for each
-  //           gap length of each connector. 
-  //           row n corresponds to connector n
-  //           column n corresponds to the score for the gap
-  //           that was taken to get to that position for that connector
-  //tr_matrix: is a matrix that holds the gap length from the previous placement
-  //           row n corresponds to 
-  //           column n corresponds to the length of the gap
-  //           that was taken to get to that position
+  // rs_matrix: is an n_align by n_rec array that holds scores for each placement
+  //            placement of each recognizer. 
+  //            row n corresponds to recognizer n
+  //            column n corresponds to the nth valid placement along the sequence
+  // gs_matrix: is an n_align by n_rec - 1 array that holds the scores for each
+  //            gap length of each connector. 
+  //            row n corresponds to connector n
+  //            column n corresponds to the score for the gap
+  //            that was taken to get to that position for that connector
+  // tr_matrix: is a matrix that holds the gap length from the previous placement
+  //            row n corresponds to 
+  //            column n corresponds to the length of the gap
+  //            that was taken to get to that position
   double* rs_matrix = (double*)calloc(n_align * n_rec, sizeof(double));
   double* gs_matrix = (double*)calloc(n_align * (n_rec - 1), sizeof(double));
   int*    tr_matrix = (int*)calloc(n_align * (n_rec - 1), sizeof(int));
 
-  //gap:     keep tracks of the length of the current gap
-  //max_len: keeps track of the max length that has been precomputed up until
-  //         for a given connector
-  //g_score: keeps track of the score for the current gap for the current
-  //         connector
+  // gap:     keep tracks of the length of the current gap
+  // max_len: keeps track of the max length that has been precomputed up until
+  //          for a given connector
+  // g_score: keeps track of the score for the current gap for the current
+  //          connector
   int     gap;
   int     max_len;
   double  g_score;
 
-  //rec: points to the current recognzier
-  //con: points to the current connector
+  // rec: points to the current recognzier
+  // con: points to the current connector
   Recognizer* rec = NULL;
   Connector* con = NULL;
 
-  clock_t rec_scoring_total = 0;
-  clock_t gap_scoring_total = 0;
-  clock_t traceback_total = 0;
-  clock_t auc_total = 0;
-  clock_t s;
-  clock_t e;
-
-  clock_t auc_s;
-  clock_t auc_e;
-  for (int i = 0; i < n_rec; i++) {
+    for (int i = 0; i < n_rec; i++) {
     rec = &org->recs[i];
 
     //populates the row for the current recognizer with the score for
     //each possible placement along the sequence
-    s = clock();
     score_row(rec, seq + f_offset, n_align, rs_matrix + (i * n_align));
-    e = clock();
-    rec_scoring_total += (e - s);
 
     //on the first iteration we dont need to do any cumulative score
     //calculations because there are no connectors involved yet
     if (i > 0) {
-      s = clock();
       con = &org->cons[i - 1];
       max_len = con->max_len;
 
       //sometimes the length of the sequence is greater than the max precomputed length
       //if this is the case then we need to compute the cdf to used for the placement
-      auc_s = clock();
       if (s_len - m_len > max_len)
         auc = log2f(norm_cdf(eff_len - n_rec + 0.5, con->mu, con->sigma) 
                   - norm_cdf(-0.5, con->mu, con->sigma));
       else
         auc = con->cdf[s_len - m_len];      
-      auc_e = clock();
-      auc_total += (auc_e - auc_s);
       //j current position in the temp score row
       //k is the current position in the cumulative score array
       //we compare the score currently stored in our array
@@ -338,8 +355,6 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
           }
 
         }
-      e = clock();
-      gap_scoring_total += (e - s);
       //each position in the cumulative array is overwritten with the 
       //corresponding position in the temp array since the best possible
       //score for each posiiton was obtained by the end of the current
@@ -366,28 +381,37 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
   //m_idx:    index that keeps track of the current position in the traceback
   //r_scores: is the array that we write the cumulative score to in the last
   //          position and the score for the corresponding recognizer
-  s = clock();
   int m_idx = max_index(c_row, n_align);
   r_scores[n_rec] = c_row[m_idx];
 
   //starting from the last recognizer, iterate backwards and get the get the
   //score and gap length for each recognizer and connector
   for (int i = n_rec - 1; i >= 0; i--) {
-    r_scores[i] = rs_matrix[i * n_align + m_idx];
-    if (i > 0){
-      c_scores[i - 1] = gs_matrix[(i - 1) * n_align + m_idx];
-      c_lens[i] = tr_matrix[(i - 1) * n_align + m_idx];
-      m_idx -= tr_matrix[(i - 1) * n_align + m_idx];
-    }
-    c_lens[0] = m_idx;
-  }
-  e = clock();
-  traceback_total += (e - s);
 
-  //printf("scoring recs took: %f\n", (double)(rec_scoring_total) / (double)(CLOCKS_PER_SEC));
-  //printf("scoring gaps took: %f\n", (double)(gap_scoring_total) / (double)(CLOCKS_PER_SEC));
-  //printf("traceback took:    %f\n", (double)(traceback_total) / (double)(CLOCKS_PER_SEC));
-  //printf("auc took:          %f\n", (double)(auc_total) / (double)(CLOCKS_PER_SEC));
+    // i * n_align gets to the row for the current recognizer
+    // adding m_idx yields the appropriate column
+    r_scores[i] = rs_matrix[i * n_align + m_idx];
+
+    // there are no connectors before the first recognizer so we stop
+    // dealing with connectors when we hit the first recognizer
+    if (i > 0){
+
+      // connectors are offset 1 from the current recognizer
+      c_scores[i - 1] = gs_matrix[(i - 1) * n_align + m_idx];
+
+      // c_lens is not offset one since it also holds the starting position
+      // of the first recognizer
+      c_lens[i] = tr_matrix[(i - 1) * n_align + m_idx];
+
+      // m_idx steps back by the gap length value at that postion in the
+      // traceback matrix
+      m_idx -= tr_matrix[(i - 1) * n_align + m_idx];
+
+    }
+
+  }
+  c_lens[0] = m_idx;
+
   free(r_lens);
   free(t_row);
   free(c_row);

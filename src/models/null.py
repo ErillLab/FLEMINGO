@@ -15,9 +15,9 @@ def print_histogram(histogram):
     print(histogram[1])
     for i,j in zip(histogram[0], histogram[1]):
         counter += 1 
-        print('[' + str(round(j, 1)) + ', ' + str(round(histogram[1][counter], 1)) + ') ' + '{0: >10}'.format(i))
+        print('[' + str(round(j, 2)) + ', ' + str(round(histogram[1][counter], 2)) + ') ' + '{0: >10}'.format(i))
 
-def get_null_mgw(sequences, n):
+def get_null_mgw(sequences, n, num_bins):
     num_pentamers = n - 4
     pentamer_scores = []
     scores = []
@@ -45,20 +45,13 @@ def get_null_mgw(sequences, n):
             pentamer_scores.append(constants.MGW_SCORES[index])
 
         scores.append(sum(pentamer_scores)/len(pentamer_scores))
-    min_range = round(round(min(scores), 1) - 0.1, 1)
-    max_range = round(round(max(scores), 1) + 0.1, 1)
-    num_bins = math.ceil(round((max_range - min_range), 1) * 10)
-    if (min(scores) > min_range + 0.1):
-        num_bins -= 1
-        min_range += 0.1
 
-    if (max(scores) < max_range - 0.1):
-        num_bins -= 1
-        max_range -= 0.1
+    hist = np.histogram(scores, bins=num_bins, density=True)
+    for i in range(len(hist[0])):
+        hist[0][i] = np.log(hist[0][i])
+    return hist
 
-    return np.histogram(scores, bins=num_bins, density=True, range=(round(min_range, 2), round(max_range, 2)))
-
-def get_null_prot(sequences, n):
+def get_null_prot(sequences, n, num_bins):
     num_pentamers = n - 4
     pentamer_scores = []
     scores = []
@@ -86,19 +79,13 @@ def get_null_prot(sequences, n):
             pentamer_scores.append(constants.PROT_SCORES[index])
 
         scores.append(sum(pentamer_scores)/len(pentamer_scores))
-    min_range = round(round(min(scores), 1) - 0.1, 1)
-    max_range = round(round(max(scores), 1) + 0.1, 1)
-    num_bins = math.ceil((max_range - min_range) * 10)
-    if (min(scores) > min_range + 0.1):
-        num_bins -= 1
-        min_range += 0.1
+    hist = np.histogram(scores, bins=num_bins, density=True)
 
-    if (max(scores) < max_range - 0.1):
-        num_bins -= 1
-        max_range -= 0.1
-    return np.histogram(scores, bins=num_bins, density=True, range=(min_range, max_range))
+    for i in range(len(hist[0])):
+        hist[0][i] = np.log(hist[0][i])
+    return hist
 
-def get_null_roll(sequences, n):
+def get_null_roll(sequences, n, num_bins):
     num_pentamers = n - 4
     pentamer_scores = []
     scores = []
@@ -127,19 +114,14 @@ def get_null_roll(sequences, n):
             pentamer_scores.append(constants.ROLL_SCORES[1024 + index])
 
         scores.append( (pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / (len(pentamer_scores) + 2) )
-    min_range = round(round(min(scores), 1) - 0.1, 1)
-    max_range = round(round(max(scores), 1) + 0.1, 1)
-    num_bins = math.ceil(round((max_range - min_range), 1) * 10)
-    if (min(scores) > min_range + 0.1):
-        num_bins -= 1
-        min_range += 0.1
+    hist = np.histogram(scores, bins=num_bins, density=True)
 
-    if (max(scores) < max_range - 0.1):
-        num_bins -= 1
-        max_range -= 0.1
-    return np.histogram(scores, bins=num_bins, density=True, range=(min_range, max_range))
+    for i in range(len(hist[0])):
+        hist[0][i] = np.log(hist[0][i])
 
-def get_null_helt(sequences, n):
+    return hist
+
+def get_null_helt(sequences, n, num_bins):
     num_pentamers = n - 4
     pentamer_scores = []
     scores = []
@@ -167,49 +149,42 @@ def get_null_helt(sequences, n):
             pentamer_scores.append(constants.HELT_SCORES[index])
             pentamer_scores.append(constants.HELT_SCORES[1024 + index])
 
-        scores.append( (pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / (len(pentamer_scores) + 2) )
-    min_range = round(round(min(scores), 1) - 0.1, 1)
-    max_range = round(round(max(scores), 1) + 0.1, 1)
-    num_bins = math.ceil((max_range - min_range) * 10)
+        scores.append((pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / (len(pentamer_scores) + 2))
+    print(scores)
+    hist = np.histogram(scores, bins=num_bins, density=True)
+    print_histogram(hist)
+    for i in range(len(hist[0])):
+        hist[0][i] = np.log(hist[0][i])
+    return hist
 
-    if (min(scores) > min_range + 0.1):
-        num_bins -= 1
-        min_range += 0.1
-
-    if (max(scores) < max_range - 0.1):
-        num_bins -= 1
-        max_range -= 0.1
-    return np.histogram(scores, bins=num_bins, density=True, range=(min_range, max_range))
-
-
-def generate_range(a, b, models):
-    if models == {}:
-        models["mgw"] = {}
-        models["prot"] = {}
-        models["roll"] = {}
-        models["helt"] = {}
+def generate_range(a, b, models, bins):
+    if models == {} or (bins not in models.keys()):
+        models[bins] = {}
+        models[bins]["mgw"] = {}
+        models[bins]["prot"] = {}
+        models[bins]["roll"] = {}
+        models[bins]["helt"] = {}
     for i in range(a, b):
         print("Generating cartesian product for length {}...".format(i))
         sequences = (list(itertools.product(['A', 'G', 'C', 'T'], repeat=i)))
         print("Finished generating sequences for length {}".format(i))
         print("Calculating null distributions for length {}...".format(i))
-        model, edges = get_null_mgw(sequences, i)
-        models["mgw"][i] = {}
-        models["mgw"][i]["frequencies"] = model
-        models["mgw"][i]["bins"] = edges
-        model, edges = get_null_helt(sequences, i)
-        models["prot"][i] = {}
-        models["prot"][i]["frequencies"] = model
-        models["prot"][i]["bins"] = edges
-        model, edges = get_null_roll(sequences, i)
-        models["roll"][i] = {}
-        models["roll"][i]["frequencies"] = model
-        models["roll"][i]["bins"] = edges
-        model, edges = get_null_helt(sequences, i)
-        models["helt"][i] = {}
-        models["helt"][i]["frequencies"] = model
-        models["helt"][i]["bins"] = edges
-        print(models)
+        model, edges = get_null_mgw(sequences, i, bins)
+        models[bins]["mgw"][i] = {}
+        models[bins]["mgw"][i]["frequencies"] = model
+        models[bins]["mgw"][i]["bins"] = edges
+        model, edges = get_null_prot(sequences, i, bins)
+        models[bins]["prot"][i] = {}
+        models[bins]["prot"][i]["frequencies"] = model
+        models[bins]["prot"][i]["bins"] = edges
+        model, edges = get_null_roll(sequences, i, bins)
+        models[bins]["roll"][i] = {}
+        models[bins]["roll"][i]["frequencies"] = model
+        models[bins]["roll"][i]["bins"] = edges
+        model, edges = get_null_helt(sequences, i, bins)
+        models[bins]["helt"][i] = {}
+        models[bins]["helt"][i]["frequencies"] = model
+        models[bins]["helt"][i]["bins"] = edges
         print("Finsihed calculating null for shapes of length {}".format(i))
         with open("models/models", "wb") as outfile:
             pickle.dump(models, outfile)

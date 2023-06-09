@@ -93,7 +93,7 @@ class ConnectorObject():
         self.mutate_probability_mu = config["MUTATE_PROBABILITY_MU"]
         self.mutate_variance_sigma = config["MUTATE_VARIANCE_SIGMA"]
         self.mutate_variance_mu = config["MUTATE_VARIANCE_MU"]
-        self.expected_seq_length = max_seq_length
+        self.max_seq_length = max_seq_length
         self.sigma_mutator = config["SIGMA_MUTATOR"] #log or linear
         self.mu_mutator = config["MU_MUTATOR"] #log or linear
         self.pseudo_count = config["PSEUDO_COUNT"]
@@ -124,42 +124,44 @@ class ConnectorObject():
         self._sigma = sigma
     
     def set_precomputed_pdfs_cdfs(self) -> None:
-        return
-        """Set stored_pdfs variable and stored_cdfs variable
+        """Set stored_pdfs variable and stored_cdfs variable. This is done
+        through computation of cdfs for all intervals with width 1 from -0.5 to 
+        max_seq_length + 0.5. the pdfs can also be computed using these
+        computations by taking the difference a cdf and its previous cdf.
+        a pseudo count is added to each interval in the pdfs. The cdfs have
+        a pseudo count of (pseudo_count * j) added where j is the number of
+        pdf bins that have had the pseudo count added so far.
+
+        Args:
+            None
+        Returns:
+            None
         """
         
         # Delete previous values
-        self.stored_pdfs = []
-        self.stored_cdfs = []
-        import time
-        # Compute new values
-        cdf0 = norm_cdf(0, self._mu, self._sigma)
-        s = time.monotonic_ns()
-        for dist in range(self.expected_seq_length):
-            
-            # Precompute PDF
-            pdf = np.log2(norm_pf(dist, self._mu, self._sigma))
-            if pdf > -1E10:
-                self.stored_pdfs.append(pdf)            
-            else:
-                self.stored_pdfs.append(-1E10)
-            # Precompute CDF
+        self.stored_pdfs = [None] * self.max_seq_length
+        self.stored_cdfs = [None] * self.max_seq_length
+       
+        prev_cdf = norm_cdf(-0.5, self._mu, self._sigma)
+        cdf_0 = prev_cdf
+        offset = 0
+        # range is 1 to max_seq_length + 1 because first pdf is cdf(0.5) - cdf(-0.5)
+        # and the last pf should be cdf(max_seq_length + 0.5) - cdf(max_seq_length - 0.5)
+        # since we're starting at 1, for each index in the auc array we need
+        # to actually use the previous iteration of the auc since the first index
+        # should be cdf(-0.5) - cdf(-0.5)
 
-            if self._sigma != 0:
-                cdf = np.log2(norm_cdf(dist, self._mu, self._sigma) - cdf0)
-                if cdf > -1E10:
-                    self.stored_cdfs.append(cdf)
-                else:
-                    self.stored_cdfs.append(-1E10)
+        for j in range(1, self.max_seq_length + 1):
+            cdf = norm_cdf(j - 0.5, self._mu, self._sigma)
+            auc = np.log2(prev_cdf - cdf_0 + (self.pseudo_count * j))
+            pf = np.log2(cdf - prev_cdf + self.pseudo_count)
 
-            else:
-                if dist<self._mu:
-                    self.stored_cdfs.append(-1E10)
-                else:
-                    self.stored_cdfs.append(0.00)
+            self.stored_pdfs[offset] = np.double(pf)
+            self.stored_cdfs[offset] = np.double(auc)
+            offset += 1
+            prev_cdf = cdf
+
     
-        e = time.monotonic_ns()
-        print("precomputeing took:", (e - s) * 10E-9)
 
     def mutate(self, org_factory) -> None:
         """mutation for a connector
@@ -222,7 +224,7 @@ class ConnectorObject():
         return prob_of_d(gap_size+1, effective_len, len(recog_sizes))
 
     def get_numerator(self, d, s_dna_len, recog_sizes) -> float:
-        if d<self.expected_seq_length:
+        if d<self.max_seq_length:
             numerator = self.stored_pdfs[d]
         else:
             numerator = norm_pf(d, self._mu, self._sigma)
@@ -234,7 +236,7 @@ class ConnectorObject():
         if self._sigma == 0:
             auc = 1.0  # all the gaussian is within the (-(L-1), +(L-1)) range
         else:
-            if max_d<self.expected_seq_length:
+            if max_d<self.max_seq_length:
                 auc = self.stored_cdfs[max_d] - self.stored_cdfs[0]
             else:
                 auc = (norm_cdf(max_d, self._mu, self._sigma) -
@@ -282,7 +284,7 @@ class ConnectorObject():
 
         """
         # Numerator
-        if d<self.expected_seq_length:
+        if d<self.max_seq_length:
             numerator = self.stored_pdfs[d]
         else:
             numerator = norm_pf(d, self._mu, self._sigma)
@@ -294,7 +296,7 @@ class ConnectorObject():
         if self._sigma == 0:
             auc = 1.0  # all the gaussian is within the (-(L-1), +(L-1)) range
         else:
-            if max_d<self.expected_seq_length:
+            if max_d<self.max_seq_length:
                 auc = self.stored_cdfs[max_d] - self.stored_cdfs[0]
             else:
                 auc = (norm_cdf(max_d, self._mu, self._sigma) -

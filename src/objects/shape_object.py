@@ -31,8 +31,35 @@ def norm_pf(x, mu, sigma):
 
 class ShapeObject:
     def __init__(self, rec_type, rec_size, config, mu = None, sigma = None):
-        #print(null_models)
-        #print(models.models)
+        """ShapeObject: recognizers a specific DNA-shape {mgw, prot, roll, 
+        or helt}
+
+        All null models ever computed are stored in the global null_models 
+        variable. Each shape has exactly one null model corresponding to 
+        the DNA-shape feature that it recognizers and its length.
+
+        Each shape has exactly one alternative model represented by a 
+        normal distribution following a mean, mu, and standard deviation, sigma. 
+        It's representation distribution is calculated of the same intervals 
+        that the null models are.
+
+        Shape features can be mutated by either increasing or decreasing its mu, 
+        its sigma, and/or its length. mu is bounded by the min and max obseved
+        scores in the null model, sigma is any non-negative number, and length is
+        bounded by the config file.
+
+        Note: minimum length can be modified but can NOT be less than 5.
+
+        Args:
+            rec_type: kind of shape feature
+            rec_size: length of the recognizer
+            config: shape recognizer config parameters
+            mu: mean for distribution
+            sigma: standard deviation for distribution
+
+        Returns:
+            Fully operational shape object ready to be placed
+        """
         self.type = rec_type
         self.length = rec_size
 
@@ -63,14 +90,21 @@ class ShapeObject:
             self._mu = np.random.uniform(self.min_mu, self.max_mu)
             self._sigma = np.random.uniform(0, 1)
 
+        # array for alt model must be filled prior to placement
         self.set_alt_model()
 
         
 
     def set_null_model(self):
-        """
-        sets the null model corresponding to shape recognizer's feature
-        and length
+        """Sets the null model corresponding to shape recognizer's feature
+        and length by retrieving information from the appropriate 
+        sub-dictionary of null_models.
+
+        Args:
+            None
+
+        Returns:
+            None
         """
         self.null_model = null_models[self.type][self.length]["frequencies"]
         self.bins = null_models[self.type][self.length]["bins"]
@@ -78,19 +112,33 @@ class ShapeObject:
         self.max_mu = self.bins[-1]
 
     def set_alt_model(self):
-        """
-        sets the array of frequencies corresponding to the distribution of the
+        """Sets the array of frequencies corresponding to the distribution of the
         shape recognizer 
         """
-        alt_model = []
-        #bin array is one longer than frequency array
-        #computed in the same way that null model for connectors is computed
+
+        self.alt_model = []
+
+        # bin array is one longer than frequency array
+        # computed in the same way that null model for connectors is computed
         for i in range(0, len(self.bins) - 1):
             score = norm_pf(i + 0.05, self._mu, self._sigma)
-            alt_model.append(np.log(score + self.pseudo_count))
-        self.alt_model = np.array(alt_model, dtype=np.dtype("d"))
+            self.alt_model.append(np.log(score + self.pseudo_count))
 
     def mutate(self, org_fac):
+        """randomly mutates various attributes of the shape recognizer object.
+        The recognizer may or may not be mutated
+
+        Args:
+            org_fac (has config information for determining mutations)
+
+        Returns:
+            None
+            
+        """
+        # keeps track of if a mutation happend, if it did, then alternative
+        # model is updated
+        mutated = False
+
         # SIGMA MUTATION
         if random.random() < self.mutate_probability_sigma:
             #determine type of mutation (linear or log)
@@ -107,6 +155,8 @@ class ShapeObject:
                 # Apply a shift in the range (-1, 1) to the log-sigma
                 logb_sigma += shift
                 self._sigma = base**logb_sigma
+
+            mutated = True
                 
        
         # MU MUTATION
@@ -127,39 +177,63 @@ class ShapeObject:
             elif self.mu_mutator=="standard":
                 self._mu = random.gauss(self._mu, self._sigma)
 
+            mutated = True
+
+        # size mutations, bounded by min and max lengths specified by config
+        # null models must be updated whenever size changes
         if random.random() < self.mutate_probability_increase_size and self.length < self.max_columns:
             self.length += 1 
             self.set_null_model()
-            self.set_alt_model()
+            mutated = True
 
         if random.random() < self.mutate_probability_decrease_size and self.length > self.min_columns:
             self.length -= 1
             self.set_null_model()
-            self.set_alt_model()
+            mutated = True
 
+        # mu is bounded by the minimum and maximum observed values in the
+        # null
         if self._mu < self.min_mu:
             self._mu = self.min_mu
 
         if self._mu > self.max_mu:
             self._mu = self.max_mu
 
+        if mutated:
+            self.set_alt_model()
+
+
     def print(self) -> None:
+        """Displays information about the shape recongizer
+
+        Args:
+            None
+
+        Returns:
+            None
+            
+        """
         print("Shape recognizer: ")
         print("Type:", self.type, "Length:", self.length)
         print("mu:", self._mu, "sigma", self._sigma)
 
     def export(self, export_file) -> None:
-        """Exports pssm to a file
+        """Exports shape to a file
 
         Args:
             export_file: File to write the output
         """
-        export_file.write("\n" + str(self._mu) + " " + str(self._sigma) + " " + self.type)
+        export_file.write("\n" + str(self._mu) + " " + str(self._sigma) + " " + self.type + " " + str(self.length))
 
     def get_type(self):
-        """
-        returns the one character definiton of a recognizers type
+        """Returns the one character definiton of a recognizers type
         used for generating string of recognizer types
+
+        Args: 
+            None
+
+        Returns:
+            None
         """
         if self.type == "mgw":
             return 'm'
