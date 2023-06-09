@@ -50,21 +50,29 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
       "sequence", "rec_types", "rec_matrices", "rec_lengths", "con_matrices",
       "rec_scores", "con_scores",   "con_lengths", "max_length", "bin_freqs", 
       "bin_edges", "num_bins", NULL};
-  Py_ssize_t len_seq;
-  Py_ssize_t num_rec;
-  Py_ssize_t max_length;
-  PyObject *result = Py_None;
-  Py_buffer rec_matrices;
-  Py_buffer con_matrices;
-  Py_buffer rec_lengths;
-  Py_buffer rec_scores;
 
-  Py_buffer con_scores;
-  Py_buffer con_lengths;
 
-  Py_buffer bin_freqs;
-  Py_buffer bin_edges;
-  Py_buffer num_bins;
+  Py_ssize_t len_seq;    // length of the sequence
+  Py_ssize_t num_rec;    // number of recognizers the organism has
+  Py_ssize_t max_length; // max length that has been precomputed until
+
+  PyObject *result = Py_None; //Python/C-API boilerplate
+
+  Py_buffer rec_matrices; // 1D array of PSSM scores
+  Py_buffer con_matrices; // 1D array of connects mus sigmas
+                          // pf arrays and auc arrays
+  Py_buffer rec_lengths;  // lengths of all recognizers
+
+  Py_buffer rec_scores;  // array to hold recongizer scores in
+                         // and final cumulative score
+  Py_buffer con_scores;  // array to hold connector scores in
+  Py_buffer con_lengths; // array to hold gap lengths and 
+                         // starting postion in
+
+  Py_buffer bin_freqs; // array holding the log2 of frequencies
+                       // for shape alt and null models
+  Py_buffer bin_edges; // array denoting the intervals of for shape models
+  Py_buffer num_bins;  // array denoting the number of bin edges
 
   rec_matrices.obj = NULL;
   con_matrices.obj = NULL;
@@ -102,7 +110,10 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   // rec_scores:   buffer used to store our calculated scores for recognizers
   // con_scores:   buffer used to score our calculated scores for connectors
   // con_lengths:  buffer used to store the length of each connector for our
-  // placment
+  //               placment
+
+  // creation of pointers to the buffers is easier to work with than using the
+  // buffers directly
   double *rec_matrices_ptr = rec_matrices.buf;
   double *con_matrices_ptr = con_matrices.buf;
 
@@ -115,12 +126,19 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   double *bin_edges_ptr = bin_edges.buf;
   int *num_bins_ptr = num_bins.buf;
 
+  // if the lengths of the con_matrices array is equal to 2 * number of
+  // connectors, then we know that no precomputation was done
   if (con_matrices.shape[0] == (num_rec - 1) * 2){
+
+    // max length (which denotes the point until precomputation is done) is 
+    // set to -1 to indicate that no gap lengths were precomputed for
     max_length = -1;
   }
 
   Organism org;
 
+  // pass all of the information to a function that parses it into an organism
+  // struct for easier use
   parse_org(&org, 
             rec_matrices_ptr, 
             rec_lengths_ptr, 
@@ -131,17 +149,23 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
             num_rec, 
             con_matrices_ptr, 
             max_length);
+
+  // place the organism, if the return value is -1 then the organism was too
+  // large to place. This should never happen since there is a protection in the
+  // python function OrganismObject.get_placement(self, sequence)
   int ret = place_org(&org, 
              seq, len_seq, 
              rec_scores_ptr, 
              con_scores_ptr, 
              con_lengths_ptr);
+
   switch(ret){
     case -1:
       PyErr_SetString(PyExc_RuntimeError, "organism is too large to be placed on sequence");    
       break;
   }
 
+  // all code below this is freeing memory and API boilerplate
   free(org.recs);
   free(org.cons);
   Py_INCREF(Py_None);
