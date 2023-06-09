@@ -2,7 +2,6 @@ import random
 import numpy as np
 import math
 import copy
-import models.models as models
 global null_models
 null_models = {}
 
@@ -11,7 +10,7 @@ def norm_cdf(x, mu, sigma):
     z = (x-mu)/abs(sigma)
     return (1.0 + math.erf(z / math.sqrt(2.0))) / 2.0
 
-def norm_pf(x, mu, sigma):
+def norm_pf(x, y, mu, sigma):
     """
     Probablity function for normal distribution.
     Considering that the observed x is an integer, the probability of x is
@@ -19,7 +18,7 @@ def norm_pf(x, mu, sigma):
     given a normal distribution specified by the given mu and sigma.
     """
     if sigma != 0:
-        p = norm_cdf(x+0.5, mu, sigma) - norm_cdf(x-0.5, mu, sigma)
+        p = norm_cdf(y, mu, sigma) - norm_cdf(x, mu, sigma)
     else:
         # when sigma is 0
         if x == mu:
@@ -64,12 +63,12 @@ class ShapeObject:
         self.length = rec_size
 
         self.null_model = []
-        self.bins = []
+        self.edges = []
         self.alt_model = []
         self.set_null_model()
 
-        self.min_mu = self.bins[0]
-        self.max_mu = self.bins[-1]
+        self.min_mu = self.edges[0]
+        self.max_mu = self.edges[-1]
         self._mu = mu
         self._sigma = sigma
 
@@ -107,9 +106,9 @@ class ShapeObject:
             None
         """
         self.null_model = null_models[self.type][self.length]["frequencies"]
-        self.bins = null_models[self.type][self.length]["bins"]
-        self.min_mu = self.bins[0]
-        self.max_mu = self.bins[-1]
+        self.edges = null_models[self.type][self.length]["bins"]
+        self.min_mu = self.edges[0]
+        self.max_mu = self.edges[-1]
 
     def set_alt_model(self):
         """Sets the array of frequencies corresponding to the distribution of the
@@ -120,9 +119,16 @@ class ShapeObject:
 
         # bin array is one longer than frequency array
         # computed in the same way that null model for connectors is computed
-        for i in range(0, len(self.bins) - 1):
-            score = norm_pf(i + 0.05, self._mu, self._sigma)
-            self.alt_model.append(np.log(score + self.pseudo_count))
+
+        auc = norm_cdf(self.edges[-1], self._mu, self._sigma) - norm_cdf(self.edges[0], self._mu, self._sigma)
+
+        auc += (len(self.edges) - 1) * self.pseudo_count
+
+        log_auc = np.log(auc)
+        
+        for i in range(0, len(self.edges) - 1):
+            score = norm_pf(self.edges[i], self.edges[i + 1], self._mu, self._sigma)
+            self.alt_model.append(np.log(score + self.pseudo_count) - log_auc)
 
     def mutate(self, org_fac):
         """randomly mutates various attributes of the shape recognizer object.

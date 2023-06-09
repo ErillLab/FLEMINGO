@@ -45,7 +45,7 @@ class OrganismObject:
         self.recognizer_models = []
         self.recognizer_bin_edges = []
         self.recognizer_bin_nums = []
-        self.minimum_length = 0
+        self.sum_recognizer_lengths = 0
         # assign organism-specific parameters
 	
         # whether fitness is computed over sequences as sum or average
@@ -1147,13 +1147,13 @@ class OrganismObject:
         # treat sigma to be 1E-100 if it is lower, otherwise overflow potential
         # is greater
         sigma = min(con._sigma, 1E-100)
-        g_curr = g(sequence_length - self.minimum_length, con._mu, sigma)
+        g_curr = g(sequence_length - self.sum_recognizer_lengths, con._mu, sigma)
         h_curr = 1
 
         h_list = [1 + con.pseudo_count]
         tot_sum =  h_list[0]
 
-        for i in range(sequence_length - 1 - self.minimum_length, -1, -1):
+        for i in range(sequence_length - 1 - self.sum_recognizer_lengths, -1, -1):
             g_next = g(i, con._mu, sigma)
             h_next = h_curr * math.exp(g_next - g_curr)
 
@@ -1208,7 +1208,7 @@ class OrganismObject:
 
         # if the organism cannot be placed on the sequence, then it recieves a very low score
         # and is not attempted to be placed
-        if self.minimum_length > len(sequence):
+        if self.sum_recognizer_lengths > len(sequence):
             placement = Placement(self._id, sequence)
             placement.set_energy(-1E100)
             return placement
@@ -1243,7 +1243,7 @@ class OrganismObject:
                 if float(len(sequence)) + 0.5 < self.connectors[i]._mu:
 
                     # idx is the greatest possible gap that the connector could have in the placement
-                    idx = len(sequence) - self.minimum_length
+                    idx = len(sequence) - self.sum_recognizer_lengths
 
                     # if the alternative model prediction for the gap of the maximum length is below our
                     # threshold then we rescale the scores for that connector
@@ -1279,8 +1279,8 @@ class OrganismObject:
        
         return placement
 
-    def set_minimum_length(self) -> None:
-        self.minimum_length = sum([i.length for i in self.recognizers])
+    def set_sum_recognizer_lengths(self) -> None:
+        self.sum_recognizer_lengths = sum([i.length for i in self.recognizers])
         
     def flatten(self) -> None:
         """
@@ -1388,9 +1388,9 @@ class OrganismObject:
                     flat_rec_models.append(prob)
                 for prob in recognizer.alt_model:
                     flat_rec_models.append(prob)
-                for edge in recognizer.bins:
+                for edge in recognizer.edges:
                     rec_bin_edges.append(edge)
-                rec_bin_nums.append(len(recognizer.bins))
+                rec_bin_nums.append(len(recognizer.edges))
             recognizer_lengths.append(recognizer.length)
             self.recognizer_types += recognizer.get_type()
 
@@ -1403,7 +1403,7 @@ class OrganismObject:
 
         # the minimum length of the organism is updated in case a recognizer was added, removed
         # or changed size
-        self.set_minimum_length()
+        self.set_sum_recognizer_lengths()
 
 
         if self.is_precomputed == True:
