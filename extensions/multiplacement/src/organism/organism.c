@@ -77,11 +77,17 @@ void debug_placement(Organism* org, const char* seq, int s_len, int* pos, double
   print_scores(org, r_scores, c_scores, pos);
   print_placement(org, seq, s_len, pos);
 }
+
 /*
 name:            parse_org
+
 pre-conditions:  all information for recognizers and connectors has been loaded
-                 number of recognziers is 1 greater than number of recognizers
+                 number of recognziers is 1 greater than number of recognizers.
+                 all of this information is passed from python, recognizers and
+                 connectors store pointers to the 1D array passed from python.
+
 post-conditions: organism has been loaded with parsed information
+
 parameters:      org:           pointer to organism so it can be modified
                                 in this function
                  matrix:        1D array concatenation of all PSSM scores in 
@@ -92,8 +98,8 @@ parameters:      org:           pointer to organism so it can be modified
                  edges:         1D array concatenation of the lower bound of 
                                 each range for all bins of all shape 
                                 recognizers
-                 model_lengths: an array containing the lengths of all models
-                                of all shape recognzers
+                 model_lengths: an array containing the number of interval edges
+                                for all shape recognzers
                  rec_types:     an array of chars denoting the type of all
                                 recognziers
                  num_recs:      the total number of recognizers
@@ -108,6 +114,10 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models,
                int num_recs, double* con_matrix, int max_len){
 
   org->len  = num_recs;
+
+  // allocates space for arrays of recognizers and connectors
+  // recognizers and connectors just have pointers to information 
+  // in arrays that were passed by from python
   org->recs = (Recognizer*)malloc(num_recs * sizeof(Recognizer));
   org->cons = (Connector*)malloc((num_recs - 1) * sizeof(Connector));
 
@@ -131,6 +141,7 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models,
     //shape recognizers are passed null models, alternative models,
     //edges, length of their models, and the type of recognizer
 
+    // determine which parsing function to call based on recognizer type
     if (rec_types[i] == 'p') {
       parse_pssm(&org->recs[i],     // memory for the recognizer
                  matrix + m_offset, // matrix pointer shifted by the offset
@@ -143,28 +154,34 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models,
       // is increased by 4 * length of that recognizer
       // which is essentially (number of based * number of columns)
       m_offset += rec_lengths[i] * 4;
+
     } else { 
       parse_shape(
         &org->recs[i],          // memory for shape recognizer
-        models + a_offset,      // null model                                           
-        models + (a_offset + model_lengths[shape_i]  - 1), // alt model
+        models + a_offset,      // null model offset by the correct amount
+        models + (a_offset + model_lengths[shape_i]  - 1), // alt model offset
+                                // by the correct amount
         edges + e_offset,       //intervals for recognizers models
         model_lengths[shape_i], // number of interval edges for the shape
         rec_lengths[i],         // length of the recognizer
         rec_types[i]            // type shape for the recognizer
       );
 
-      // model_lengths[shape_i] is the number of intervals the shapes models
+      // model_lengths[shape_i] is the number of interval edges the shapes models
       // have. null and alternative model are both (model_lengths[shape_i] - 1)
       // long. So to go to the start of the null model for the next shape, the
       // offset is increased by the total length occupied by the null and alt
       // models of the current shape.
       a_offset += (model_lengths[shape_i] - 1) * 2;
 
-      // the array for intervals has exactly model_lengths[shape_i] indices
+      // the array for intervals has exactly model_lengths[shape_i] edges
       // so to get to the intervals for the next shape, the offset for edges
       // is increased by that amount
       e_offset += model_lengths[shape_i];
+
+      // information for shapes are all stored in 1D arrays,  we only want
+      // to move to the next shape after encountering a shape object,
+      // and not when we encounter a pssm object
       shape_i  += 1;
     }
 
@@ -240,9 +257,10 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
                double* c_scores, int* c_lens) {
   
   // n_rec and r_lens are instantiated as variables to make code more readable
-  // m_len is the sum of the lengths of all recognizers
   int n_rec = org->len;
   int* r_lens = (int*)malloc(n_rec * sizeof(int));
+
+  // m_len is the sum of the lengths of all recognizers
   int m_len = 0;
   double auc;
 
@@ -254,13 +272,14 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
     m_len += r_lens[i];
   }
 
+  // checks to see if the organism is too large to be placed on the sequence
   if (m_len > s_len)
     return -1;
 
-  // calcualtion of the effective length and number of alignments
+  // calcualtion of the effective length
   int eff_len = s_len - m_len + n_rec;
 
-  // n_align represents the number of possible placements of a single
+  // n_rec_placements represents the number of possible placements of a single
   // recognizer along the sequence
   int n_align = s_len - m_len + 1;
 
@@ -271,11 +290,15 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
   // of cumulative scores
   double* t_row = (double*)malloc(n_align * sizeof(double));
   for (int i = 0; i < n_align; i++){
+
+    // first evaluation of calculated score must always succeed so that a real gap
+    // score is recorded
     t_row[i] = -INFINITY;
   }
 
-  //c_row keeps track of the best cumulative score for each position that
-  //the current recognizer can be placed
+  // c_row keeps track of the best cumulative score for each position
+  // this means that it holds the sum of scores for the best placements of all 
+  // previous recognizers and connectors for each position
   double* c_row = (double*)calloc(n_align, sizeof(double));
 
   // rs_matrix: is an n_align by n_rec array that holds scores for each placement
@@ -329,6 +352,7 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
                   - norm_cdf(-0.5, con->mu, con->sigma));
       else
         auc = con->cdf[s_len - m_len];      
+
       //j current position in the temp score row
       //k is the current position in the cumulative score array
       //we compare the score currently stored in our array
@@ -348,6 +372,10 @@ int place_org(Organism* org,  const char* seq,  int s_len, double* r_scores,
           //if the score at some position k in the cumulative scores +
           //the score from the gap of lenght j - k is greater than the 
           //current best score at j in our temp scores array, we overwrite it
+
+          // evaluating the placement at position j and all possible gap lengths
+          // to get from the previous placed cumulative scores to the placement
+          // at position j 
           if (t_row[j] < c_row[k] + g_score + rs_matrix[i * n_align + j]){
             t_row[j] = c_row[k] + g_score + rs_matrix[i * n_align + j];
             tr_matrix[(i - 1) * n_align + j] = gap;
