@@ -1143,14 +1143,18 @@ class OrganismObject:
         """
         # con is just used as a shorthand to refer to the desired connector
         con = self.connectors[c_idx]
-        g_curr = g(sequence_length - self.minimum_length, con._mu, con._sigma)
+
+        # treat sigma to be 1E-100 if it is lower, otherwise overflow potential
+        # is greater
+        sigma = min(con._sigma, 1E-100)
+        g_curr = g(sequence_length - self.minimum_length, con._mu, sigma)
         h_curr = 1
 
         h_list = [1 + con.pseudo_count]
         tot_sum =  h_list[0]
 
         for i in range(sequence_length - 1 - self.minimum_length, -1, -1):
-            g_next = g(i, con._mu, con._sigma)
+            g_next = g(i, con._mu, sigma)
             h_next = h_curr * math.exp(g_next - g_curr)
 
             h_list.append(h_next + con.pseudo_count)
@@ -1243,7 +1247,7 @@ class OrganismObject:
 
                     # if the alternative model prediction for the gap of the maximum length is below our
                     # threshold then we rescale the scores for that connector
-                    if self.connecotrs[i].stored_pdfs[idx] <= np.log(1E-15):
+                    if self.connectors[i].stored_pdfs[idx] <= np.log(1E-15):
                         print("rescaling...")
                         self.adjust_connector_scores(i, c_scores, len(sequence))
 
@@ -1277,69 +1281,6 @@ class OrganismObject:
 
     def set_minimum_length(self) -> None:
         self.minimum_length = sum([i.length for i in self.recognizers])
-
-    def set_pf_auc(self) -> None:
-        """
-        Deprecated, will be reomoved
-        """
-        exit()
-        s = time.monotonic_ns()
-        #if we have no connectors, empty connectors info
-        n_con = len(self.connectors)
-        if n_con == 0:
-            self.connectors_scores_flat = np.zeros(0, dtype=np.dtype('d'))
-            return
-
-        #allocate all of the space needed for the whole flat array
-        exp_len  = self.connectors[0].max_seq_length
-        self.connectors_scores_flat = np.zeros(n_con * (2 * exp_len + 2), dtype=np.dtype('d'))
-        offset = 0
-        pf = 0
-        auc = 0
-
-        #this value keeps track of the the length n that a sequence must be
-        #such that all values from index 0 to index n in the precomputed scores
-        #are all rounded to con.pseudo_count
-        adjust_score_threshold = 0
-        """
-        for each connector we need to:
-            add mu and sigma
-            compute the cdf(-0.5) for normalization
-        """
-
-        for i in range(n_con):
-            con = self.connectors[i]
-            prev_cdf = norm_cdf(-0.5, con._mu, con._sigma)
-            cdf_0 = prev_cdf
-            self.connectors_scores_flat[offset] = np.double(con._mu)
-            self.connectors_scores_flat[offset + 1] = np.double(con._sigma)
-            offset += 2
-
-            """
-            range is 1 to e_len + 1 because first pdf is cdf(0.5) - cdf(-0.5)
-            and the last pf should be cdf(e_len + 0.5) - cdf(e_len - 0.5)
-            since we're starting at 1, for each index in the auc array we need
-            to actually use the previous iteration of the auc since the first index
-            should be cdf(-0.5) - cdf(-0.5)
-            """
-
-            for j in range(1, exp_len + 1):
-                cdf = norm_cdf(j - 0.5, con._mu, con._sigma)
-                if cdf == prev_cdf and cdf <= con.pseudo_count:
-                    con.adjust_score_threshold = j
-                auc = np.log2(prev_cdf - cdf_0 + (con.pseudo_count * j))
-
-                pf = np.log2(cdf - prev_cdf + con.pseudo_count)
-
-                self.connectors_scores_flat[offset] = np.double(pf)
-                self.connectors_scores_flat[offset + exp_len] = np.double(auc)
-                offset += 1
-                prev_cdf = cdf
-
-            #our offset to get to the start of the next connector will be e_len since
-            #we have alread iterated e_len times and each connector takes (2 * e_len + 2)
-            #indices
-            offset += exp_len
         
     def flatten(self) -> None:
         """

@@ -124,7 +124,18 @@ class ConnectorObject():
         self._sigma = sigma
     
     def set_precomputed_pdfs_cdfs(self) -> None:
-        """Set stored_pdfs variable and stored_cdfs variable
+        """Set stored_pdfs variable and stored_cdfs variable. This is done
+        through computation of cdfs for all intervals with width 1 from -0.5 to 
+        max_seq_length + 0.5. the pdfs can also be computed using these
+        computations by taking the difference a cdf and its previous cdf.
+        a pseudo count is added to each interval in the pdfs. The cdfs have
+        a pseudo count of (pseudo_count * j) added where j is the number of
+        pdf bins that have had the pseudo count added so far.
+
+        Args:
+            None
+        Returns:
+            None
         """
         
         # Delete previous values
@@ -134,7 +145,12 @@ class ConnectorObject():
         prev_cdf = norm_cdf(-0.5, self._mu, self._sigma)
         cdf_0 = prev_cdf
         offset = 0
-        
+        # range is 1 to max_seq_length + 1 because first pdf is cdf(0.5) - cdf(-0.5)
+        # and the last pf should be cdf(max_seq_length + 0.5) - cdf(max_seq_length - 0.5)
+        # since we're starting at 1, for each index in the auc array we need
+        # to actually use the previous iteration of the auc since the first index
+        # should be cdf(-0.5) - cdf(-0.5)
+
         for j in range(1, self.max_seq_length + 1):
             cdf = norm_cdf(j - 0.5, self._mu, self._sigma)
             auc = np.log2(prev_cdf - cdf_0 + (self.pseudo_count * j))
