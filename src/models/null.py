@@ -15,7 +15,7 @@ def print_histogram(histogram):
     print(histogram[1])
     for i,j in zip(histogram[0], histogram[1]):
         counter += 1 
-        print('[' + str(round(j, 1)) + ', ' + str(round(histogram[1][counter], 1)) + ') ' + '{0: >10}'.format(i))
+        print('[' + str(round(j, 2)) + ', ' + str(round(histogram[1][counter], 2)) + ') ' + '{0: >10}'.format(i))
 
 def get_null_mgw(sequences, n, num_bins):
     num_pentamers = n - 4
@@ -149,8 +149,10 @@ def get_null_helt(sequences, n, num_bins):
             pentamer_scores.append(constants.HELT_SCORES[index])
             pentamer_scores.append(constants.HELT_SCORES[1024 + index])
 
-        scores.append( (pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / (len(pentamer_scores) + 2) )
+        scores.append((pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / (len(pentamer_scores) + 2))
+    print(scores)
     hist = np.histogram(scores, bins=num_bins, density=True)
+    print_histogram(hist)
     for i in range(len(hist[0])):
         hist[0][i] = np.log(hist[0][i])
     return hist

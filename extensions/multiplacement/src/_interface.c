@@ -120,10 +120,7 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
   }
 
   Organism org;
-  clock_t s;
-  clock_t e;
 
-  s = clock();
   parse_org(&org, 
             rec_matrices_ptr, 
             rec_lengths_ptr, 
@@ -134,16 +131,11 @@ static PyObject *py_calculate(PyObject *self, PyObject *args,
             num_rec, 
             con_matrices_ptr, 
             max_length);
-  e = clock();
-  //printf("parsing organism took %f seconds\n", (double)(e - s) / (double)CLOCKS_PER_SEC);
-  s = clock();
   int ret = place_org(&org, 
              seq, len_seq, 
              rec_scores_ptr, 
              con_scores_ptr, 
              con_lengths_ptr);
-  e = clock();
-  //printf("placing organism took %f seconds\n", (double)(e - s) / (double) CLOCKS_PER_SEC);
   switch(ret){
     case -1:
       PyErr_SetString(PyExc_RuntimeError, "organism is too large to be placed on sequence");    

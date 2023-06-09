@@ -71,6 +71,18 @@ class OrganismFactory:
         shape_object.null_models = shape_object.null_models[conf_shape["NUM_BINS"]]
 
     def load_shape_null_models(self):
+        """loads the serialzed null model dictionary into shape_object.null_models
+        shape_object.null_models is a global variable that holds all null models for
+        all shape recognizers for a given number of bins (specified by "NUM_BINS" 
+        in the config.json file)
+
+        Args:
+            None
+
+        Returns:
+            None
+            
+        """
         if not os.path.isfile("models/models"):
             shape_object.null_models = {}
             return
@@ -83,7 +95,28 @@ class OrganismFactory:
             shape_object.null_models = pickle.load(infile)
             return
 
+        return
+
     def check_shape_null_models(self, bins):
+        """Determines if null models must be computed or not, and calls 
+        computing function if necessary.
+
+        generates models for all shapes for lengths [5, MAX_COLUMNS] if
+        shape_object.null_models is empty, or empty for the specified number
+        of intervals. If it isn't empty for the specified number of bins,
+        and the maximum length that has been computed already is less than
+        MAX_COLUMNS, then it will compute the remaining null models and adds
+        them to the dictionary. If all of the required null models have been
+        computed already, it will do nothing and return None.
+
+        Args:
+            bins: the number of intervals in the null models for each shape
+
+        Returns:
+            None
+        
+            
+        """
 
         if shape_object.null_models == {}:
             null.generate_range(5, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models, bins)
@@ -96,7 +129,8 @@ class OrganismFactory:
         if max(shape_object.null_models[bins]["mgw"].keys()) < self.conf_shape["MAX_COLUMNS"]:
             null.generate_range(max(shape_object.null_models["mgw"].keys()) + 1, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models, bins)
             return
-        
+
+        return
 
     def get_id(self) -> int:
         """ Returns a new unique organism ID (as a string). If the program is
@@ -177,6 +211,16 @@ class OrganismFactory:
 
 
     def create_recognizer(self, length = None):
+        """Randomly creates either a PSSM or shape recognizer
+
+        Args:
+            length: length of the recognizer to be created
+                    passed to either create_pssm or create_shape
+
+        Returns:
+            a recognizer with the specified length (if its valid)
+            
+        """
         if random.random() < self.pssm_vs_shape_probability:
             return self.create_pssm(length)
         else:
@@ -202,7 +246,17 @@ class OrganismFactory:
 
         return PssmObject(np.array(pwm), self.conf_pssm)
     
-    def create_shape(self, length = None):
+    def create_shape(self, length = None) -> ShapeObject:
+        """It return a shape object with a specific length (>= 5)
+           and random feature (one of {mgw, prot, roll, or helt})
+
+        Args:
+            length: length of the shape recognizer
+            if None or less than 5, then 5 is used
+
+        Returns:
+            shape object with a specified length
+        """
         if length == None or length < 5:
             length = 5
 
@@ -350,11 +404,9 @@ class OrganismFactory:
         Returns:
             Connector object from given connector dictionary
         """
-        new_connector = ConnectorObject(
-            connector["mu"], connector["sigma"], self.conf_con, self.max_seq_length
-        )
+        return ConnectorObject(connector["mu"], connector["sigma"], \
+            self.conf_con, self.max_seq_length )
 
-        return new_connector
 
     def import_pssm(self, pssm: dict) -> PssmObject:
         """Import PSSM from JSON object
@@ -369,6 +421,15 @@ class OrganismFactory:
         return PssmObject(np.array(pssm["pwm"]), self.conf_pssm)
 
     def import_shape(self, shape: dict) -> ShapeObject:
+        """Import shape recognizer from JSON object
+
+        Args:
+            shape: shape recognizer in dictionary format
+
+        Returns:
+            Shape Object from given shape dictionary
+
+        """
         return ShapeObject(shape["recType"], shape["length"], self.conf_shape, shape["mu"], shape["sigma"])
 
     def export_organisms(self, a_organisms: list, filename: str) -> None:
@@ -383,11 +444,9 @@ class OrganismFactory:
         for o_organism in a_organisms:
             organism = []
             for i in range(o_organism.count_recognizers() - 1):
-                if o_organism.recognizers[i].type == 'p':
-                    organism.append(self.export_pssm(o_organism.recognizers[i]))
-                    organism.append(self.export_connector(o_organism.connectors[i]))
-            if o_organism.recognizers[-1].type == 'p':
-                organism.append(self.export_pssm(o_organism.recognizers[-1]))
+                organism.append(self.export_recognizer(o_organism.recognizers[i]))
+                organism.append(self.export_connector(o_organism.connectors[i]))
+            organism.append(self.export_recognizer(o_organism.recognizers[-1]))
             list_json_organisms.append(organism)
         
         with open(filename, "w+") as json_file:
@@ -409,6 +468,22 @@ class OrganismFactory:
 
         return connector
 
+    def export_recognizer(self, o_rec) -> dict:
+        """calls the appropriate export function depending on
+        the type of the given recognizer
+
+        Args:
+            None
+
+        Returns:
+            None
+            
+        """
+        if o_rec.get_type() == 'p':
+            return self.export_pssm(o_rec)
+        else:
+            return self.export_shape(o_rec)
+        
     def export_pssm(self, o_pssm: PssmObject) -> dict:
         """Export PSSM object
 
@@ -425,6 +500,24 @@ class OrganismFactory:
         return pssm
     
     
+    def export_shape(self, o_shape: ShapeObject) -> dict:
+        """Export Shape object
+
+        Args:
+            o_shape: Shape object to export
+
+        Returns:
+            shape in dictionary format
+
+        """
+        shape = {}
+        shape["objectType"] = "shape"
+        shape["recType"] = o_shape.type
+        shape["mu"] = o_shape._mu
+        shape["sigma"] = o_shape._sigma
+        shape["length"] = o_shape.length
+        return shape
+
     def get_children(self, par1, par2, reference_dna_seq, pos_dna_sample):
         '''
         Implements the recombination operator.

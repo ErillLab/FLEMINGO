@@ -378,3 +378,10 @@ class PssmObject():
 
     def get_type(self):
         return 'p'
+
+    def get_flat_pssm(self):
+        flat_pssm = []
+        for i in range(len(self.pssm)):
+            for base in ['a', 'g', 'c', 't']:
+                flat_pssm.append(self.pssm[i][base])
+        return flat_pssm

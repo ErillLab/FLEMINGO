@@ -178,27 +178,15 @@ parameters:      score:           the calculated score from sliding the pentamer
                                   over the sequence
                  bin_frequencies: the frequencies of the scores in each bin
                  bin_edges:       the range of each bin
-                 num_bins:        the number of bins for the model
+                 num_bin_edges:   the number of bin edges for the model
 notes:           .
 */
-double get_bin_frequency(double score, double bin_frequencies[], double bin_edges[], int num_bins){
-  for (int i = 1; i < num_bins + 1; i++){
-    if (score < bin_edges[i - 1]){
-
-      if (fabs(score - bin_edges[i - 1]) > 0.000001){
-        //printf("bin edge %i is %f, score is: %f, freq is: %f\n", i - 1, bin_edges[i - 1], score, bin_frequencies[i - 1]);
-        return bin_frequencies[i - 2];
-      }
-
-      if (fabs(score - bin_edges[i - 1]) <= 0.0000001){
-        //printf("bin edge %i is %f, score is: %f, freq is: %f\n", i - 1, bin_edges[i - 1], score, bin_frequencies[i]);
-        return bin_frequencies[i - 1];
-      }
+double get_bin_frequency(double score, double bin_frequencies[], double bin_edges[], int num_bin_edges){
+  for (int i = 1; i < num_bin_edges; i++)
+    if (score >= bin_edges[i - 1] && score < bin_edges[i]){
+      return bin_frequencies[i - 1];
     }
-  } 
-  //printf("wtf\n");
-  //printf("bin edge %i is %f, score is: %f, freq is: %f\n", num_bins, bin_edges[num_bins - 1], score, bin_frequencies[num_bins - 2]);
-  return bin_frequencies[num_bins - 2];
+  return bin_frequencies[num_bin_edges - 2];
 }
 
 /* 
@@ -212,7 +200,7 @@ parameters:      pentamer_scores: the scores for each pentamer in the
 notes:           the terminal elements are counted twice to weight
                  terminal scores for Roll and HelT the same as internal ones
 */
-double shape_average(double pentamer_scores[], int num_elements){
+double shape_average_helt_roll(double pentamer_scores[], int num_elements){
   double sum = pentamer_scores[0] + pentamer_scores[num_elements - 1]; 
   for (int i = 0; i < num_elements; i++){
     sum += pentamer_scores[i];

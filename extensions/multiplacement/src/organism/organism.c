@@ -130,6 +130,7 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models,
     //pssms are passed the matrix and the offset is update.
     //shape recognizers are passed null models, alternative models,
     //edges, length of their models, and the type of recognizer
+
     if (rec_types[i] == 'p') {
       parse_pssm(&org->recs[i], 
                  matrix + m_offset, 
@@ -138,7 +139,7 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models,
     } else { 
       parse_shape(&org->recs[i], 
                   models + a_offset, 
-                  models + a_offset + model_lengths[shape_i] - 1, 
+                  models + (a_offset + model_lengths[shape_i] - 1), 
                   edges + e_offset, 
                   model_lengths[shape_i], 
                   rec_lengths[i], 
@@ -147,7 +148,6 @@ void parse_org(Organism *org, double* matrix, int* rec_lengths, double* models,
       e_offset += model_lengths[shape_i];
       shape_i  += 1;
     }
-
     //connectors are passed pdfs and cdfs,
     //mu, sigma, and the length that is precomputed up until
     if (i < num_recs - 1){

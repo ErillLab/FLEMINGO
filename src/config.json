@@ -61,7 +61,6 @@
     "MUTATE_VARIANCE_MU": 5,
     "SIGMA_MUTATOR": "linear",
     "MU_MUTATOR": "standard",
-    "EXPECTED_SEQ_LENGTH": 300,
     "PSEUDO_COUNT": 1E-15
   },
   "pssm": {
@@ -89,9 +88,9 @@
     "MUTATE_PROBABILITY_CHANGE_REC_TYPE": 0.15,
     "MUTATE_PROBABILITY_INCREASE_SIZE": 0.1,
     "MUTATE_PROBABILITY_DECREASE_SIZE": 0.1,
-    "MIN_COLUMNS": 5,
+    "MIN_COLUMNS": 6,
     "MAX_COLUMNS": 6,
     "PSEUDO_COUNT": 1E-100,
-    "NUM_BINS": 50
+    "NUM_BINS": 25
   }
 }

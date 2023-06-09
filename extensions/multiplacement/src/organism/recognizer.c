@@ -137,9 +137,10 @@ void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 
-    if (score > BIG_POSITIVE)
+    if (score > BIG_POSITIVE){
+      print_rec(rec);
       exit(1);
-
+    }
     row[i] = score;
   }
   free(pent_s);
@@ -195,9 +196,10 @@ void prot_row( Recognizer* rec,  const char* seq,  int len, double* row){
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 
-    if (score > BIG_POSITIVE)
+    if (score > BIG_POSITIVE){
+      print_rec(rec);
       exit(1);
-
+    }
     row[i] = score;
   }
   free(pent_s);
@@ -246,16 +248,17 @@ void roll_row( Recognizer* rec,  const char* seq,  int len, double* row){
       pent_s[j - i] = ROLL_SCORES[idx];
       pent_s[j - i + n_pent] = ROLL_SCORES[idx + 1024];
     }
-    score = shape_average(pent_s, n_pent * 2);
+    score = shape_average_helt_roll(pent_s, n_pent * 2);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
     score = alt_f - null_f;
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 
-    if (score > BIG_POSITIVE)
+    if (score > BIG_POSITIVE){
+      print_rec(rec);
       exit(1);
-
+    }
     row[i] = score;
   }
   free(pent_s);
@@ -273,7 +276,6 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
   double* pent_s = (double*)malloc((n_pent * 2) * sizeof(double));
   double score = 0.0;
   int idx = 0;
-
   for (int i = 0; i < len; i++){
     for (int j = i; j < i + n_pent; j++){
       score = 0.0;
@@ -304,8 +306,7 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
       pent_s[j - i] = HELT_SCORES[idx];
       pent_s[j - i + n_pent] = HELT_SCORES[idx + 1024];
     }
-    score = shape_average(pent_s, n_pent * 2);
-    double t_score = score;
+    score = shape_average_helt_roll(pent_s, n_pent * 2);
     alt_f = get_bin_frequency(score, alt, edges, n_bins);
     null_f = get_bin_frequency(score, null, edges, n_bins);
     score = alt_f - null_f;
