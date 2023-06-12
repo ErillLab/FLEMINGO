@@ -830,33 +830,33 @@ class OrganismObject:
         
         if n_to_trim == 0:
             mean = np.mean(energy_scores)
-            stdev = np.std(energy_scores)
+            stdev = np.std(energy_scores, ddof=1)
             stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
             sterr = stdev / np.sqrt(len(energy_scores))
         elif method == "Welch":
             mean = np.mean(energy_scores)
-            stdev = np.std(energy_scores)
+            stdev = np.std(energy_scores, ddof=1)
             stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
             sterr = stdev / np.sqrt(len(energy_scores))
         elif method == "Yuen":
             energy_scores.sort()
             energy_scores_trimmed = energy_scores[n_to_trim:-n_to_trim]
             mean = np.mean(energy_scores_trimmed)
-            stdev = np.std(energy_scores)
+            stdev = np.std(energy_scores, ddof=1)
             stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
             sterr = stdev / np.sqrt(len(energy_scores))
         elif method == "Trim-left-M":
             energy_scores.sort()
             energy_scores_trimmed = energy_scores[n_to_trim:]
             mean = np.mean(energy_scores_trimmed)
-            stdev = np.std(energy_scores)
+            stdev = np.std(energy_scores, ddof=1)
             stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
             sterr = stdev / np.sqrt(len(energy_scores))
         elif method == "Trim-left-M-SD":
             energy_scores.sort()
             energy_scores_trimmed = energy_scores[n_to_trim:]
             mean = np.mean(energy_scores_trimmed)
-            stdev = np.std(energy_scores_trimmed)
+            stdev = np.std(energy_scores_trimmed, ddof=1)
             stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
             sterr = stdev / np.sqrt(len(energy_scores_trimmed))
         else:
