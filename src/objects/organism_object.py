@@ -30,7 +30,7 @@ class OrganismObject:
         Args:
             _id: Organism identifier (assigned by factory)
             conf: Organism-specific configuration values from JSON file
-            self.pwm_length: Maximum column size of the pssm recognizer
+            max_pssm_length: Maximum number of columns per PSSM recognizer
 	    [will prevent mutations from going over max pssm length]
         """
         self._id = _id
@@ -88,8 +88,8 @@ class OrganismObject:
         self.min_nodes = conf["MIN_NODES"]
         self.max_nodes = conf["MAX_NODES"]
         
-        # maximum length of PSSMs allowed
-        self.max_pssm_length = max_pssm_length
+        # !!! maximum length of PSSMs allowed
+        # self.max_pssm_length = max_pssm_length
         
         # Map used by the placement algorithm
         # The list maps each row of the matrix of the placement scores onto a
@@ -333,7 +333,6 @@ class OrganismObject:
             org_factory (OrganismFactory): Factory of organisms and node
                                            components
         """
-
         
         # Deletion
         if random.random() < self.mutate_probability_delete_recognizer:
@@ -353,6 +352,41 @@ class OrganismObject:
         # alignment matrix anew
         self.set_row_to_pssm()
         self.flatten()
+    
+    def check_size(self, org_factory):
+        '''
+        Checks that the organism complies with the constraints specified in the
+        config file. If the organism doesn't comply, instead of killing it (which
+        means that the parent it's paired with doesn't have a competitor), the
+        organism is modified as necessary to make it acceptable.
+        
+        Constraints:
+            - the number of nodes in the organism
+            - the total "coverage", i.e., the sum of the lengths of the recognizers
+        
+        '''
+        
+        edited = False
+        
+        # If the number of nodes exceeded the maximum allowed, prune the organism
+        while self.count_nodes() > self.max_nodes:
+            self.delete_recognizer()
+            edited = True
+        
+        # If the number of nodes is not sufficient, insert recognizers
+        while self.count_nodes() < self.min_nodes:
+            self.insert_recognizer(org_factory)
+            edited = True
+        
+        # XXX
+        # Put here the code for check on "coverage", i.e., sum of lengths of recognizers
+        # ...
+        # ...
+        
+        # Update
+        if edited:
+            self.set_row_to_pssm()
+            self.flatten()
     
     def delete_recognizer(self):
         '''
@@ -507,153 +541,163 @@ class OrganismObject:
               connector before the insertion ("intelligent" method).
         '''
         
+        
+        
         # instantiate the new recognizer and the new connector
         new_connector = org_factory.create_connector()
         new_recognizer = org_factory.create_recognizer()
-       
-        # "blind" method: pre-existing connector linked to the new inserted
-        # recognizer is left unmodified
-        if self.insertion_method == "blind":
-            
-            n_recognizers = self.count_recognizers()
-            # Choose randomly the recognizer next to which the insertion
-            # is going to occur
-            recognizer_idx = random.randint(0, n_recognizers - 1)
-            # Choose randomly whether the insertion is going to be to the
-            # left or to the right of the considered recognizer
-            
-            if random.random() < 0.5:  # Insertion occurs to the left
-                # First connector after insertion point and first
-                # recognizer after insertion point
-                connector_idx = recognizer_idx
+        
+        # Special case for empty organism.
+        # This can happen after a recombination event where all the parental
+        # nodes were assigned to the other child, leaving this child empty
+        if self.count_recognizers() == 0:
+            # In this case, the connector must not be added
+            self.recognizers.append(new_recognizer)
+        
+        else:
+            # "blind" method: pre-existing connector linked to the new inserted
+            # recognizer is left unmodified
+            if self.insertion_method == "blind":
                 
-            else:  # Insertion occurs to the right
-                # First connector after insertion point
-                connector_idx = recognizer_idx
-                # First recognizer after insertion point
-                recognizer_idx += 1
+                n_recognizers = self.count_recognizers()
+                # Choose randomly the recognizer next to which the insertion
+                # is going to occur
+                recognizer_idx = random.randint(0, n_recognizers - 1)
+                # Choose randomly whether the insertion is going to be to the
+                # left or to the right of the considered recognizer
                 
-            # recreate arrays of connectors/recognizers, adding
-            # the newly minted recognizer+connector
-            new_recognizers = (self.recognizers[:recognizer_idx] +
-                               [new_recognizer] +
-                               self.recognizers[recognizer_idx:])
-            new_connectors = (self.connectors[:connector_idx] +
-                               [new_connector] +
-                               self.connectors[connector_idx:])
+                if random.random() < 0.5:  # Insertion occurs to the left
+                    # First connector after insertion point and first
+                    # recognizer after insertion point
+                    connector_idx = recognizer_idx
+                    
+                else:  # Insertion occurs to the right
+                    # First connector after insertion point
+                    connector_idx = recognizer_idx
+                    # First recognizer after insertion point
+                    recognizer_idx += 1
+                    
+                # recreate arrays of connectors/recognizers, adding
+                # the newly minted recognizer+connector
+                new_recognizers = (self.recognizers[:recognizer_idx] +
+                                   [new_recognizer] +
+                                   self.recognizers[recognizer_idx:])
+                new_connectors = (self.connectors[:connector_idx] +
+                                   [new_connector] +
+                                   self.connectors[connector_idx:])
+                
+                # assign new connector/recognizer arrays
+                self.recognizers = new_recognizers
+                self.connectors = new_connectors
+                
+                
+            # "intelligent" method: the pre-existing connector and the new one are
+            # "shrinked" so that together they model a spacer "equivalent" to
+            # the one modeled by the connector previously occupying the space
+            # where the new recognizer has been inserted
+            elif self.insertion_method == "intelligent":
+                
+                n_recognizers = self.count_recognizers()
+                # Choose randomly the recognizer next to which the insertion
+                # is going to occur
+                recognizer_idx = random.randint(0, n_recognizers - 1)
+                
+                # set no compression as default (for terminal insertion cases)
+                connector_to_compress = None
+                
+                # Choose randomly whether the insertion is going to be to the
+                # left or to the right of the considered recognizer
+                if random.random() < 0.5:  # Insertion occurs to the left
+                    # First connector after insertion point and first
+                    # recognizer after insertion point
+                    connector_idx = recognizer_idx
+                    
+                	# if the new recognizer is NOT the first in the chain
+                    if recognizer_idx != 0:
+                        connector_to_compress = recognizer_idx - 1
+                        # (No compression is required if insertion occurs to
+                        # the left of the first recognizer of the chain)
+                
+                else:  # Insertion occurs to the right
+                    # First connector after insertion point
+                    connector_idx = recognizer_idx
+                    
+                	# if the new recognizer is NOT the last in the chain
+                    if recognizer_idx != n_recognizers - 1:
+                        connector_to_compress = recognizer_idx
+                        # (No compression is required if insertion occurs to
+                        # the right of the last recognizer of the chain)
+                        
+                        # First recognizer after insertion point
+                        recognizer_idx += 1
+                
+                # if connector needs to be "compressed" (not a terminal insertion)
+                if connector_to_compress != None:
+                    
+                    '''Ideally, we would like the sum of the mus of the two
+                    connectors (the old one and the inserted one) + the length
+                    of the inserted recognizer to be equal to the gap spanned
+                    by the pre-existing connector, so that the insertion
+                    doesn't heavily affect the placement of the nodes to the
+                    sides of the insertion point. So we need to shrink the
+                    mus and sigmas accordingly.'''
+                    
+                    # Adjust MUs approach
+                    ''' If the legth of the inserted recognizer alone is larger
+                    than the gap (i.e. larger than the mu of the already present
+                    connector) we can't reach the goal entirely and the best
+                    thing we can do is to keep the mus of the two connectors
+                    maximally shrinked. Otherwise, the mus of the connectors
+                    will be scaled so that their sum is equal to the gap (mu of
+                    the old connector) minus the length of the inserted
+                    recognizer.'''
+                    
+                    # Adjust SIGMAs approach
+                    ''' Variances are additive (under assumption of independence
+                    between the two random variables). Therefore, the overall
+                    variance will be the sum of the variances of the two
+                    connectors. The variances will be scaled so that their sum
+                    is equal to the variance of the connector that was already
+                    present before the insertion. The standard deviations,
+                    which are the square root of the variances, will be adjusted
+                    accordingly.'''
+                    
+                    # Define what the sum of the two mu values should be (expected_sum_mus)
+                    mu_old_connector = self.connectors[connector_to_compress]._mu
+                    expected_sum_mus = mu_old_connector - new_recognizer.length
+                    # If the inserted recognizer alone is larger than the gap
+                    if expected_sum_mus < 0:
+                        # best thing we can do is to maximally shrink mus
+                        expected_sum_mus = 0
+                    # Define what the variance of the total span should be (it
+                    # should be equal to the variance of the pre-existing connector)
+                    expected_var = self.connectors[connector_to_compress]._sigma ** 2
+                    # Updated values for the two connectors that need compression
+                    preexisting, inserted = self.compress_connectors(expected_sum_mus, expected_var)
+                    # Update parameters of pre-existing connector
+                    self.connectors[connector_to_compress].set_mu(preexisting[0])
+                    self.connectors[connector_to_compress].set_sigma(preexisting[1])
+                    # Update paramters of inserted connector
+                    new_connector.set_mu(inserted[0])
+                    new_connector.set_sigma(inserted[1])
+                        
+                # recreate arrays of connectors/recognizers, adding
+                # the newly minted recognizer+connector and containing
+                # also the "compressed" existing connector
+                new_recognizers = (self.recognizers[:recognizer_idx] +
+                                   [new_recognizer] +
+                                   self.recognizers[recognizer_idx:])
+                new_connectors = (self.connectors[:connector_idx] +
+                                   [new_connector] +
+                                   self.connectors[connector_idx:])
+            
+            else:
+                raise ValueError('INSERTION_METHOD in the config should be ' +
+                                 '"blind" or "intelligent".')
             
             # assign new connector/recognizer arrays
             self.recognizers = new_recognizers
             self.connectors = new_connectors
-            
-            
-        # "intelligent" method: the pre-existing connector and the new one are
-        # "shrinked" so that together they model a spacer "equivalent" to
-        # the one modeled by the connector previously occupying the space
-        # where the new recognizer has been inserted
-        elif self.insertion_method == "intelligent":
-            
-            n_recognizers = self.count_recognizers()
-            # Choose randomly the recognizer next to which the insertion
-            # is going to occur
-            recognizer_idx = random.randint(0, n_recognizers - 1)
-            
-            # set no compression as default (for terminal insertion cases)
-            connector_to_compress = None
-            
-            # Choose randomly whether the insertion is going to be to the
-            # left or to the right of the considered recognizer
-            if random.random() < 0.5:  # Insertion occurs to the left
-                # First connector after insertion point and first
-                # recognizer after insertion point
-                connector_idx = recognizer_idx
-                
-            	# if the new recognizer is NOT the first in the chain
-                if recognizer_idx != 0:
-                    connector_to_compress = recognizer_idx - 1
-                    # (No compression is required if insertion occurs to
-                    # the left of the first recognizer of the chain)
-            
-            else:  # Insertion occurs to the right
-                # First connector after insertion point
-                connector_idx = recognizer_idx
-                
-            	# if the new recognizer is NOT the last in the chain
-                if recognizer_idx != n_recognizers - 1:
-                    connector_to_compress = recognizer_idx
-                    # (No compression is required if insertion occurs to
-                    # the right of the last recognizer of the chain)
-                    
-                    # First recognizer after insertion point
-                    recognizer_idx += 1
-            
-            # if connector needs to be "compressed" (not a terminal insertion)
-            if connector_to_compress != None:
-                
-                '''Ideally, we would like the sum of the mus of the two
-                connectors (the old one and the inserted one) + the length
-                of the inserted recognizer to be equal to the gap spanned
-                by the pre-existing connector, so that the insertion
-                doesn't heavily affect the placement of the nodes to the
-                sides of the insertion point. So we need to shrink the
-                mus and sigmas accordingly.'''
-                
-                # Adjust MUs approach
-                ''' If the legth of the inserted recognizer alone is larger
-                than the gap (i.e. larger than the mu of the already present
-                connector) we can't reach the goal entirely and the best
-                thing we can do is to keep the mus of the two connectors
-                maximally shrinked. Otherwise, the mus of the connectors
-                will be scaled so that their sum is equal to the gap (mu of
-                the old connector) minus the length of the inserted
-                recognizer.'''
-                
-                # Adjust SIGMAs approach
-                ''' Variances are additive (under assumption of independence
-                between the two random variables). Therefore, the overall
-                variance will be the sum of the variances of the two
-                connectors. The variances will be scaled so that their sum
-                is equal to the variance of the connector that was already
-                present before the insertion. The standard deviations,
-                which are the square root of the variances, will be adjusted
-                accordingly.'''
-                
-                # Define what the sum of the two mu values should be (expected_sum_mus)
-                mu_old_connector = self.connectors[connector_to_compress]._mu
-                expected_sum_mus = mu_old_connector - new_recognizer.length
-                # If the inserted recognizer alone is larger than the gap
-                if expected_sum_mus < 0:
-                    # best thing we can do is to maximally shrink mus
-                    expected_sum_mus = 0
-                # Define what the variance of the total span should be (it
-                # should be equal to the variance of the pre-existing connector)
-                expected_var = self.connectors[connector_to_compress]._sigma ** 2
-                # Updated values for the two connectors that need compression
-                preexisting, inserted = self.compress_connectors(expected_sum_mus, expected_var)
-                # Update parameters of pre-existing connector
-                self.connectors[connector_to_compress].set_mu(preexisting[0])
-                self.connectors[connector_to_compress].set_sigma(preexisting[1])
-                # Update paramters of inserted connector
-                new_connector.set_mu(inserted[0])
-                new_connector.set_sigma(inserted[1])
-                    
-            # recreate arrays of connectors/recognizers, adding
-            # the newly minted recognizer+connector and containing
-            # also the "compressed" existing connector
-            new_recognizers = (self.recognizers[:recognizer_idx] +
-                               [new_recognizer] +
-                               self.recognizers[recognizer_idx:])
-            new_connectors = (self.connectors[:connector_idx] +
-                               [new_connector] +
-                               self.connectors[connector_idx:])
-        
-        else:
-            raise ValueError('INSERTION_METHOD in the config should be ' +
-                             '"blind" or "intelligent".')
-        
-        # assign new connector/recognizer arrays
-        self.recognizers = new_recognizers
-        self.connectors = new_connectors
     
     def mutate_nodes(self, org_factory):
         '''

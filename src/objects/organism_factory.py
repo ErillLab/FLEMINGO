@@ -148,12 +148,13 @@ class OrganismFactory:
             return str(self._process_rank) + "_" + str(self._organism_counter)
 
     def get_organism(self) -> OrganismObject:
-        """It creates and returns a full organism datastructure
-           An organism contains essentially two lists:
-           - a recognizer list
-           - a connector list
-           The placement of these elements in the lists defines
-           implicitly the connections between the elements.
+        """
+        It creates and returns a full organism datastructure.
+        An organism contains essentially two lists:
+            - a recognizer list
+            - a connector list
+        The index of these elements in the lists defines implicitly the
+        connections between them.
 
         Returns:
             A new organism based on JSON config file
@@ -162,32 +163,39 @@ class OrganismFactory:
         # instantiates organism with organism configuration and pssm columns
         new_organism = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
         
-        # The number of recognizers of the organism is randomly chosen from a
-        # Poisson distribution with the lambda provided.
-        # The Poisson distribution is truncated to only allow integers larger than
-        # 0, so that null organisms are avoided. The truncation is achieved by using
-        # lambda - 1 instead of lambda (in this way the average number of
-        # recognizers will be lower by one unit) and then shifting up the
-        # values by one unit.
-        number_of_recognizers = np.random.poisson(self.num_recognizers_lambda_param - 1)
-        number_of_recognizers += 1
+        '''
+        The number of recognizer for the new organism is drawn from a Poisson
+        distribution. The Poisson distribution is shifted so that the lowest
+        bound is not 0, but `min_n_recogs`. The value of `min_n_recogs` is 1 unless
+        a larger number is required to comply with the parameter that specifies
+        the minimum number of nodes per organism in the config file. The shifted
+        Poisson distribution is constructed so that the average number of nodes
+        per organism matches the request from the config file.
+        In other words, the Poisson distribution is used to decide how many nodes
+        more than the minimum should an organism have, while ensureing the desired
+        average number of nodes.
+        However, if the number of recognizers drawn from the shifted Poisson
+        exceeds the maximum allowed by the config, it is set to the maximum.
+        '''
+        # Draw from shifted Poisson
+        min_n_recogs = int((new_organism.min_nodes + 1)/2)
+        n_recogs = np.random.poisson(self.num_recognizers_lambda_param - min_n_recogs)
+        n_recogs += min_n_recogs
+        # Check upper bound
+        max_n_recogs = int((new_organism.max_nodes + 1)/2)
+        n_recogs = min(n_recogs, max_n_recogs)
         
-        # avoid signle PSSM case, which breaks recombination operator, that 
-        # assumes at least one connector is present
-        if number_of_recognizers == 1:
-            number_of_recognizers += 1
-        
-        # for each recognizer in the organism
-        for i in range(number_of_recognizers - 1):
-            # instantiate new recognizer and append it to organism's recognizer list
+        # for each recognizer in the organism except for the last
+        for i in range(n_recogs - 1):
+            # Add one recognizer
             new_recognizer = self.create_recognizer(self.pwm_length)
             new_organism.recognizers.append(new_recognizer)
-            # instantiate new connector and append it to organism's connector list
+            # Add one connector
             _mu = random.randint(self.min_mu, self.max_mu)
             _sigma = random.randint(self.min_sigma, self.max_sigma)
             new_connector = ConnectorObject(_mu, _sigma, self.conf_con, self.max_seq_length)
             new_organism.connectors.append(new_connector)
-        # insert last recognizer in the chain and add it to list
+        # Add last recognizer
         new_recognizer = self.create_recognizer(self.pwm_length)
         new_organism.recognizers.append(new_recognizer)
         # Set attribute that will map organism nodes to alignment matrix rows
@@ -208,7 +216,6 @@ class OrganismFactory:
         new_connector = ConnectorObject(_mu, _sigma, self.conf_con, self.max_seq_length)
 
         return new_connector
-
 
     def create_recognizer(self, length = None):
         """Randomly creates either a PSSM or shape recognizer

@@ -227,6 +227,10 @@ def main():
                 child1.mutate(organism_factory)
                 child2.mutate(organism_factory)
             
+            # Check that new organisms comply with size contraints (modify them if necessary)
+            child1.check_size(organism_factory)
+            child2.check_size(organism_factory)
+            
             # Pair parents and offspring
             two_parent_child_pairs = pair_parents_and_children(org1, org2, child1, child2)
             
@@ -240,33 +244,16 @@ def main():
                 Therefore, the winner of the competition will replace element
                 i+j in  organism_population
                 '''
-
-                parent = two_parent_child_pairs[j][0]  # Parent Organism
-                child = two_parent_child_pairs[j][1]  # Child Organism
+                
+                parent, child = two_parent_child_pairs[j]
                 
                 p_fitness = parent.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
                                                negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
                                                FITNESS_FUNCTION, GAMMA)
-                c_fitness = child.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                              negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                              FITNESS_FUNCTION, GAMMA)
                 
-                if MAX_NODES != None:  # Upper_bound to complexity
-                    
-                    if parent.count_nodes() > MAX_NODES:
-                        p_fitness = -1000 * int(parent.count_nodes())
-                    
-                    if child.count_nodes() > MAX_NODES:
-                        c_fitness = -1000 * int(child.count_nodes())
-
-                if MIN_NODES != None:  # Lower_bound to complexity
-                    
-                    if parent.count_nodes() < MIN_NODES:
-                        p_fitness = -1000 * int(parent.count_nodes())
-                    
-                    if child.count_nodes() < MIN_NODES:
-                        c_fitness = -1000 * int(child.count_nodes())
-                
+                c_fitness = child.get_fitness( positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
+                                               negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
+                                               FITNESS_FUNCTION, GAMMA)
                 
                 # Competition
                 if p_fitness > c_fitness:
@@ -329,9 +316,9 @@ def main():
             s_time = "{}h:{}m:{:.2f}s".format(int(_h), int(_m), _s)
             print_ln(
                 (
-                    "Iter: {} AF:{:.2f} SDF:{:.2f} GF:{:.2f} AN:{:.2f}"
-                    + " - MO: {} MF: {:.2f} MN: {}"
-                    + " -  BO: {} BF: {:.2f} BN: {} Time: {}"
+                    "Iter: {} | AF:{:.2f} SDF:{:.2f} GF:{:.2f} AN:{:.2f}"
+                    + " | MO: {} MF: {:.2f} MN: {}"
+                    + " | BO: {} BF: {:.2f} BN: {} | Time: {}"
                 ).format(
                     iterations,  # "Iter"
                     mean_fitness,  # "AF"
@@ -375,14 +362,12 @@ def main():
                 filename = "{}_{}".format(time.strftime(timeformat), max_org._id)
                 export_organism(max_org, pos_set_for_export, filename, organism_factory)
             
-            # Periodic population export
+            # Periodic population export (+ update plot)
             if iterations % PERIODIC_POP_EXPORT == 0:
                 # Select a random positive DNA sequence to use for the population export
                 seq_idx = random.randint(0, len(pos_set_for_export)-1)
-                
                 export_population(organism_population, pos_set_for_export,
                                   organism_factory,iterations, seq_idx)
-                
                 # Export plot, too
                 export_plots()
         
