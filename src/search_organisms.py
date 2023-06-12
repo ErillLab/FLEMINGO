@@ -714,8 +714,6 @@ def set_up():
     global OUTPUT_FILENAME
     global PERIODIC_ORG_EXPORT
     global PERIODIC_POP_EXPORT
-    global MAX_NODES
-    global MIN_NODES
 
     # Config data
     global configOrganism
@@ -776,9 +774,7 @@ def set_up():
     OUTPUT_FILENAME = config["main"]["OUTPUT_FILENAME"]
     PERIODIC_ORG_EXPORT = config["main"]["PERIODIC_ORG_EXPORT"]
     PERIODIC_POP_EXPORT = config["main"]["PERIODIC_POP_EXPORT"]
-    MAX_NODES = config["organism"]["MAX_NODES"]
-    MIN_NODES = config["organism"]["MIN_NODES"]
-
+    
     # Create directory where the output and results will be stored
     if i_am_main_process():
         check_dir(RESULT_BASE_PATH_DIR)

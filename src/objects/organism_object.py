@@ -15,23 +15,21 @@ from .connector_object import g
 import _multiplacement
 
 class OrganismObject:
-    """Organism object
-       The Organism object essentially contains two vectors:
-       - A vector of connector objects
-       - A vector of recognizer objects
-       The order of the elements in these vectors determine, implicitly,
-       the connections between the elements (i.e. what recognizers a
-       particular connector is connecting)
     """
-
+    Organism object
+    The Organism object essentially contains two vectors:
+        - A vector of connector objects
+        - A vector of recognizer objects
+    The order of the elements in these vectors determine, implicitly, the
+    connections between the elements.
+    """
+    
     def __init__(self, _id: int, conf: dict) -> None:
         """Organism constructor
 
         Args:
             _id: Organism identifier (assigned by factory)
             conf: Organism-specific configuration values from JSON file
-            max_pssm_length: Maximum number of columns per PSSM recognizer
-	    [will prevent mutations from going over max pssm length]
         """
         self._id = _id
         
@@ -84,9 +82,9 @@ class OrganismObject:
             "MUTATE_PROBABILITY_NODE_MUTATION"
         ]
         
-        # min and maximum number of nodes allowed
-        self.min_nodes = conf["MIN_NODES"]
-        self.max_nodes = conf["MAX_NODES"]
+        # min and maximum number of recognizers allowed
+        self.min_n_recognizers = conf["MIN_N_RECOGNIZERS"]
+        self.max_n_recognizers = conf["MAX_N_RECOGNIZERS"]
         
         # !!! maximum length of PSSMs allowed
         # self.max_pssm_length = max_pssm_length
@@ -369,12 +367,12 @@ class OrganismObject:
         edited = False
         
         # If the number of nodes exceeded the maximum allowed, prune the organism
-        while self.count_nodes() > self.max_nodes:
+        while self.count_recognizers() > self.max_n_recognizers:
             self.delete_recognizer()
             edited = True
         
         # If the number of nodes is not sufficient, insert recognizers
-        while self.count_nodes() < self.min_nodes:
+        while self.count_recognizers() < self.min_n_recognizers:
             self.insert_recognizer(org_factory)
             edited = True
         
@@ -1235,7 +1233,6 @@ class OrganismObject:
 
 
     def get_placement(self, sequence: str) -> PlacementObject:
-
         """
         Calculates a placement for a given organism for a given sequence using
         the _multiplacement.calculate function.
@@ -1249,20 +1246,19 @@ class OrganismObject:
         Returns:
             PlacementObject containing information of optimal placement
         """
-
         # if the organism cannot be placed on the sequence, then it recieves a very low score
         # and is not attempted to be placed
         if self.sum_recognizer_lengths > len(sequence):
             placement = Placement(self._id, sequence)
             placement.set_energy(-1E100)
             return placement
-
+        
         num_recognizers = len(self.recognizers)
-
+        
         # max length represents the gap length until precomputation has been done for, -1 means
         # no precomputation has been done
         max_length = -1
-
+        
         # these arrays are allocated for the placement function to fill
         # gaps stores [starting position, gap_length_1, gap_length_2, ..., gap_length_n]
         # gap_scores stores the score associated with the gap length for the corresponding connector
@@ -1271,56 +1267,56 @@ class OrganismObject:
         gaps = np.empty(num_recognizers, dtype = np.dtype('i'))
         gap_scores = np.empty(num_recognizers - 1, dtype = np.dtype('d'))
         recognizer_scores = np.empty(num_recognizers + 1, dtype = np.dtype('d'))
-
+        
         # a temporary copy of the connector scores is made in case we need to rescale connector scores
         c_scores = np.copy(self.connectors_scores_flat)
         if num_recognizers > 1:
-
+            
             #this determines until what gap length has been precomputed for [this will probably be removed since everything is precomputed now]
             max_length = self.connectors[0].max_seq_length - 1
-
+            
             # this determines which connecters need to be rescaled and calls the function that rescales them
             # we rescale the scores for a connector when all pfs for gaps of length [0, sequence_length - minimum_length]
             # and mu > (length of sequence + 0.5)
             for i in range(len(self.connectors)):
-
+                
                 if float(len(sequence)) + 0.5 < self.connectors[i]._mu:
-
+                    
                     # idx is the greatest possible gap that the connector could have in the placement
                     idx = len(sequence) - self.sum_recognizer_lengths
-
+                    
                     # if the alternative model prediction for the gap of the maximum length is below our
                     # threshold then we rescale the scores for that connector
                     if self.connectors[i].stored_pdfs[idx] <= np.log(1E-15):
                         print("rescaling...")
                         self.adjust_connector_scores(i, c_scores, len(sequence))
-
+        
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), \
             self.recognizers_flat, self.recognizer_lengths,  c_scores, recognizer_scores, gap_scores, \
             gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
-
+        
         # parsing of the data from our placement function is done here
         # a placement object is instantiated and stores all of the scores that we obtained
         placement = PlacementObject(self._id, sequence)
         placement.set_energy(float(recognizer_scores[-1]))
         placement.set_recognizer_scores([float(score) for score in recognizer_scores[:-1]])
         placement.set_connectors_scores([float(score) for score in gap_scores])
-
+        
         # the starting and ending positions for each recognizer and connector are calculated
         # using the starting position, lengths of each recognizer, and size of each gap
         current_position = gaps[0]
         placement.set_recognizer_types(self.recognizer_types)
         for i in range(num_recognizers):
-
+            
             stop = current_position + self.recognizer_lengths[i]
             placement.append_recognizer_position([int(current_position), int(stop)])
             current_position += self.recognizer_lengths[i]
-
+            
             if i < num_recognizers - 1:
                 stop = current_position + gaps[i + 1]
                 placement.append_connector_position([int(current_position), int(stop)])
                 current_position += gaps[i + 1]
-       
+        
         return placement
 
     def set_sum_recognizer_lengths(self) -> None:

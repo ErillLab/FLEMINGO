@@ -37,12 +37,10 @@ class OrganismFactory:
         # Process rank (used to esure unique organism IDs when running in parallel mode)
         self._process_rank = p_rank
         self.max_seq_length = max_seq_length
-        #self._id = 0
-        # lambda parameter for Poisson distribution that will instantiate
-        # organism. lambda is the expected number of recognizers in the
-        # organism (and also its variance)
-        self.num_recognizers_lambda_param = conf_org_fac[
-            "NUM_RECOGNIZERS_LAMBDA_PARAM"
+        # lambda parameter for Poisson distribution used to instantiate organisms.
+        # lambda is the expected number of recognizers per organism
+        self.avg_n_recognizers_lambda = conf_org_fac[
+            "AVG_N_RECOGNIZERS_LAMBDA"
         ]
 
         self.recombination_probability = conf_org_fac["RECOMBINATION_PROBABILITY"]
@@ -115,7 +113,6 @@ class OrganismFactory:
         Returns:
             None
         
-            
         """
 
         if shape_object.null_models == {}:
@@ -178,11 +175,13 @@ class OrganismFactory:
         exceeds the maximum allowed by the config, it is set to the maximum.
         '''
         # Draw from shifted Poisson
-        min_n_recogs = int((new_organism.min_nodes + 1)/2)
-        n_recogs = np.random.poisson(self.num_recognizers_lambda_param - min_n_recogs)
+        #min_n_recogs = int((new_organism.min_nodes + 1)/2)
+        min_n_recogs = new_organism.min_n_recognizers
+        n_recogs = np.random.poisson(self.avg_n_recognizers_lambda - min_n_recogs)
         n_recogs += min_n_recogs
         # Check upper bound
-        max_n_recogs = int((new_organism.max_nodes + 1)/2)
+        #max_n_recogs = int((new_organism.max_nodes + 1)/2)
+        max_n_recogs = new_organism.max_n_recognizers
         n_recogs = min(n_recogs, max_n_recogs)
         
         # for each recognizer in the organism except for the last
