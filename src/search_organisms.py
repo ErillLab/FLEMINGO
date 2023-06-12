@@ -195,7 +195,7 @@ def main():
             negative_dataset = shuffle_dataset(negative_dataset)
         
         # Reset max_score
-        last_max_score = max_score
+        last_max_score = max_score  # !!! Obsolete code. To be deleted/updated
         max_score = float("-inf")
         changed_best_score = False
         initial = time.time()
@@ -241,47 +241,48 @@ def main():
                 i+j in  organism_population
                 '''
 
-                first_organism = two_parent_child_pairs[j][0]  # Parent Organism
-                second_organism = two_parent_child_pairs[j][1]  # Child Organism
+                parent = two_parent_child_pairs[j][0]  # Parent Organism
+                child = two_parent_child_pairs[j][1]  # Child Organism
                 
-                fitness1 = first_organism.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                      negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                      FITNESS_FUNCTION, GAMMA)
-                fitness2 = second_organism.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                       negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                       FITNESS_FUNCTION, GAMMA)
+                p_fitness = parent.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
+                                               negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
+                                               FITNESS_FUNCTION, GAMMA)
+                c_fitness = child.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
+                                              negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
+                                              FITNESS_FUNCTION, GAMMA)
                 
                 if MAX_NODES != None:  # Upper_bound to complexity
                     
-                    if first_organism.count_nodes() > MAX_NODES:
-                        fitness1 = -1000 * int(first_organism.count_nodes())
+                    if parent.count_nodes() > MAX_NODES:
+                        p_fitness = -1000 * int(parent.count_nodes())
                     
-                    if second_organism.count_nodes() > MAX_NODES:
-                        fitness2 = -1000 * int(second_organism.count_nodes())
+                    if child.count_nodes() > MAX_NODES:
+                        c_fitness = -1000 * int(child.count_nodes())
 
                 if MIN_NODES != None:  # Lower_bound to complexity
                     
-                    if first_organism.count_nodes() < MIN_NODES:
-                        fitness1 = -1000 * int(first_organism.count_nodes())
+                    if parent.count_nodes() < MIN_NODES:
+                        p_fitness = -1000 * int(parent.count_nodes())
                     
-                    if second_organism.count_nodes() < MIN_NODES:
-                        fitness2 = -1000 * int(second_organism.count_nodes())
+                    if child.count_nodes() < MIN_NODES:
+                        c_fitness = -1000 * int(child.count_nodes())
                 
                 
                 # Competition
-                if fitness1 > fitness2:  # The first organism wins (the parent wins)
-                    organism_population[i + j] = first_organism
-                    pop_id_list.append(first_organism)
-                    pop_fitness_list.append(fitness1)
-                    pop_n_nodes_list.append(first_organism.count_nodes())
+                if p_fitness > c_fitness:
+                    # The parent wins
+                    organism_population[i + j] = parent
+                    pop_id_list.append(parent)
+                    pop_fitness_list.append(p_fitness)
+                    pop_n_nodes_list.append(parent.count_nodes())
                 
-                else:  # The second organism wins (the child wins)
-                    organism_population[i + j] = second_organism
-                    pop_id_list.append(second_organism)
-                    pop_fitness_list.append(fitness2)
-                    pop_n_nodes_list.append(second_organism.count_nodes())
-                    
-
+                else:
+                    # The child wins
+                    organism_population[i + j] = child
+                    pop_id_list.append(child)
+                    pop_fitness_list.append(c_fitness)
+                    pop_n_nodes_list.append(child.count_nodes())
+                
                 # END FOR j
 
             # END FOR i
