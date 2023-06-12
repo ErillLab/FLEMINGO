@@ -338,12 +338,12 @@ class OrganismObject:
         # Deletion
         if random.random() < self.mutate_probability_delete_recognizer:
             # Delete a recognizer (and a connector)
-            self.delete_a_recognizer()
+            self.delete_recognizer()
         
         # Insertion
         if random.random() < self.mutate_probability_insert_recognizer:
             # Insert a recognizer (and a connector)
-            self.insert_a_recognizer(org_factory)
+            self.insert_recognizer(org_factory)
         
         # Node-mutations
         self.mutate_nodes(org_factory)
@@ -354,7 +354,7 @@ class OrganismObject:
         self.set_row_to_pssm()
         self.flatten()
     
-    def delete_a_recognizer(self):
+    def delete_recognizer(self):
         '''
         A randomly selected recognizer is deleted.
         
@@ -484,7 +484,7 @@ class OrganismObject:
                 raise ValueError('DELETION_METHOD in the config should be ' +
                                  '"blind" or "intelligent".')
     
-    def insert_a_recognizer(self, org_factory):
+    def insert_recognizer(self, org_factory):
         '''
         A new recognizer is inserted in a random position of the chain.
         
