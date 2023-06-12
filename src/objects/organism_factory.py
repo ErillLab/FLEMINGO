@@ -161,7 +161,7 @@ class OrganismFactory:
         """
         
         # instantiates organism with organism configuration and pssm columns
-        new_organism = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
+        new_organism = OrganismObject(self.get_id(), self.conf_org)
         
         '''
         The number of recognizer for the new organism is drawn from a Poisson
@@ -337,7 +337,7 @@ class OrganismFactory:
         for organism in organism_json:
 
             new_organism = OrganismObject(
-                self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"]
+                self.get_id(), self.conf_org
             )
             
             new_org_recognizers = []  # The recognizers are collected here
@@ -559,10 +559,10 @@ class OrganismFactory:
         '''
         
         # Initialize child 1 as an empty organism
-        child1 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
+        child1 = OrganismObject(self.get_id(), self.conf_org)
         
         # Initialize child 2 as an empty organism
-        child2 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
+        child2 = OrganismObject(self.get_id(), self.conf_org)
         
         # Place the parents on all the sequences in the sample of the positive set
         par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample)

@@ -24,7 +24,7 @@ class OrganismObject:
        particular connector is connecting)
     """
 
-    def __init__(self, _id: int, conf: dict, max_pssm_length: int) -> None:
+    def __init__(self, _id: int, conf: dict) -> None:
         """Organism constructor
 
         Args:
