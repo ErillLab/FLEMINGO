@@ -100,7 +100,8 @@ def main():
     """
     # Instantiate organism Factory object with object configurations
     max_seq_length = max([len(i) for i in (positive_dataset + negative_dataset)])
-    print(max_seq_length)
+    if i_am_main_process():
+        print("max_seq_length =", max_seq_length)
     organism_factory = OrganismFactory(
         configOrganism, configOrganismFactory, configConnector, configPssm, rank, configShape, max_seq_length
     )
@@ -160,19 +161,10 @@ def main():
     iterations = 0
     max_score = float("-inf")
     last_max_score = 0.0
-    # Organism with highest fitness in the simulation
-    best_organism = (
-        None,  # the organism object
-        -np.inf,  # its fitness
-        0  # number of nodes it is made of
-    )
-    # Organism with highest fitness in the iteration
-    max_organism = (
-        None,  # the organism object
-        -np.inf,  # its fitness
-        0  # number of nodes it is made of
-    )
     timeformat = "%Y-%m-%d--%H-%M-%S"
+    
+    best_org = None
+    best_org_fitness = -np.inf
     
     if i_am_main_process():
         print("Starting execution...")
@@ -180,15 +172,12 @@ def main():
     # Main loop, it iterates until organisms do not get a significant change
     # or MIN_ITERATIONS or MIN_FITNESS is reached.
 
-    while not is_finished(END_WHILE_METHOD, iterations, max_score, 
-                          last_max_score):
-        
+    while not is_finished(END_WHILE_METHOD, iterations, max_score, last_max_score):
         
         if i_am_main_process():
             # Shuffle population
             # Organisms are shuffled for deterministic crowding selection
-            random.shuffle(organism_population)        
-        
+            random.shuffle(organism_population)
         
         if RUN_MODE == 'parallel':
             # FRAGMENT AND SCATTER THE POPULATION
@@ -211,8 +200,9 @@ def main():
         changed_best_score = False
         initial = time.time()
         
-        a_fitness = []
-        a_nodes = []
+        pop_id_list = []
+        pop_fitness_list = []
+        pop_n_nodes_list = []
         
         # Deterministic crowding
         # Iterate over pairs of organisms
@@ -239,53 +229,6 @@ def main():
             
             # Pair parents and offspring
             two_parent_child_pairs = pair_parents_and_children(org1, org2, child1, child2)
-            
-            # # Make two pairs: each parent is paired with the more similar child
-            # # (the child with higher ratio of nodes from that parent).
-            # two_parent_child_pairs = []
-            # ''' `two_parent_child_pairs` is a list of two elements. The two parents
-            # we are now working with are elements i and i+1 in `organism_population`.
-            # We need to pair each of them with one of the two children obtained
-            # with the  get_children  method.
-            
-            #     - The first element in `two_parent_child_pairs` will be a tuple where
-            #       the first element is organism i, and the second one is a
-            #       child
-                  
-            #     - The second element in `two_parent_child_pairs` will be a tuple where
-            #       the first element is organism i+1, and the second one is the
-            #       other child
-            # '''
-            
-            # # get parent1/parent2 ratio for the children
-            # child1_p1p2_ratio = child1.get_parent1_parent2_ratio()
-            # child2_p1p2_ratio = child2.get_parent1_parent2_ratio()
-            
-            # # If a parent gets paired with an empty child, the empty child is
-            # # substituted by a deepcopy of the parent, i.e. the parent escapes
-            # # competition
-            # if child1_p1p2_ratio > child2_p1p2_ratio:
-            #     # org1 with child1
-            #     if child1.count_nodes() > 0:
-            #         two_parent_child_pairs.append( (org1, child1) )
-            #     else:
-            #         two_parent_child_pairs.append( (org1, copy.deepcopy(org1)) )
-            #     # org2 with child2
-            #     if child2.count_nodes() > 0:
-            #         two_parent_child_pairs.append( (org2, child2) )
-            #     else:
-            #         two_parent_child_pairs.append( (org2, copy.deepcopy(org2)) )
-            # else:
-            #     # org1 with child2
-            #     if child2.count_nodes() > 0:
-            #         two_parent_child_pairs.append( (org1, child2) )
-            #     else:
-            #         two_parent_child_pairs.append( (org1, copy.deepcopy(org1)) )
-            #     # org2 with child1
-            #     if child1.count_nodes() > 0:
-            #         two_parent_child_pairs.append( (org2, child1) )
-            #     else:
-            #         two_parent_child_pairs.append( (org2, copy.deepcopy(org2)) )
             
             # Make the two organisms in each pair compete
             # j index is used to re insert winning organism into the population
@@ -327,86 +270,56 @@ def main():
                 
                 # Competition
                 if fitness1 > fitness2:  # The first organism wins (the parent wins)
-                    # Set it back to the population and save fitness
-                    # for next iteration
                     organism_population[i + j] = first_organism
-                    a_fitness.append(fitness1)
-                    # If the parent wins, mean_nodes don't change
-                    a_nodes.append(first_organism.count_nodes())
-
-                    # Check if its the max score in that iteration
-                    if fitness1 > max_score:
-                        max_score = fitness1
-                        max_organism = (
-                            first_organism,
-                            fitness1,
-                            first_organism.count_nodes()
-                        )
-
-                    # Check if its the max score so far and if it is set it as
-                    # best organism
-                    if max_organism[1] > best_organism[1]:
-                        # ID, EF, Nodes, Penalty applied
-                        best_organism = max_organism
-                        changed_best_score = True
-
+                    pop_id_list.append(first_organism)
+                    pop_fitness_list.append(fitness1)
+                    pop_n_nodes_list.append(first_organism.count_nodes())
+                
                 else:  # The second organism wins (the child wins)
-                    # Set it back to the population and save fitness for next
-                    # iteration
                     organism_population[i + j] = second_organism
-                    a_fitness.append(fitness2)
-                    # If the child wins, update mean_nodes
-                    # mean_nodes = ((meanNodes * POPULATION_LENGTH) +
-                    # second_organism.count_nodes() -
-                    # first_organism.count_nodes()) / POPULATION_LENGTH
-                    a_nodes.append(second_organism.count_nodes())
-
-                    # Check if its the max score in that iteration
-                    if fitness2 > max_score:
-                        max_score = fitness2
-                        max_organism = (
-                            second_organism,
-                            fitness2,
-                            second_organism.count_nodes()
-                        )
-
-                    # Check if its the max score so far and if it is set it as
-                    # best organism
-                    if fitness2 > best_organism[1]:
-                        # ID, EF, Nodes, Penalty applied
-                        best_organism = max_organism
-                        changed_best_score = True
+                    pop_id_list.append(second_organism)
+                    pop_fitness_list.append(fitness2)
+                    pop_n_nodes_list.append(second_organism.count_nodes())
+                    
 
                 # END FOR j
 
             # END FOR i
         
         if RUN_MODE == 'parallel':
-            # GATHER AND FLATTEN THE POPULATION
+            # MPI GATHER
             organism_population = comm.gather(organism_population, root=0)
             organism_population = flatten_population(organism_population)
             
-            # print to check that the population is correct
-            # This is just for code testing/debugging
-            # if rank == 0:
-            #     my_ids = [org._id for org in organism_population]
-            #     print("From process " + str(rank) + ": gathered pop is " + str(my_ids))
+            pop_fitness_list = comm.gather(pop_fitness_list, root=0)
+            pop_fitness_list = flatten_population(pop_fitness_list)
             
-            # Also gather a_fitness and a_nodes
-            a_fitness = comm.gather(a_fitness, root=0)
-            a_fitness = flatten_population(a_fitness)
-            a_nodes   = comm.gather(a_nodes,   root=0)
-            a_nodes   = flatten_population(a_nodes)
+            pop_n_nodes_list = comm.gather(pop_n_nodes_list,   root=0)
+            pop_n_nodes_list = flatten_population(pop_n_nodes_list)
+            
+            pop_id_list = comm.gather(pop_id_list, root=0)
+            pop_id_list = flatten_population(pop_id_list)
         
         if i_am_main_process():
             # Mean fitness in the population
-            mean_fitness = np.mean(a_fitness)
+            mean_fitness = np.mean(pop_fitness_list)
             # Standard deviation of fitness in the population
-            standard_dev_fitness = np.std(a_fitness)
+            standard_dev_fitness = np.std(pop_fitness_list)
             # Inequality of fitness in the population (measured with the Gini coefficient)
-            gini_fitness = gini_RSV(a_fitness)
+            gini_fitness = gini_RSV(pop_fitness_list)
             # Mean number of nodes per organism in the population
-            mean_nodes = np.mean(a_nodes)
+            mean_nodes = np.mean(pop_n_nodes_list)
+            
+            # `max_org`: Organism with highest fitness within current population
+            idx_of_max_org = np.argmax(pop_fitness_list)
+            max_org = organism_population[idx_of_max_org]
+            max_org_fitness = pop_fitness_list[idx_of_max_org]
+            
+            # `best_org`: Organism with highest fitness ever encountered in the run
+            if max_org_fitness >= best_org_fitness:
+                best_org = max_org
+                best_org_fitness = max_org_fitness
+                changed_best_score = True
             
             # Show IDs of final array
             # print("-"*10)
@@ -424,25 +337,24 @@ def main():
                     standard_dev_fitness,  # "SDF"
                     gini_fitness,  # "GF"
                     mean_nodes,  # "AN"
-                    max_organism[0]._id,  # "MO"
-                    max_organism[1],  # "MF" (fitness)
-                    max_organism[2],  # "MN" (nodes)
-                    best_organism[0]._id,  # "BO"
-                    best_organism[1],  # "BF" (fitness)
-                    best_organism[2],  # "BN" (nodes)
+                    max_org._id,  # "MO"
+                    max_org_fitness,  # "MF"
+                    max_org.count_nodes(),  # "MN"
+                    best_org._id,  # "BO"
+                    best_org_fitness,  # "BF"
+                    best_org.count_nodes(),  # "BN"
                     s_time,  # Time
                 ),
                 RESULT_BASE_PATH_DIR + OUTPUT_FILENAME,
             )
             
             # Print against a random positive sequence
-            placement = max_organism[0].get_placement(random.choice(positive_dataset))
+            placement = max_org.get_placement(random.choice(positive_dataset))
             placement.print_placement(stdout = True)
             
             # Print against a random negative sequence
-            placement = max_organism[0].get_placement(random.choice(negative_dataset))
+            placement = max_org.get_placement(random.choice(negative_dataset))
             placement.print_placement(stdout = True)
-            
             
             if RANDOM_SHUFFLE_SAMPLING_POS:
                 # If the dataset is shuffled, prepare a sorted version for the
@@ -453,33 +365,22 @@ def main():
             else:
                 pos_set_for_export = positive_dataset
             
-            
             # Export organism if new best organism
             if changed_best_score:
-                filename = "{}_{}".format(
-                    time.strftime(timeformat), best_organism[0]._id
-                )
-                export_organism(
-                    best_organism[0], pos_set_for_export, filename, organism_factory
-                )
+                filename = "{}_{}".format(time.strftime(timeformat), best_org._id)
+                export_organism(best_org, pos_set_for_export, filename, organism_factory)
             # Periodic organism export
             if iterations % PERIODIC_ORG_EXPORT == 0:
-                filename = "{}_{}".format(
-                    time.strftime(timeformat), max_organism[0]._id
-                )
-                export_organism(
-                    max_organism[0], pos_set_for_export, filename, organism_factory
-                )
+                filename = "{}_{}".format(time.strftime(timeformat), max_org._id)
+                export_organism(max_org, pos_set_for_export, filename, organism_factory)
             
             # Periodic population export
             if iterations % PERIODIC_POP_EXPORT == 0:
                 # Select a random positive DNA sequence to use for the population export
                 seq_idx = random.randint(0, len(pos_set_for_export)-1)
                 
-                export_population(
-                    organism_population, pos_set_for_export, organism_factory,
-                    iterations, seq_idx
-                )
+                export_population(organism_population, pos_set_for_export,
+                                  organism_factory,iterations, seq_idx)
                 
                 # Export plot, too
                 export_plots()
