@@ -23,7 +23,8 @@ class OrganismFactory:
     """Factory class
     """
 
-    def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank, conf_shape, max_seq_length) -> None:
+    def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank,
+                 conf_shape, min_seq_length, max_seq_length) -> None:
         """
         Instantiates an OrganismFactory object.
         Reads in the configuration paramaters for the factory and for all object
@@ -36,6 +37,8 @@ class OrganismFactory:
         self._organism_counter = 0
         # Process rank (used to esure unique organism IDs when running in parallel mode)
         self._process_rank = p_rank
+        # Length of shortest and longest DNA sequence
+        self.min_seq_length = min_seq_length
         self.max_seq_length = max_seq_length
         # lambda parameter for Poisson distribution used to instantiate organisms.
         # lambda is the expected number of recognizers per organism
@@ -175,12 +178,10 @@ class OrganismFactory:
         exceeds the maximum allowed by the config, it is set to the maximum.
         '''
         # Draw from shifted Poisson
-        #min_n_recogs = int((new_organism.min_nodes + 1)/2)
         min_n_recogs = new_organism.min_n_recognizers
         n_recogs = np.random.poisson(self.avg_n_recognizers_lambda - min_n_recogs)
         n_recogs += min_n_recogs
         # Check upper bound
-        #max_n_recogs = int((new_organism.max_nodes + 1)/2)
         max_n_recogs = new_organism.max_n_recognizers
         n_recogs = min(n_recogs, max_n_recogs)
         

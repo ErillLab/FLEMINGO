@@ -81,12 +81,13 @@ def main():
     else:
         # If no file was specified for negative set, it's generated from positive set
         if i_am_main_process():
+            # This is executed by process 0 (or by the only process if RUN_MODE is serial)
             print("Generateing negative set...")
             negative_dataset = generate_negative_set(positive_dataset)
         else:
             negative_dataset = None  # this will only happen in parallel runs
         if RUN_MODE == 'parallel':
-            # make sure all processes share the same negative set (the one of process 0)
+            # make sure all processes share the same negative set (the one made by process 0)
             negative_dataset = comm.bcast(negative_dataset, root=0)
 
     mean_nodes = 0
@@ -99,11 +100,14 @@ def main():
     Generate initial population
     """
     # Instantiate organism Factory object with object configurations
+    min_seq_length = min([len(i) for i in (positive_dataset + negative_dataset)])
     max_seq_length = max([len(i) for i in (positive_dataset + negative_dataset)])
     if i_am_main_process():
+        print("min_seq_length =", min_seq_length)
         print("max_seq_length =", max_seq_length)
     organism_factory = OrganismFactory(
-        configOrganism, configOrganismFactory, configConnector, configPssm, rank, configShape, max_seq_length
+        configOrganism, configOrganismFactory, configConnector, configPssm, rank,
+        configShape, min_seq_length, max_seq_length
     )
     
     # Initialize the population of organisms
@@ -695,8 +699,8 @@ def set_up():
     global RESULT_BASE_PATH_DIR
     global POSITIVE_FILENAME
     global NEGATIVE_FILENAME
-    global GENERATED_NEG_SET_SIZE  # XXX
-    global GENERATED_NEG_SET_KMER_LEN  # XXX
+    global GENERATED_NEG_SET_SIZE
+    global GENERATED_NEG_SET_KMER_LEN
     global RESULT_PATH_PATH_DIR
     global MAX_SEQUENCES_TO_FIT_POS
     global MAX_SEQUENCES_TO_FIT_NEG
@@ -704,7 +708,6 @@ def set_up():
     global RANDOM_SHUFFLE_SAMPLING_NEG
     global FITNESS_FUNCTION
     global GAMMA
-    global GENOME_LENGTH
     global MIN_ITERATIONS
     global MIN_FITNESS
     global THRESHOLD
@@ -763,7 +766,6 @@ def set_up():
     RANDOM_SHUFFLE_SAMPLING_NEG = config["main"]["RANDOM_SHUFFLE_SAMPLING_NEG"]
     FITNESS_FUNCTION = config["main"]["FITNESS_FUNCTION"]
     GAMMA = config["main"]["GAMMA"]
-    GENOME_LENGTH = config["main"]["GENOME_LENGTH"]
     MIN_ITERATIONS = config["main"]["MIN_ITERATIONS"]
     MIN_FITNESS = config["main"]["MIN_FITNESS"]
     THRESHOLD = config["main"]["THRESHOLD"]
