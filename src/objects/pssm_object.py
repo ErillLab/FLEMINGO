@@ -40,27 +40,14 @@ class PssmObject():
         self.type = 'pssm'
         
         # assign PSSM-specific configuration elements
-        self.mutate_probability_random_col = config[
-            "MUTATE_PROBABILITY_RANDOM_COL"
-        ]
-        self.mutate_probability_mutate_col = config[
-            "MUTATE_PROBABILITY_MUTATE_COL"
-        ]
-        self.mutate_probability_flip_cols = config[
-            "MUTATE_PROBABILITY_FLIP_COL"
-        ]
-        self.mutate_probability_flip_rows = config[
-            "MUTATE_PROBABILITY_FLIP_ROW"
-        ]
-        self.mutate_probability_shift = config[
-            "MUTATE_PROBABILITY_SHIFT"
-        ]
-        self.mutate_probability_increase_pwm = config[
-            "MUTATE_PROBABILITY_INCREASE_PWM"
-                ]
-        self.mutate_probability_decrease_pwm = config[
-            "MUTATE_PROBABILITY_DECREASE_PWM"
-                ]
+        self.mutate_probability_random_col = config["MUTATE_PROBABILITY_RANDOM_COL"]
+        self.mutate_probability_mutate_col = config["MUTATE_PROBABILITY_MUTATE_COL"]
+        self.mutate_probability_flip_cols = config["MUTATE_PROBABILITY_FLIP_COL"]
+        self.mutate_probability_flip_rows = config["MUTATE_PROBABILITY_FLIP_ROW"]
+        self.mutate_probability_shift = config["MUTATE_PROBABILITY_SHIFT"]
+        self.mutate_probability_increase_pwm = config["MUTATE_PROBABILITY_INCREASE_PWM"]
+        self.mutate_probability_decrease_pwm = config["MUTATE_PROBABILITY_DECREASE_PWM"]
+        
         self.min_columns = config["MIN_COLUMNS"]
         self.max_columns = config["MAX_COLUMNS"]
 
@@ -86,6 +73,8 @@ class PssmObject():
             org_factory (OrganismFactory)
         """
         
+        mutated = False
+        
         # Code to keep track if mutations that shift the boundaries of the
         # PSSM placement have occurred:
         # shift left / shift right / increase pwm / decrease pwm.
@@ -93,49 +82,69 @@ class PssmObject():
         
         # Randomize column
         if random.random() < self.mutate_probability_random_col:
-            self.randomize_column(org_factory)
+            self._randomize_column(org_factory)
+            mutated = True
         
         # Mutate column
         if random.random() < self.mutate_probability_mutate_col:
-            self.mutate_column(org_factory)
+            self._mutate_column(org_factory)
+            mutated = True
         
         # Flip columns
         if random.random() < self.mutate_probability_flip_cols:
-            self.flip_cols()
+            self._flip_cols()
+            mutated = True
         
         # Flip rows
         if random.random() < self.mutate_probability_flip_rows:
-            self.flip_rows()
+            self._flip_rows()
+            mutated = True
         
         # Shift left/right with rolling-over
         if random.random() < self.mutate_probability_shift:
-            self.shift(pssm_displacement_code)
+            self._shift(pssm_displacement_code)
+            mutated = True
         
         # Increase length
         if random.random() < self.mutate_probability_increase_pwm:
-            self.increase_length(pssm_displacement_code, org_factory)
+            self._increase_length(pssm_displacement_code, org_factory)
+            mutated = True
         
         # Decrease length
         if random.random() < self.mutate_probability_decrease_pwm:
-            self.decrease_length(pssm_displacement_code)
+            self._decrease_length(pssm_displacement_code)
+            mutated = True
+        
+        if mutated:
+            # Recompute PSSM. Mutation operators affect the PWM (frequency matrix),
+            # so the PSSM is re-computed after mutations take place
+            self.recalculate_pssm()
         
         # If the PSSM boundaries have changed, report the pssm-displacement
         # code, so that connectors can eventually be adjusted if necessary
         if pssm_displacement_code != [0, 0]:
             return pssm_displacement_code
     
-    def randomize_column(self, org_factory):
-        ''' Randomize PSSM column. Substitutes column with a random column. '''
+    def _randomize_column(self, org_factory):
+        '''
+        Randomize PSSM column. Substitutes column with a random column.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
+        '''
         # Select a random column
         column_to_update = random.randint(0, self.length - 1)
         # Substitute it with a new random column
         self.pwm[column_to_update] = org_factory.get_pwm_column()
-        
-        # Recompute PSSM. Mutation operators affect the PWM (frequency matrix),
-        # so the PSSM is re-computed after mutations take place
-        self.recalculate_pssm()
     
-    def mutate_column(self, org_factory):
+    def _mutate_column(self, org_factory):
         '''
         Mutate a column of the PSSM. The mutation involves transferring
         some of the weight from a "donor" base to an "acceptor" base.
@@ -143,6 +152,16 @@ class PssmObject():
         this way we ensure that the final frequencies are compatible with the
         virtual number of binding sites, i.e., the "PWM_NUM_OF_BINDING_SITES"
         paramter specified in the config file.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
         '''
         # Chose a random column of that PSSM
         idx_of_random_col = random.randint(0, self.length - 1)
@@ -187,8 +206,20 @@ class PssmObject():
         # so the PSSM is re-computed after mutations take place
         self.recalculate_pssm()
     
-    def flip_cols(self):
-        ''' Swaps two PSSM columns. '''
+    def _flip_cols(self):
+        '''
+        Swaps two PSSM columns.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
+        '''
         # Pick two columns to be swapped
         col1, col2 = random.sample(range(self.length), 2)
         tmp_col = self.pwm[col1]
@@ -199,8 +230,20 @@ class PssmObject():
         # so the PSSM is re-computed after mutations take place
         self.recalculate_pssm()
     
-    def flip_rows(self):
-        ''' Swaps two PSSM rows. '''
+    def _flip_rows(self):
+        '''
+        Swaps two PSSM rows.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
+        '''
         # Pick two rows (A, C, T or G) to be swapped
         base1, base2 = random.sample(["a", "c", "g", "t"], 2)
         # Swap rows
@@ -213,7 +256,7 @@ class PssmObject():
         # so the PSSM is re-computed after mutations take place
         self.recalculate_pssm()
     
-    def shift(self, pssm_displacement_code):
+    def _shift(self, pssm_displacement_code):
         '''
         Shifts with roll-over the PSSM.
         Example:
@@ -221,6 +264,16 @@ class PssmObject():
                 1,2,3,4,5
             After shifting towards the left the order of the columns is:
                 5,1,2,3,4
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
         '''
         # Shift to the left (50% probability)
         if random.random() < 0.5:
@@ -244,7 +297,7 @@ class PssmObject():
         # so the PSSM is re-computed after mutations take place
         self.recalculate_pssm()
     
-    def increase_length(self, pssm_displacement_code, org_factory):
+    def _increase_length(self, pssm_displacement_code, org_factory):
         '''
         Increase length of PSSM recognizer, by adding a column to the left or
         to the right.
@@ -253,6 +306,16 @@ class PssmObject():
         adjacent connectors accordingly.
         Example: if the PSSM grows one new column on the left, the connector on
         the left must reduce `mu` by one.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
         '''
         # do only if allowed
         if self.length < self.max_columns:
@@ -284,7 +347,7 @@ class PssmObject():
             # so the PSSM is re-computed after mutations take place
             self.recalculate_pssm()
     
-    def decrease_length(self, pssm_displacement_code):
+    def _decrease_length(self, pssm_displacement_code):
         '''
         Decrease length of PSSM recognizer, by removing a column to the left or
         to the right.
@@ -293,6 +356,16 @@ class PssmObject():
         adjacent connectors accordingly.
         Example: if the PSSM loses one column on the left, the connector on
         the left must increase `mu` by one.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
         '''
         # do only if allowed
         if self.length > self.min_columns:
