@@ -44,15 +44,8 @@ class OrganismObject:
         self.recognizer_bin_edges = []
         self.recognizer_bin_nums = []
         self.sum_recognizer_lengths = 0
-        # assign organism-specific parameters
-	
-        # whether fitness is computed over sequences as sum or average
-        self.is_precomputed = conf["PRECOMPUTE"]
-        self.cumulative_fit_method = conf["CUMULATIVE_FIT_METHOD"]
         
-        # energy thresholding parameters (to prevent negative energy values)
-        self.energy_threshold_method = conf["ENERGY_THRESHOLD_METHOD"]
-        self.energy_threshold_value = conf["ENERGY_THRESHOLD_PARAM"]
+        self.is_precomputed = conf["PRECOMPUTE"]
         
         # probability of replacing PSSM by random PSSM
         self.mutate_probability_substitute_pssm = conf[
@@ -377,15 +370,15 @@ class OrganismObject:
             edited = True
         
         # XXX
-        # while sum([r.length for r in self.recognizers]) > org_factory.min_seq_length:
-        #     # Choose a random recognizer and decrease its length
-        #     idx = random.randint(0, self.count_recognizers()-1)
-        #     displacement_code = self.recognizers[idx]._decrease_length([0, 0])
-        #     if displacement_code:
-        #         self.adjust_gaps_after_recog_bounds_displacement(idx, displacement_code)
-        #     else:
-        #         self.delete_recognizer(recognizer_idx=idx)
-        #     edited = True
+        while sum([r.length for r in self.recognizers]) > org_factory.min_seq_length:
+            # Choose a random recognizer and decrease its length
+            idx = random.randint(0, self.count_recognizers()-1)
+            displacement_code = self.recognizers[idx]._decrease_length([0, 0])
+            if displacement_code:
+                self.adjust_gaps_after_recog_bounds_displacement(idx, displacement_code)
+            else:
+                self.delete_recognizer(recognizer_idx=idx)
+            edited = True
         
         # Update organism
         if edited:
