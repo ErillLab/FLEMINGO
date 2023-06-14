@@ -75,10 +75,10 @@ class PssmObject():
         
         mutated = False
         
-        # Code to keep track if mutations that shift the boundaries of the
-        # PSSM placement have occurred:
-        # shift left / shift right / increase pwm / decrease pwm.
-        pssm_displacement_code = [0, 0]
+        # Mutations that can shift the boundaries of the PSSM placement
+        # (shift left / shift right / increase pwm / decrease pwm) will modify
+        # the values in `displacement_code`
+        displacement_code = [0, 0]  # left and right displacement (in bp)
         
         # Randomize column
         if random.random() < self.mutate_probability_random_col:
@@ -102,17 +102,17 @@ class PssmObject():
         
         # Shift left/right with rolling-over
         if random.random() < self.mutate_probability_shift:
-            self._shift(pssm_displacement_code)
+            self._shift(displacement_code)
             mutated = True
         
         # Increase length
         if random.random() < self.mutate_probability_increase_pwm:
-            self._increase_length(pssm_displacement_code, org_factory)
+            self._increase_length(displacement_code, org_factory)
             mutated = True
         
         # Decrease length
         if random.random() < self.mutate_probability_decrease_pwm:
-            self._decrease_length(pssm_displacement_code)
+            self._decrease_length(displacement_code)
             mutated = True
         
         if mutated:
@@ -122,8 +122,8 @@ class PssmObject():
         
         # If the PSSM boundaries have changed, report the pssm-displacement
         # code, so that connectors can eventually be adjusted if necessary
-        if pssm_displacement_code != [0, 0]:
-            return pssm_displacement_code
+        if displacement_code != [0, 0]:
+            return displacement_code
     
     def _randomize_column(self, org_factory):
         '''
@@ -201,10 +201,6 @@ class PssmObject():
         # Update pwm
         self.pwm[idx_of_random_col][donor_base] = donor_new_prob
         self.pwm[idx_of_random_col][acceptor_base] = acceptor_new_prob
-        
-        # Recompute PSSM. Mutation operators affect the PWM (frequency matrix),
-        # so the PSSM is re-computed after mutations take place
-        self.recalculate_pssm()
     
     def _flip_cols(self):
         '''
@@ -225,10 +221,6 @@ class PssmObject():
         tmp_col = self.pwm[col1]
         self.pwm[col1] = self.pwm[col2]
         self.pwm[col2] = tmp_col
-        
-        # Recompute PSSM. Mutation operators affect the PWM (frequency matrix),
-        # so the PSSM is re-computed after mutations take place
-        self.recalculate_pssm()
     
     def _flip_rows(self):
         '''
@@ -251,12 +243,8 @@ class PssmObject():
             tmp_base = self.pwm[i][base1]
             self.pwm[i][base1] = self.pwm[i][base2]
             self.pwm[i][base2] = tmp_base
-        
-        # Recompute PSSM. Mutation operators affect the PWM (frequency matrix),
-        # so the PSSM is re-computed after mutations take place
-        self.recalculate_pssm()
     
-    def _shift(self, pssm_displacement_code):
+    def _shift(self, displacement_code):
         '''
         Shifts with roll-over the PSSM.
         Example:
@@ -280,32 +268,28 @@ class PssmObject():
             # Shift PSSM from right to left, rolling over
             self.pwm = np.roll(self.pwm, 1)
             # The left bound of the PSSM shifts 1 bp to the left (-1)
-            pssm_displacement_code[0] -= 1
+            displacement_code[0] -= 1
             # The right bound of the PSSM shifts 1 bp to the left (-1)
-            pssm_displacement_code[1] -= 1
+            displacement_code[1] -= 1
         
         # Shift to the right (50% probability)
         else:
             # Shift PSSM from left to right, rolling over
             self.pwm = np.roll(self.pwm, -1)
             # The left bound of the PSSM shifts 1 bp to the right (+1)
-            pssm_displacement_code[0] += 1
+            displacement_code[0] += 1
             # The right bound of the PSSM shifts 1 bp to the right (+1)
-            pssm_displacement_code[1] += 1
-        
-        # Recompute PSSM. Mutation operators affect the PWM (frequency matrix),
-        # so the PSSM is re-computed after mutations take place
-        self.recalculate_pssm()
+            displacement_code[1] += 1
     
-    def _increase_length(self, pssm_displacement_code, org_factory):
+    def _increase_length(self, displacement_code, org_factory):
         '''
         Increase length of PSSM recognizer, by adding a column to the left or
         to the right.
-        The `pssm_displacement_code` is updated to report the shift of the
+        The `displacement_code` is updated to report the shift of the
         right / left bound of the PSSM. This info is used to adjust the
         adjacent connectors accordingly.
         Example: if the PSSM grows one new column on the left, the connector on
-        the left must reduce `mu` by one.
+        the left must reduce its `mu` by one.
         
         =======
         Warning
@@ -328,34 +312,30 @@ class PssmObject():
                 # Insert to the left
                 tmp_array = [new_col] + self.pwm.tolist()
                 
-                # The left bound of the PSSM shifts 1 bp to the left (-1)
-                pssm_displacement_code[0] -= 1
+                # The left bound ([0]) of the PSSM shifts 1 bp to the left (-1)
+                displacement_code[0] -= 1
                 
             else:
                 # Insert to the right
                 tmp_array = self.pwm.tolist() + [new_col]
                 
-                # The right bound of the PSSM shifts 1 bp to the right (+1)
-                pssm_displacement_code[1] += 1
+                # The right bound ([1]) of the PSSM shifts 1 bp to the right (+1)
+                displacement_code[1] += 1
 
             # assign newly made PWM
             self.pwm = np.array(tmp_array)
             # Update length attribute
             self.update_length()
-            
-            # Recompute PSSM. Mutation operators affect the PWM (frequency matrix),
-            # so the PSSM is re-computed after mutations take place
-            self.recalculate_pssm()
     
-    def _decrease_length(self, pssm_displacement_code):
+    def _decrease_length(self, displacement_code):
         '''
         Decrease length of PSSM recognizer, by removing a column to the left or
         to the right.
-        The `pssm_displacement_code` is updated to report the shift of the
+        The `displacement_code` is updated to report the shift of the
         right / left bound of the PSSM. This info is used to adjust the
         adjacent connectors accordingly.
         Example: if the PSSM loses one column on the left, the connector on
-        the left must increase `mu` by one.
+        the left must increase its `mu` by one.
         
         =======
         Warning
@@ -376,21 +356,17 @@ class PssmObject():
                 self.pwm = self.pwm[1:]
                 
                 # The left bound of the PSSM shifts 1 bp to the right (+1)
-                pssm_displacement_code[0] += 1
+                displacement_code[0] += 1
             
             else:
                 # Remove from the right
                 self.pwm = self.pwm[:-1]
                 
                 # The right bound of the PSSM shifts 1 bp to the left (-1)
-                pssm_displacement_code[1] -= 1
+                displacement_code[1] -= 1
             
             # Update length attribute
             self.update_length()
-            
-            # Recompute PSSM. Mutation operators affect the PWM (frequency matrix),
-            # so the PSSM is re-computed after mutations take place
-            self.recalculate_pssm()
     
     # Calculate self.pssm based on self.pwm
     def recalculate_pssm(self) -> None:
