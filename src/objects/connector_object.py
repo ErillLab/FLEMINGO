@@ -125,11 +125,6 @@ class ConnectorObject():
         a pseudo count is added to each interval in the pdfs. The cdfs have
         a pseudo count of (pseudo_count * j) added where j is the number of
         pdf bins that have had the pseudo count added so far.
-
-        Args:
-            None
-        Returns:
-            None
         """
         
         # Delete previous values

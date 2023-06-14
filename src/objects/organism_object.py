@@ -377,18 +377,26 @@ class OrganismObject:
             edited = True
         
         # XXX
-        # Put here the code for check on "coverage", i.e., sum of lengths of recognizers
-        # ...
-        # ...
+        # while sum([r.length for r in self.recognizers]) > org_factory.min_seq_length:
+        #     # Choose a random recognizer and decrease its length
+        #     idx = random.randint(0, self.count_recognizers()-1)
+        #     displacement_code = self.recognizers[idx]._decrease_length([0, 0])
+        #     if displacement_code:
+        #         self.adjust_gaps_after_recog_bounds_displacement(idx, displacement_code)
+        #     else:
+        #         self.delete_recognizer(recognizer_idx=idx)
+        #     edited = True
         
-        # Update
+        # Update organism
         if edited:
             self.set_row_to_pssm()
             self.flatten()
     
-    def delete_recognizer(self):
+    def delete_recognizer(self, recognizer_idx=None):
         '''
-        A randomly selected recognizer is deleted.
+        A randomly selected recognizer is deleted, unless the index of a
+        specific target recognizer to be deleted is provided (the `recognizer_idx`
+        argument).
         
         Connectors are adjusted as needed:
             
@@ -400,20 +408,27 @@ class OrganismObject:
               
               Note:
               Depending on the `deletion_method`, specified in the config, this
-              replacement can occur by randomly chosing which connector to keep
-              ("blind" method) or by merging their normal random variables into
-              a single new random variable with a mu and sigma that model the
-              spacer equivalently to the sum of the two pre-existing connectors
-              ("intelligent" method).
+              replacement can occur:
+                  
+                  A) by randomly chosing which connector to keep
+                     ("blind" method)
+                     
+                  B) by merging their normal random variables into a single new
+                     random variable with mu and sigma that model the spacer
+                     equivalently to the sum of the two pre-existing connectors
+                     ("intelligent" method).
         '''
         n_recognizers = self.count_recognizers()
         # if this is a single-node organism, skip deletion
         if n_recognizers > 1:
             
-        	# "blind" method: the remaining connector is left unchanged
-            if self.deletion_method == "blind":
+            if recognizer_idx is None:
                 # Choose randomly the recognizer to be deleted
                 recognizer_idx = random.randint(0, n_recognizers - 1)
+            
+        	# "blind" method: the remaining connector is left unchanged
+            if self.deletion_method == "blind":
+                
                 if recognizer_idx == 0:
                     # If the recognizer to delete is the first, the connector to
                     # delete is the one to the right
@@ -447,8 +462,7 @@ class OrganismObject:
  			# the connectors on the sides of the deleted recognizer into a
             # single larger connector
             elif self.deletion_method == "intelligent":
-                # Choose randomly the recognizer to be deleted
-                recognizer_idx = random.randint(0, n_recognizers - 1)
+                
                 if recognizer_idx == 0:
                     # If the recognizer to delete is the first, the connector to
                     # delete is the one to the right
@@ -724,7 +738,7 @@ class OrganismObject:
                     moved_pssm_bounds = self.recognizers[random_node_idx].mutate(org_factory)
                     # Adjust adjacent gaps if needed
                     if moved_pssm_bounds:
-                        self.adjust_gaps_after_pssm_bounds_displacement(
+                        self.adjust_gaps_after_recog_bounds_displacement(
                             random_node_idx, moved_pssm_bounds)
                 else:
                     # mutate a connector
@@ -740,60 +754,59 @@ class OrganismObject:
                 
                 # Adjust adjacent gaps if needed
                 if moved_pssm_bounds:
-                    self.adjust_gaps_after_pssm_bounds_displacement(i, moved_pssm_bounds)
+                    self.adjust_gaps_after_recog_bounds_displacement(i, moved_pssm_bounds)
             
             # Connectors
             for connector in self.connectors:
                 connector.mutate(org_factory)
 
-    def adjust_gaps_after_pssm_bounds_displacement(self, pssm_index,
-                                                   pssm_displacement_code):
+    def adjust_gaps_after_recog_bounds_displacement(self, recog_idx, displacement_code):
         '''
         For well-adapted organisms (organisms that have a consistent placement
-        strategy on the positive set) some PSSM mutations will produce a slight
-        change in the DNA positions occupied by the PSSMs. If the PSSM gets a
-        new column added to the left, and if there's a gap to the left of that
-        PSSM, the connector modeling that gap should decrease its mu by 1, so
-        that it mantains its optimality. Otherwise, the benefit of a good extra
-        PSSM column could be overcomed by the downsides of having the average
-        gap size off by 1 unit in the adjacent connector.
+        strategy on the positive set) some recognizer mutations will produce a
+        change in the DNA positions occupied by the recognizers.
+        Example: If a PSSM gets a new column added to the left, and if there's
+        a gap to the left of that PSSM, the connector modeling that gap should
+        decrease its mu by 1, so that it preserves its optimality. Otherwise,
+        the benefit of a good extra PSSM column could be overcomed by the
+        downsides of having the average gap size off by 1 unit in the adjacent
+        connector.
         
-        The PSSM mutations to be taken into account for this problem are:
+        The recognizer mutations to be taken into account for this problem are:
             - increase/decrease PSSM size
+            - increase/decrease SHAPE recognizer size
             - right/left shift of the PSSM
-        Those are the mutation that can produce some displacement of the PSSM's
-        bounds (the left and the right bounds). When they're called, a code is
-        generated, that keeps track of how the bounds have changed. This code
-        can be used as the second parameter of this function. The purpose of
-        this function is to adjust connectors according to those codes, so that
-        PSSMs are free to change size or shift without damaging adjacent
-        connectors.
+        Those are the mutation that can produce some displacement of the
+        recognizer's bounds (the left and the right bounds). When they're
+        called, a code is generated, that keeps track of how the bounds have
+        changed. This code is the second input argument of this function. The
+        purpose of this function is to adjust connectors according to those
+        codes, so that recognizers are free to change size or shift without
+        damaging the optimality of adjacent connectors.
 
         Parameters
         ----------
-        pssm_index : int
-            Index of the PSSM that has gone through some bound displacement.
-        pssm_displacement_code : list
+        recog_idx : int
+            Index of the recognizer that has gone through bounds displacement.
+        displacement_code : list
             It's a list of two integers. The first integer is the shift
-            occurred the left bound of the PSSM. The second integer is the
-            shift occurred to its right bound.
+            occurred the left bound of the recognizer. The second integer is
+            the shift occurred to its right bound.
             A positive shift means that the bound moved to the right, while a
             negative shift means a shift to the left.
-            These codes are generated when mutating a PSSM with its mutate()
-            method.
-
+            The `displacement_code` is generated when a recognizer is mutated
+            by its `mutate()` method.
         '''
         
-        left_bound_shift, right_bound_shift = pssm_displacement_code
+        left_bound_shift, right_bound_shift = displacement_code
         
         # If the LEFT bound has changed
         if left_bound_shift != 0:
             # Adjust connector to the left
-            conn_index = pssm_index - 1
+            conn_index = recog_idx - 1
             
-            # There's no connector the left of a PSSM that's the first
-            # recognizer of the organism (no connector with index -1), so check
-            # that the index is not -1.
+            # There's no connector to the left of the first recognizer
+            # (no connector with index -1), so check that the index is not -1.
             if conn_index >= 0:
                 # Adjust mu
                 new_mu = self.connectors[conn_index]._mu + left_bound_shift
@@ -805,11 +818,10 @@ class OrganismObject:
         # If the RIGHT bound has changed
         if right_bound_shift != 0:
             # Adjust connector to the right
-            conn_index = pssm_index
+            conn_index = recog_idx
             
-            # There's no connector the right of a PSSM that's the last
-            # recognizer of the organism, so check that the index is not equal
-            # to the number of connectors
+            # There's no connector to the right of the last recognizer
+            # so check that the index is not equal to the number of connectors
             if conn_index < self.count_connectors():
                 # Adjust mu
                 new_mu = self.connectors[conn_index]._mu - right_bound_shift
