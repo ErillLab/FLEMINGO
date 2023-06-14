@@ -122,6 +122,7 @@ def main():
             # For a random origin, we can generate #POPULATION_LENGTH organisms.
             for i in range(POPULATION_LENGTH):
                 new_organism = organism_factory.get_organism()
+                new_organism.check_size(organism_factory)  # XXX
                 organism_population.append(new_organism)
         elif POPULATION_ORIGIN.lower() == "file":
             #if the population is seeded from file
@@ -659,11 +660,11 @@ def i_am_main_process():
     return not rank
 
 
-def check_mpi_settings():
+def check_mpi_settings(p, config):
     ''' If the number of processes exceeds the number of pairs of organisms in
     the population, some processes will be left with an empty population. In
     that case, to avoid wasting computing power, an error is raised. '''
-    if p > int(POPULATION_LENGTH / 2):
+    if p > int(config["main"]["POPULATION_LENGTH"] / 2):
         raise ValueError("The minimum number of organisms assigned to each " +
                          "process is 2 (you need a pair for recombination events " +
                          "to take place). Thus, the maximum number of processes" +
@@ -732,23 +733,27 @@ def set_up():
 
     config = read_json_file(JSON_CONFIG_FILENAME)
     
-    POPULATION_LENGTH = config["main"]["POPULATION_LENGTH"]
-    if POPULATION_LENGTH % 2 != 0:
-        raise Exception("POPULATION_LENGTH must be an even number.")
-    
+    # Check the config settings and set up MPI if running in parallel
     RUN_MODE = config["main"]["RUN_MODE"]
     if RUN_MODE == "parallel":
         from mpi4py import MPI  # mpi4py is only imported if needed
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
         p = comm.Get_size()
-        check_mpi_settings()
+        check_mpi_settings(p, config)
+        # Check the settings in the config file
+        if rank==0:
+            check_config_settings(config)
+        # Make all processes wait for process 0 to complete the check
+        comm.Barrier()
     elif RUN_MODE == "serial":
         comm, rank, p = None, None, None
+        # Check the settings in the config file
+        check_config_settings(config)
     else:
-        raise ValueError('RUN_MODE should be "serial" or "parallel".')
+        raise ValueError('RUN_MODE should be "serial" or "parallel".')    
     
-    
+    POPULATION_LENGTH = config["main"]["POPULATION_LENGTH"]
     DATASET_BASE_PATH_DIR = config["main"]["DATASET_BASE_PATH_DIR"]
     if i_am_main_process():
         print('\n==================\nRUN_MODE: {}\n==================\n'.format(
@@ -834,19 +839,54 @@ def read_fasta_file(filename: str) -> list:
 
 
 def read_json_file(filename: str) -> dict:
-    """Reads a JSON file and returns a dictionary with the content
-
+    """Reads a JSON file and returns a dictionary with the content.
+    
     Args:
         filename: Name of the json file to read
-
     Returns:
         Dictionary with the json file info
-
     """
-
     with open(filename) as json_content:
-
         return json.load(json_content)
+
+
+def check_config_settings(config):
+    '''
+    Checks that the input parameters set in the config file are valid.
+    '''
+    
+    # Check that the population size is an even number
+    if config["main"]["POPULATION_LENGTH"] % 2 != 0:
+        raise Exception(("POPULATION_LENGTH must be an even number. " +
+                         "Please correct the settings."))
+    
+    # Check that min_n_recogs <= avg_n_recogs <= max_n_recogs
+    if (config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"] <
+        config["organism"]["MIN_N_RECOGNIZERS"]):
+        raise ValueError(("The average number of recognizers per organism " +
+                          "must be a valid one, i.e. between the minimum " +
+                          "and the maximum allowed (included). " +
+                          "AVG_N_RECOGNIZERS_LAMBDA was set to " +
+                          str(config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"]) +
+                          ", but MIN_N_RECOGNIZERS was set to " +
+                          str(config["organism"]["MIN_N_RECOGNIZERS"]) +
+                          ". Please correct the settings."))
+    elif (config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"] >
+        config["organism"]["MAX_N_RECOGNIZERS"]):
+        raise ValueError(("The average number of recognizers per organism " +
+                          "must be a valid one, i.e. between the minimum " +
+                          "and the maximum allowed (included). " +
+                          "AVG_N_RECOGNIZERS_LAMBDA was set to " +
+                          str(config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"]) +
+                          ", but MAX_N_RECOGNIZERS was set to " +
+                          str(config["organism"]["MAX_N_RECOGNIZERS"]) +
+                          ". Please correct the settings."))
+    
+    # Check that the fitness function is spelled correctly
+    if (config["main"]["FITNESS_FUNCTION"] not in
+        ["Welch", "Yuen", "Trim-left-M", "Trim-left-M-SD"]):
+        raise ValueError("Unknown fitness function. Please choose one of the " +
+                         "following: 'Welch', 'Yuen', 'Trim-left-M', 'Trim-left-M-SD'.")
 
 
 def print_config_json(config: dict, name: str, path: str) -> None:
