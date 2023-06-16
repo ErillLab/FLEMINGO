@@ -1002,7 +1002,7 @@ class OrganismFactory:
                                  p1_placements, p2_placements):
         '''
         This function is used to generate an appropriate connector to link two
-        recognizers of a child, when no one of the connectors of the parents
+        recognizers of a child, when no one of the connectors from the parents
         is appropriate.
 
         Parameters
@@ -1013,17 +1013,26 @@ class OrganismFactory:
             It identifies the recognizer to the right.
         p1_placements : list
             List of placements for parent 1.
+            Note:
+                Placements are assumed to be paired. I.e., p1_placements[i] and
+                p2_placements[i] are placements on the same DNA sequence
         p2_placements : list
             List of placements for parent 2.
-
+            Note:
+                Placements are assumed to be paired. I.e., p1_placements[i] and
+                p2_placements[i] are placements on the same DNA sequence
+        
         Returns
         -------
         synthetic_connector : ConnectorObject
-            A new connector, whose mu is the average distance between the left
-            and the right recognizers specified, observed in the provided
-            placements, and whose sigma is the standard deviation of the
-            observed distance in those same placements.
-
+            A new connector that connects the two input recognizers from two
+            different parents, for which we didn't have an available connector.
+            mu and sigma are inferred from the input placements. There are n
+            placements of parent 1 on n DNA sequences and n placements of
+            parent 2 on those same n DNA sequences. Therefore, for each of the
+            n DNA sequences, we can estimate the relative distance of those two
+            connectors. These stats are used to guess a reasonable value for mu
+            and sigma.
         '''
         # Get parent and node index that specify the left recognizer
         recog_left_parent, recog_left_idx = recog_left_name.split('_')
@@ -1032,8 +1041,9 @@ class OrganismFactory:
         recog_right_parent, recog_right_idx = recog_right_name.split('_')
         recog_right_idx = int(recog_right_idx)
         
+        n_DNA_sequences = len(p1_placements)
         gap_values = []
-        for i in range(len(p1_placements)):
+        for i in range(n_DNA_sequences):
             
             # Placement of the left recognizer
             if recog_left_parent == 'p1':
@@ -1054,23 +1064,32 @@ class OrganismFactory:
             gap = distance - 1
             gap_values.append(gap)
         
-        '''
-        # Estimate mu and sigma
-        avg_gap = sum(gap_values)/len(gap_values)
-        # Avoid negative mu values
-        if avg_gap < 0:
-            avg_gap = 0
-        '''
-        avg_gap = gap_values[0]
-        
-        
-        stdev_gap = np.std(gap_values)
+        # ESTIMATE SIGMA
+        # Compute sample standard deviation as an estimate for sigma
+        sigma = np.std(gap_values, ddof=1)
         # Avoid setting sigma to 0
-        if stdev_gap < 0.1:  # !!! temporarily hard-coded lower-bound
-            stdev_gap = 0.1
+        if sigma < 0.1:  # !!! temporarily hard-coded lower-bound
+            sigma = 0.1
         
-        synthetic_connector = ConnectorObject(avg_gap, stdev_gap, self.conf_con, self.max_seq_length)
-        return synthetic_connector
+        # ESTIMATE MU
+        '''
+        mu could be estimated as the average gap. However, due to the typically
+        small sample size, and the fact that in most use cases we expect several
+        gaps to be optimal and others to be random values (coming from bad
+        placements), we set mu to be equal to one of the gap values, instead of
+        the average. This will sometimes lead to bad mu estimates, but often
+        enough it will guess a clean estimate mu, avoiding the effect of bad
+        placements. Another approach to this problem could have been to use the
+        median instead of the average, but "bad placements" can produce
+        consistently small/consistently large gaps, so the median could easily
+        fail. Therefore we just choose one gap value to be our guess for mu.
+        '''
+        mu = gap_values[0]
+        # Avoid negative mu
+        mu = max(0, mu)
+        
+        # Return the synthetic connector
+        return ConnectorObject(mu, sigma, self.conf_con, self.max_seq_length)
     
     def get_recog_pos_on_DNA_seq(self, org_placement, recog_idx):
         '''
