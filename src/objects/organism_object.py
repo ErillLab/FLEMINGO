@@ -344,47 +344,6 @@ class OrganismObject:
         self.set_row_to_pssm()
         self.flatten()
     
-    def check_size(self, org_factory):
-        '''
-        Checks that the organism complies with the constraints specified in the
-        config file. If the organism doesn't comply, instead of killing it (which
-        means that the parent it's paired with doesn't have a competitor), the
-        organism is modified as necessary to make it acceptable.
-        
-        Constraints:
-            - the number of nodes in the organism
-            - the total "coverage", i.e., the sum of the lengths of the recognizers
-        
-        '''
-        
-        edited = False
-        
-        # If the number of nodes exceeded the maximum allowed, prune the organism
-        while self.count_recognizers() > self.max_n_recognizers:
-            self.delete_recognizer()
-            edited = True
-        
-        # If the number of nodes is not sufficient, insert recognizers
-        while self.count_recognizers() < self.min_n_recognizers:
-            self.insert_recognizer(org_factory)
-            edited = True
-        
-        # XXX
-        while sum([r.length for r in self.recognizers]) > org_factory.min_seq_length:
-            # Choose a random recognizer and decrease its length
-            idx = random.randint(0, self.count_recognizers()-1)
-            displacement_code = self.recognizers[idx]._decrease_length([0, 0])
-            if displacement_code:
-                self.adjust_gaps_after_recog_bounds_displacement(idx, displacement_code)
-            else:
-                self.delete_recognizer(recognizer_idx=idx)
-            edited = True
-        
-        # Update organism
-        if edited:
-            self.set_row_to_pssm()
-            self.flatten()
-    
     def delete_recognizer(self, recognizer_idx=None):
         '''
         A randomly selected recognizer is deleted, unless the index of a
@@ -412,116 +371,206 @@ class OrganismObject:
                      ("intelligent" method).
         '''
         n_recognizers = self.count_recognizers()
-        # if this is a single-node organism, skip deletion
-        if n_recognizers > 1:
-            
-            if recognizer_idx is None:
-                # Choose randomly the recognizer to be deleted
-                recognizer_idx = random.randint(0, n_recognizers - 1)
-            
-        	# "blind" method: the remaining connector is left unchanged
-            if self.deletion_method == "blind":
-                
-                if recognizer_idx == 0:
-                    # If the recognizer to delete is the first, the connector to
-                    # delete is the one to the right
-                    # ( same index: connector_idx = recognizer_idx = 0 )
-                    connector_idx = recognizer_idx
-                elif recognizer_idx == n_recognizers - 1:
-                    # If the recognizer to delete is the last, the connector to
-                    # delete is the one to the left
-                    # ( different index: connector_idx = recognizer_idx - 1 )
-                    connector_idx = recognizer_idx - 1
-                else:
-                    # if the recognizer to delete is in not a terminal recognizer
-                    # of the chain, the parent connector to be deleted (left/riht)
-                    # is chosen randomly
-                    if random.random() < 0.5:
-                        connector_idx = recognizer_idx
-                    else:
-                        connector_idx = recognizer_idx - 1
-                
-				# recreate arrays of recognizers and connectors
-				# skipping the recgonizer/connector selected for deletion
-                new_recognizers = (self.recognizers[:recognizer_idx] +
-                                   self.recognizers[recognizer_idx + 1:])
-                new_connectors = (self.connectors[:connector_idx] +
-                                   self.connectors[connector_idx + 1:])
-        		# assign new arrays
-                self.recognizers = new_recognizers
-                self.connectors = new_connectors
-            
- 			# "intelligent" method: a new connector is created by merging
- 			# the connectors on the sides of the deleted recognizer into a
-            # single larger connector
-            elif self.deletion_method == "intelligent":
-                
-                if recognizer_idx == 0:
-                    # If the recognizer to delete is the first, the connector to
-                    # delete is the one to the right
-                    # ( same index: connector_idx = recognizer_idx = 0 )
-                    connector_idx = recognizer_idx
-                elif recognizer_idx == n_recognizers - 1:
-                    # If the recognizer to delete is the last, the connector to
-                    # delete is the one to the left
-                    # ( different index: connector_idx = recognizer_idx - 1 )
-                    connector_idx = recognizer_idx - 1
-                else:
-                    # if the recognizer to delete is in not a terminal recognizer
-                    # of the chain, the parent connector to be deleted (left/right)
-                    # is chosen randomly
-                    if random.random() < 0.5:
-                        # Index of the parent connector that will be deleted
-                        connector_idx = recognizer_idx
-                        # Index of the parent connector that will be adjusted
-                        connector_to_stretch = recognizer_idx - 1
-                    else:
-                        # Index of the parent connector that will be deleted
-                        connector_idx = recognizer_idx - 1
-                        # Index of the parent connector that will be adjusted
-                        connector_to_stretch = recognizer_idx
-                    
-                    # Adjust parameters of the neighbour connector
-                    ''' The parent connector that is not deleted is modified,
-                    so that it can span the gap left by the deletion, without
-                    heavily affecting the placement of the nodes to the sides of
-                    the deletion point.'''
-                    
-                    # Adjust MU
-                    '''Thus, we need to add to the mu of the remaining connector
-                    also the mu of the deleted connector and the legth of the
-                    deleted recognizer.'''
-                    adj_mu = (self.connectors[connector_to_stretch]._mu +
-                              self.connectors[connector_idx]._mu +
-                              self.recognizers[recognizer_idx].length)
-                    
-                    # Adjust SIGMA
-                    ''' Variances are additive (under assumption of independence
-                    between the two random variables). Therefore to adjust the
-                    variance we need to add the variance of the deleted
-                    connector (the length of the deleted recognizer has no
-                    variance). Therefore, its standard deviation (sigma) becomes
-                    the square root of the sum of the squares of the sigmas.'''
-                    adj_sigma = (self.connectors[connector_to_stretch]._sigma ** 2 +
-                                self.connectors[connector_idx]._sigma ** 2)**(1/2)
-                    # set new mu and new sigma
-                    self.connectors[connector_to_stretch].set_mu(adj_mu)
-                    self.connectors[connector_to_stretch].set_sigma(adj_sigma)
-                
-				# recreate arrays of recognizers and connectors
-				# skipping the recgonizer/connector selected for deletion					
-                new_recognizers = (self.recognizers[:recognizer_idx] +
-                                   self.recognizers[recognizer_idx + 1:])
-                new_connectors = (self.connectors[:connector_idx] +
-                                   self.connectors[connector_idx + 1:])
-                
-        		# assign new arrays
-                self.recognizers = new_recognizers
-                self.connectors = new_connectors
-            
+        
+        # if this is a single-recognizer organism, no deletion occurs
+        if n_recognizers < 2:
+            return None
+        
+        # Unless specified, choose randomly the recognizer to be deleted
+        if recognizer_idx is None:
+            recognizer_idx = random.randint(0, n_recognizers - 1)
+        
+        connector_to_stretch = None
+        
+        # Establish what connector should be removed
+        if recognizer_idx == 0:
+            # If the recognizer to delete is the first, the connector to
+            # delete is the one to the right
+            # ( same index: connector_idx = recognizer_idx = 0 )
+            connector_idx = recognizer_idx
+        elif recognizer_idx == n_recognizers - 1:
+            # If the recognizer to delete is the last, the connector to
+            # delete is the one to the left
+            # ( different index: connector_idx = recognizer_idx - 1 )
+            connector_idx = recognizer_idx - 1
+        else:
+            # if the recognizer to delete is in not a terminal recognizer of
+            # the chain, the parent connector to be deleted (left/right) is
+            # chosen randomly
+            if random.random() < 0.5:
+                # Index of the parent connector that will be deleted
+                connector_idx = recognizer_idx
+                # Index of the parent connector that will be adjusted
+                connector_to_stretch = recognizer_idx - 1
             else:
-                raise ValueError('DELETION_METHOD in the config should be ' +
-                                 '"blind" or "intelligent".')
+                # Index of the parent connector that will be deleted
+                connector_idx = recognizer_idx - 1
+                # Index of the parent connector that will be adjusted
+                connector_to_stretch = recognizer_idx
+        
+        
+        
+        
+        # "intelligent" method: a new connector is created by merging the
+        # connectors on the sides of the deleted recognizer into a single
+        # larger connector
+        if self.deletion_method == "intelligent":
+            
+            if connector_to_stretch:
+                # Adjust parameters of the neighbour connector
+                ''' The parent connector that is not deleted is modified,
+                so that it can span the gap left by the deletion, without
+                heavily affecting the placement of the nodes to the sides of
+                the deletion point.'''
+                
+                # Adjust MU
+                '''Thus, we need to add to the mu of the remaining connector
+                also the mu of the deleted connector and the legth of the
+                deleted recognizer.'''
+                adj_mu = (self.connectors[connector_to_stretch]._mu +
+                          self.connectors[connector_idx]._mu +
+                          self.recognizers[recognizer_idx].length)
+
+                
+                # Adjust SIGMA
+                ''' Variances are additive (under assumption of independence
+                between the two random variables). Therefore to adjust the
+                variance we need to add the variance of the deleted connector
+                (the length of the deleted recognizer has no variance). Therefore,
+                its standard deviation (sigma) is the square root of the sum of the
+                squares of the sigmas. '''
+                adj_sigma = (self.connectors[connector_to_stretch]._sigma ** 2 +
+                            self.connectors[connector_idx]._sigma ** 2)**(1/2)
+                
+                # set new mu and new sigma
+                self.connectors[connector_to_stretch].set_mu(adj_mu)
+                self.connectors[connector_to_stretch].set_sigma(adj_sigma)
+        
+        # "blind" method: the remaining connector is left unchanged
+        elif self.deletion_method == "blind":
+            pass
+        
+        else:
+            raise ValueError(("Unknown deletion method. DELETION_METHOD should " +
+                              "be 'blind' or 'intelligent'. Please correct the " +
+                              "config file."))
+        
+        
+        # Recreate arrays of recognizers and connectors skipping the recgonizer
+        # and the connector selected for deletion				
+        new_recognizers = (self.recognizers[:recognizer_idx] +
+                           self.recognizers[recognizer_idx + 1:])
+        new_connectors =  (self.connectors[:connector_idx] +
+                           self.connectors[connector_idx + 1:])
+        
+        # assign new arrays
+        self.recognizers = new_recognizers
+        self.connectors = new_connectors
+        
+        
+#         # "blind" method: the remaining connector is left unchanged
+#         if self.deletion_method == "blind":
+            
+#             if recognizer_idx == 0:
+#                 # If the recognizer to delete is the first, the connector to
+#                 # delete is the one to the right
+#                 # ( same index: connector_idx = recognizer_idx = 0 )
+#                 connector_idx = recognizer_idx
+#             elif recognizer_idx == n_recognizers - 1:
+#                 # If the recognizer to delete is the last, the connector to
+#                 # delete is the one to the left
+#                 # ( different index: connector_idx = recognizer_idx - 1 )
+#                 connector_idx = recognizer_idx - 1
+#             else:
+#                 # if the recognizer to delete is in not a terminal recognizer
+#                 # of the chain, the parent connector to be deleted (left/riht)
+#                 # is chosen randomly
+#                 if random.random() < 0.5:
+#                     connector_idx = recognizer_idx
+#                 else:
+#                     connector_idx = recognizer_idx - 1
+            
+# 				# recreate arrays of recognizers and connectors
+# 				# skipping the recgonizer/connector selected for deletion
+#             new_recognizers = (self.recognizers[:recognizer_idx] +
+#                                self.recognizers[recognizer_idx + 1:])
+#             new_connectors = (self.connectors[:connector_idx] +
+#                                self.connectors[connector_idx + 1:])
+#     		# assign new arrays
+#             self.recognizers = new_recognizers
+#             self.connectors = new_connectors
+        
+#  			# "intelligent" method: a new connector is created by merging
+#  			# the connectors on the sides of the deleted recognizer into a
+#         # single larger connector
+#         elif self.deletion_method == "intelligent":
+            
+#             if recognizer_idx == 0:
+#                 # If the recognizer to delete is the first, the connector to
+#                 # delete is the one to the right
+#                 # ( same index: connector_idx = recognizer_idx = 0 )
+#                 connector_idx = recognizer_idx
+#             elif recognizer_idx == n_recognizers - 1:
+#                 # If the recognizer to delete is the last, the connector to
+#                 # delete is the one to the left
+#                 # ( different index: connector_idx = recognizer_idx - 1 )
+#                 connector_idx = recognizer_idx - 1
+#             else:
+#                 # if the recognizer to delete is in not a terminal recognizer
+#                 # of the chain, the parent connector to be deleted (left/right)
+#                 # is chosen randomly
+#                 if random.random() < 0.5:
+#                     # Index of the parent connector that will be deleted
+#                     connector_idx = recognizer_idx
+#                     # Index of the parent connector that will be adjusted
+#                     connector_to_stretch = recognizer_idx - 1
+#                 else:
+#                     # Index of the parent connector that will be deleted
+#                     connector_idx = recognizer_idx - 1
+#                     # Index of the parent connector that will be adjusted
+#                     connector_to_stretch = recognizer_idx
+                
+#                 # Adjust parameters of the neighbour connector
+#                 ''' The parent connector that is not deleted is modified,
+#                 so that it can span the gap left by the deletion, without
+#                 heavily affecting the placement of the nodes to the sides of
+#                 the deletion point.'''
+                
+#                 # Adjust MU
+#                 '''Thus, we need to add to the mu of the remaining connector
+#                 also the mu of the deleted connector and the legth of the
+#                 deleted recognizer.'''
+#                 adj_mu = (self.connectors[connector_to_stretch]._mu +
+#                           self.connectors[connector_idx]._mu +
+#                           self.recognizers[recognizer_idx].length)
+                
+#                 # Adjust SIGMA
+#                 ''' Variances are additive (under assumption of independence
+#                 between the two random variables). Therefore to adjust the
+#                 variance we need to add the variance of the deleted
+#                 connector (the length of the deleted recognizer has no
+#                 variance). Therefore, its standard deviation (sigma) becomes
+#                 the square root of the sum of the squares of the sigmas.'''
+#                 adj_sigma = (self.connectors[connector_to_stretch]._sigma ** 2 +
+#                             self.connectors[connector_idx]._sigma ** 2)**(1/2)
+#                 # set new mu and new sigma
+#                 self.connectors[connector_to_stretch].set_mu(adj_mu)
+#                 self.connectors[connector_to_stretch].set_sigma(adj_sigma)
+            
+# 				# recreate arrays of recognizers and connectors
+# 				# skipping the recgonizer/connector selected for deletion					
+#             new_recognizers = (self.recognizers[:recognizer_idx] +
+#                                self.recognizers[recognizer_idx + 1:])
+#             new_connectors = (self.connectors[:connector_idx] +
+#                                self.connectors[connector_idx + 1:])
+            
+#     		# assign new arrays
+#             self.recognizers = new_recognizers
+#             self.connectors = new_connectors
+        
+#         else:
+#             raise ValueError('DELETION_METHOD in the config should be ' +
+#                              '"blind" or "intelligent".')
     
     def insert_recognizer(self, org_factory):
         '''
@@ -823,7 +872,48 @@ class OrganismObject:
                 # Update connector's PDF and CDF values
                 self.connectors[conn_index].set_precomputed_pdfs_cdfs()
         self.flatten()
-
+    
+    def check_size(self, org_factory):
+        '''
+        Checks that the organism complies with the constraints specified in the
+        config file. If the organism doesn't comply, instead of killing it (which
+        means that the parent it's paired with doesn't have a competitor), the
+        organism is modified as necessary to make it acceptable.
+        
+        Constraints:
+            - the number of nodes in the organism
+            - the total "coverage", i.e., the sum of the lengths of the recognizers
+        
+        '''
+        
+        edited = False
+        
+        # If the number of nodes exceeded the maximum allowed, prune the organism
+        while self.count_recognizers() > self.max_n_recognizers:
+            self.delete_recognizer()
+            edited = True
+        
+        # If the number of nodes is not sufficient, insert recognizers
+        while self.count_recognizers() < self.min_n_recognizers:
+            self.insert_recognizer(org_factory)
+            edited = True
+        
+        # XXX
+        while sum([r.length for r in self.recognizers]) > org_factory.min_seq_length:
+            # Choose a random recognizer and decrease its length
+            idx = random.randint(0, self.count_recognizers()-1)
+            displacement_code = self.recognizers[idx]._decrease_length([0, 0])
+            if displacement_code:
+                self.adjust_gaps_after_recog_bounds_displacement(idx, displacement_code)
+            else:
+                self.delete_recognizer(recognizer_idx=idx)
+            edited = True
+        
+        # Update organism
+        if edited:
+            self.set_row_to_pssm()
+            self.flatten()
+    
     def get_M_and_SE_on_DNA_set(self, dna_set, method, gamma):
         '''
         Returns the mean and standard error to be used as input for the
@@ -1254,9 +1344,12 @@ class OrganismObject:
         # if the organism cannot be placed on the sequence, then it recieves a very low score
         # and is not attempted to be placed
         if self.sum_recognizer_lengths > len(sequence):
-            placement = Placement(self._id, sequence)
-            placement.set_energy(-1E100)
-            return placement
+            raise ValueError(("This shouldn't have happened. The check_size " +
+                              "function was supposed to prevent organisms from " +
+                              "getting 'too big'. Something is not working."))
+            # placement = Placement(self._id, sequence)
+            # placement.set_energy(-1E100)
+            # return placement
         
         num_recognizers = len(self.recognizers)
         
