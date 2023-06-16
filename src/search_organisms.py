@@ -111,59 +111,61 @@ def main():
     )
     
     # Initialize the population of organisms
-    if i_am_main_process():
-        
-        # Initialize list
-        organism_population = []
-        
-        # Generate population depending on origin and fill type.
-        # Origin can be "random" or "file"(read a set of organisms from a file).
-        if POPULATION_ORIGIN.lower() == "random":
-            # For a random origin, we can generate #POPULATION_LENGTH organisms.
-            for i in range(POPULATION_LENGTH):
-                new_organism = organism_factory.get_organism()
-                new_organism.check_size(organism_factory)  # XXX
-                organism_population.append(new_organism)
-        elif POPULATION_ORIGIN.lower() == "file":
-            #if the population is seeded from file
-            # Set the file organisms and fill with random/same organisms
-            # POPULATION_LENGTH must be >= len(fileOrganisms)
-            file_organisms = organism_factory.import_organisms(INPUT_FILENAME)
-            remaining_organisms = POPULATION_LENGTH - len(file_organisms)
-            fill_organism_population = []
+    organism_population = initialize_population(organism_factory)
     
-            if POPULATION_FILL_TYPE.lower() == "random":
-                # FILL remainder of the population WITH RANDOM organisms
-                for i in range(remaining_organisms):
-                    new_organism = organism_factory.get_organism()
-                    fill_organism_population.append(new_organism)
+    # if i_am_main_process():
+        
+    #     # Initialize list
+    #     organism_population = []
+        
+    #     # Generate population depending on origin and fill type.
+    #     # Origin can be "random" or "file"(read a set of organisms from a file).
+    #     if POPULATION_ORIGIN.lower() == "random":
+    #         # For a random origin, we can generate #POPULATION_LENGTH organisms.
+    #         for i in range(POPULATION_LENGTH):
+    #             new_organism = organism_factory.get_organism()
+    #             new_organism.check_size(organism_factory)
+    #             organism_population.append(new_organism)
+    #     elif POPULATION_ORIGIN.lower() == "file":
+    #         #if the population is seeded from file
+    #         # Set the file organisms and fill with random/same organisms
+    #         # POPULATION_LENGTH must be >= len(fileOrganisms)
+    #         file_organisms = organism_factory.import_organisms(INPUT_FILENAME)
+    #         remaining_organisms = POPULATION_LENGTH - len(file_organisms)
+    #         fill_organism_population = []
     
-            elif POPULATION_FILL_TYPE.lower() == "uniform":
-                # FILL the remainder of the population WITH ORGANISMS IN FILE
-                for i in range(remaining_organisms):
-                    new_organism = copy.deepcopy(
-                        file_organisms[i % len(file_organisms)]
-                    )
-                    fill_organism_population.append(new_organism)
-                    new_organism.set_id(organism_factory.get_id())
+    #         if POPULATION_FILL_TYPE.lower() == "random":
+    #             # FILL remainder of the population WITH RANDOM organisms
+    #             for i in range(remaining_organisms):
+    #                 new_organism = organism_factory.get_organism()
+    #                 fill_organism_population.append(new_organism)
+    
+    #         elif POPULATION_FILL_TYPE.lower() == "uniform":
+    #             # FILL the remainder of the population WITH ORGANISMS IN FILE
+    #             for i in range(remaining_organisms):
+    #                 new_organism = copy.deepcopy(
+    #                     file_organisms[i % len(file_organisms)]
+    #                 )
+    #                 fill_organism_population.append(new_organism)
+    #                 new_organism.set_id(organism_factory.get_id())
             
-            # join 
-            organism_population = file_organisms + fill_organism_population
+    #         # join 
+    #         organism_population = file_organisms + fill_organism_population
     
-        else:
-            raise Exception("Not a valid population origin, "
-                + "check the configuration file.")
+    #     else:
+    #         raise Exception("Not a valid population origin, "
+    #             + "check the configuration file.")
         
-        print("Population size =", len(organism_population))
+    #     print("Population size =", len(organism_population))
     
-    else:
-        organism_population = None
+    # else:
+    #     organism_population = None
     
     
     """
     Initialize iteration variables.
     """
-    iterations = 0
+    generation = 0
     max_score = float("-inf")
     last_max_score = 0.0
     timeformat = "%Y-%m-%d--%H-%M-%S"
@@ -173,11 +175,11 @@ def main():
     
     if i_am_main_process():
         print("Starting execution...")
-
+    
     # Main loop, it iterates until organisms do not get a significant change
     # or MIN_ITERATIONS or MIN_FITNESS is reached.
-
-    while not is_finished(END_WHILE_METHOD, iterations, max_score, last_max_score):
+    
+    while not is_finished(END_WHILE_METHOD, generation, max_score, last_max_score):
         
         if i_am_main_process():
             # Shuffle population
@@ -314,18 +316,17 @@ def main():
                 best_org_fitness = max_org_fitness
                 changed_best_score = True
             
-            # Show IDs of final array
-            # print("-"*10)
+            # Print info about the current generation
             _m, _s = divmod((time.time() - initial), 60)
             _h, _m = divmod(_m, 60)
             s_time = "{}h:{}m:{:.2f}s".format(int(_h), int(_m), _s)
             print_ln(
                 (
-                    "Iter: {} | AF:{:.2f} SDF:{:.2f} GF:{:.2f} AN:{:.2f}"
+                    "Generation {} | AF:{:.2f} SDF:{:.2f} GF:{:.2f} AN:{:.2f}"
                     + " | MO: {} MF: {:.2f} MN: {}"
                     + " | BO: {} BF: {:.2f} BN: {} | Time: {}"
                 ).format(
-                    iterations,  # "Iter"
+                    generation,  # "Generation"
                     mean_fitness,  # "AF"
                     standard_dev_fitness,  # "SDF"
                     gini_fitness,  # "GF"
@@ -363,22 +364,77 @@ def main():
                 filename = "{}_{}".format(time.strftime(timeformat), best_org._id)
                 export_organism(best_org, pos_set_for_export, filename, organism_factory)
             # Periodic organism export
-            if iterations % PERIODIC_ORG_EXPORT == 0:
+            if generation % PERIODIC_ORG_EXPORT == 0:
                 filename = "{}_{}".format(time.strftime(timeformat), max_org._id)
                 export_organism(max_org, pos_set_for_export, filename, organism_factory)
             
             # Periodic population export (+ update plot)
-            if iterations % PERIODIC_POP_EXPORT == 0:
+            if generation % PERIODIC_POP_EXPORT == 0:
                 # Select a random positive DNA sequence to use for the population export
                 seq_idx = random.randint(0, len(pos_set_for_export)-1)
                 export_population(organism_population, pos_set_for_export,
-                                  organism_factory,iterations, seq_idx)
+                                  organism_factory,generation, seq_idx)
                 # Export plot, too
                 export_plots()
         
-        iterations += 1
+        generation += 1
         # END WHILE
 
+
+def initialize_population(organism_factory):
+    '''
+    !!! Docstring here ...
+    '''
+    # Initialize the population of organisms
+    if i_am_main_process():
+        
+        # Initialize list
+        organism_population = []
+        
+        # Generate population depending on origin and fill type.
+        # Origin can be "random" or "file"(read a set of organisms from a file).
+        if POPULATION_ORIGIN.lower() == "random":
+            # For a random origin, we can generate #POPULATION_LENGTH organisms.
+            for i in range(POPULATION_LENGTH):
+                new_organism = organism_factory.get_organism()
+                new_organism.check_size(organism_factory)  # XXX
+                organism_population.append(new_organism)
+        elif POPULATION_ORIGIN.lower() == "file":
+            #if the population is seeded from file
+            # Set the file organisms and fill with random/same organisms
+            # POPULATION_LENGTH must be >= len(fileOrganisms)
+            file_organisms = organism_factory.import_organisms(INPUT_FILENAME)
+            remaining_organisms = POPULATION_LENGTH - len(file_organisms)
+            fill_organism_population = []
+    
+            if POPULATION_FILL_TYPE.lower() == "random":
+                # FILL remainder of the population WITH RANDOM organisms
+                for i in range(remaining_organisms):
+                    new_organism = organism_factory.get_organism()
+                    fill_organism_population.append(new_organism)
+    
+            elif POPULATION_FILL_TYPE.lower() == "uniform":
+                # FILL the remainder of the population WITH ORGANISMS IN FILE
+                for i in range(remaining_organisms):
+                    new_organism = copy.deepcopy(
+                        file_organisms[i % len(file_organisms)]
+                    )
+                    fill_organism_population.append(new_organism)
+                    new_organism.set_id(organism_factory.get_id())
+            
+            # join 
+            organism_population = file_organisms + fill_organism_population
+    
+        else:
+            raise Exception("Not a valid population origin, "
+                + "check the configuration file.")
+        
+        print("Population size =", len(organism_population))
+    
+    else:
+        organism_population = None
+    
+    return organism_population
 
 def pair_parents_and_children(parent1, parent2, child1, child2):
     '''
@@ -432,7 +488,7 @@ def shuffle_dataset(dataset: list) -> list:
     parallel mode. Indeed, we want all the processes to compute fitness on the
     same subset, defined as dataset[:MAX_SEQUENCES_TO_FIT_***]. So we want the
     processes to share the same random permutation of the datset. This function
-    ensures that by MPI broadcasting the indexes that define the permutation,
+    ensures that, by MPI broadcasting the indexes that define the permutation,
     instead of broadcasting the shuffled dataset of sequences.
     '''
     indexes = list(range(len(dataset)))
@@ -504,7 +560,7 @@ def generate_negative_set(positive_set: list) -> list:
 
 
 def is_finished(
-        method: str, iterations: int, max_score: float, last_max_score: float
+        method: str, generation: int, max_score: float, last_max_score: float
 ) -> bool:
     """Checks if main while loop is finished
     methods: 'Iterations', 'minScore', 'Threshold'
@@ -513,7 +569,7 @@ def is_finished(
         method: Name of the finishing method
         max_score: max score recorded on the current iteration
         last_max_score: max score recorded on the laset iteration
-        iterations: Number of the current iteration
+        generation: Number of the current iteration
 
     Returns:
         True if program should finnish.
@@ -521,7 +577,7 @@ def is_finished(
     """
 
     if method.lower() == "iterations":
-        return iterations >= MIN_ITERATIONS
+        return generation >= MIN_ITERATIONS
 
     if method.lower() == "fitness":
         return max_score >= MIN_FITNESS
@@ -887,6 +943,7 @@ def check_config_settings(config):
         ["Welch", "Yuen", "Trim-left-M", "Trim-left-M-SD"]):
         raise ValueError("Unknown fitness function. Please choose one of the " +
                          "following: 'Welch', 'Yuen', 'Trim-left-M', 'Trim-left-M-SD'.")
+    
 
 
 def print_config_json(config: dict, name: str, path: str) -> None:
@@ -999,17 +1056,14 @@ def fragment_population(population):
     
     # Number of pairs of organisms
     n_pairs = int(len(population) / 2)
-    q = n_pairs // p  # p is the number of processes
-    r = n_pairs % p  # p is the number of processes
+    q, r = divmod(n_pairs, p)  # p is the number of processes
     # Number of pairs of organisms assigned to each process
-    local_n_pairs_list = [q + 1] * r + [q] * (p - r)
+    pairs_counts = [q + 1] * r + [q] * (p - r)
     # Number of organisms assigned to each process
-    sendcounts = [n*2 for n in local_n_pairs_list]
-    # Make a list where each element is the list of organism for a process
+    org_counts = [n*2 for n in pairs_counts]
+    # Fragment population: 1D list -> 2D list
     it = iter(population)
-    population = [[next(it) for _ in range(size)] for size in sendcounts]
-    # Now the population list is "fragmented" (list -> list of lists)
-    return population
+    return [[next(it) for _ in range(count)] for count in org_counts]
 
 
 def flatten_population(population):
@@ -1026,11 +1080,9 @@ def flatten_population(population):
     if population is None:
         return None
     
-    flat_population = []
-    for sublist in population:
-        for item in sublist:
-            flat_population.append(item)
-    return flat_population
+    # Flatten population: 2D list -> 1D list
+    return [org for sublist in population for org in sublist]
+
 
 if __name__ == "__main__":
     

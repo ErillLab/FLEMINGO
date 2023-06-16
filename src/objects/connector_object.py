@@ -163,44 +163,11 @@ class ConnectorObject():
         if random.random() < self.mutate_probability_sigma:
             self._mutate_sigma()
             mutated = True
-            
-            # #determine type of mutation (linear or log)
-            # if self.sigma_mutator=="linear":
-            #     # Update sigma with a random permutation within allowed interval
-            #     self._sigma = abs(
-            #         self._sigma + random.uniform(-self.mutate_variance_sigma,
-            #                                      self.mutate_variance_sigma)
-            #     )
-            # elif self.sigma_mutator=="log":
-            #     base = self.mutate_variance_sigma
-            #     logb_sigma = np.log(self._sigma) / np.log(base)
-            #     shift = random.uniform(-1, 1)
-            #     # Apply a shift in the range (-1, 1) to the log-sigma
-            #     logb_sigma += shift
-            #     self._sigma = base**logb_sigma
         
         # Mutate mu
         if random.random() < self.mutate_probability_mu:
             self._mutate_mu()
             mutated = True
-            
-            # #determine type of mutation (linear or log)
-            # if self.mu_mutator=="linear":
-            #     # Update mu with a random permutation within allowed interval
-            #     self._mu = abs(
-            #         self._mu + random.uniform(-self.mutate_variance_mu,
-            #                                   self.mutate_variance_mu)
-            #     )
-            # elif self.mu_mutator=="log":
-            #     base = self.mutate_variance_mu
-            #     logb_mu = np.log(self._mu) / np.log(base)
-            #     shift = random.uniform(-1, 1)
-            #     # Apply a shift in the range (-1, 1) to the log-mu
-            #     logb_mu += shift
-            #     self._mu = base**logb_mu
-            
-            # elif self.mu_mutator=="standard":
-            #     self._mu = abs(random.gauss(self._mu, self._sigma))
         
         if mutated:
             # Recompute PDF and CDF values
