@@ -69,8 +69,7 @@ def main():
     Main function for the motif seek
     """
     
-    if i_am_main_process():
-        print("Loading parameters...")
+    single_print("Loading parameters...")
     
     # Read positive set from specified file
     positive_dataset = read_fasta_file(DATASET_BASE_PATH_DIR + POSITIVE_FILENAME)
@@ -93,8 +92,7 @@ def main():
     mean_nodes = 0
     mean_fitness = 0
     
-    if i_am_main_process():
-        print("Instantiating population...")
+    single_print("Instantiating population...")
     
     """
     Generate initial population
@@ -102,9 +100,8 @@ def main():
     # Instantiate organism Factory object with object configurations
     min_seq_length = min([len(i) for i in (positive_dataset + negative_dataset)])
     max_seq_length = max([len(i) for i in (positive_dataset + negative_dataset)])
-    if i_am_main_process():
-        print("min_seq_length =", min_seq_length)
-        print("max_seq_length =", max_seq_length)
+    single_print("min_seq_length =", min_seq_length)
+    single_print("max_seq_length =", max_seq_length)
     organism_factory = OrganismFactory(
         configOrganism, configOrganismFactory, configConnector, configPssm, rank,
         configShape, min_seq_length, max_seq_length
@@ -112,55 +109,6 @@ def main():
     
     # Initialize the population of organisms
     organism_population = initialize_population(organism_factory)
-    
-    # if i_am_main_process():
-        
-    #     # Initialize list
-    #     organism_population = []
-        
-    #     # Generate population depending on origin and fill type.
-    #     # Origin can be "random" or "file"(read a set of organisms from a file).
-    #     if POPULATION_ORIGIN.lower() == "random":
-    #         # For a random origin, we can generate #POPULATION_LENGTH organisms.
-    #         for i in range(POPULATION_LENGTH):
-    #             new_organism = organism_factory.get_organism()
-    #             new_organism.check_size(organism_factory)
-    #             organism_population.append(new_organism)
-    #     elif POPULATION_ORIGIN.lower() == "file":
-    #         #if the population is seeded from file
-    #         # Set the file organisms and fill with random/same organisms
-    #         # POPULATION_LENGTH must be >= len(fileOrganisms)
-    #         file_organisms = organism_factory.import_organisms(INPUT_FILENAME)
-    #         remaining_organisms = POPULATION_LENGTH - len(file_organisms)
-    #         fill_organism_population = []
-    
-    #         if POPULATION_FILL_TYPE.lower() == "random":
-    #             # FILL remainder of the population WITH RANDOM organisms
-    #             for i in range(remaining_organisms):
-    #                 new_organism = organism_factory.get_organism()
-    #                 fill_organism_population.append(new_organism)
-    
-    #         elif POPULATION_FILL_TYPE.lower() == "uniform":
-    #             # FILL the remainder of the population WITH ORGANISMS IN FILE
-    #             for i in range(remaining_organisms):
-    #                 new_organism = copy.deepcopy(
-    #                     file_organisms[i % len(file_organisms)]
-    #                 )
-    #                 fill_organism_population.append(new_organism)
-    #                 new_organism.set_id(organism_factory.get_id())
-            
-    #         # join 
-    #         organism_population = file_organisms + fill_organism_population
-    
-    #     else:
-    #         raise Exception("Not a valid population origin, "
-    #             + "check the configuration file.")
-        
-    #     print("Population size =", len(organism_population))
-    
-    # else:
-    #     organism_population = None
-    
     
     """
     Initialize iteration variables.
@@ -173,8 +121,7 @@ def main():
     best_org = None
     best_org_fitness = -np.inf
     
-    if i_am_main_process():
-        print("Starting execution...")
+    single_print("Starting execution...")
     
     # Main loop, it iterates until organisms do not get a significant change
     # or MIN_ITERATIONS or MIN_FITNESS is reached.
@@ -379,7 +326,23 @@ def main():
         
         generation += 1
         # END WHILE
+    print('\n\n\nIS FINISHED?????')
 
+
+def single_print(*argv):
+    '''
+    Prints to standard output the input as strings. It ensures the message is
+    printed only once, even if running in parallel with more than one process.
+    It recapitulates the behaviour of the print function in Python3:
+        - if more than one argument is passsed, they are printed sequentially,
+          separated by a space
+        - the input arguments don't have to be strings. They only need to be
+          types that can be converted to strings
+    '''
+    if i_am_main_process():
+        # i_am_main_process returns True only if the process rank is 0.
+        # When running in serial mode, the only process has rank 0.
+        print(" ".join([str(x) for x in argv]))
 
 def initialize_population(organism_factory):
     '''
