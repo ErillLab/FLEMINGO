@@ -44,7 +44,6 @@ class PssmObject():
         self.mutate_probability_mutate_col = config["MUTATE_PROBABILITY_MUTATE_COL"]
         self.mutate_probability_flip_cols = config["MUTATE_PROBABILITY_FLIP_COL"]
         self.mutate_probability_flip_rows = config["MUTATE_PROBABILITY_FLIP_ROW"]
-        self.mutate_probability_shift = config["MUTATE_PROBABILITY_SHIFT"]
         self.mutate_probability_increase_pwm = config["MUTATE_PROBABILITY_INCREASE_PWM"]
         self.mutate_probability_decrease_pwm = config["MUTATE_PROBABILITY_DECREASE_PWM"]
         
@@ -76,7 +75,7 @@ class PssmObject():
         mutated = False
         
         # Mutations that can shift the boundaries of the PSSM placement
-        # (shift left / shift right / increase pwm / decrease pwm) will modify
+        # (increase pwm / decrease pwm) will modify
         # the values in `displacement_code`
         displacement_code = [0, 0]  # left and right displacement (in bp)
         
@@ -98,11 +97,6 @@ class PssmObject():
         # Flip rows
         if random.random() < self.mutate_probability_flip_rows:
             self._flip_rows()
-            mutated = True
-        
-        # Shift left/right with rolling-over
-        if random.random() < self.mutate_probability_shift:
-            self._shift(displacement_code)
             mutated = True
         
         # Increase length
@@ -244,42 +238,42 @@ class PssmObject():
             self.pwm[i][base1] = self.pwm[i][base2]
             self.pwm[i][base2] = tmp_base
     
-    def _shift(self, displacement_code):
-        '''
-        Shifts with roll-over the PSSM.
-        Example:
-            Five columns:
-                1,2,3,4,5
-            After shifting towards the left the order of the columns is:
-                5,1,2,3,4
+    # def _shift(self, displacement_code):
+    #     '''
+    #     Shifts with roll-over the PSSM.
+    #     Example:
+    #         Five columns:
+    #             1,2,3,4,5
+    #         After shifting towards the left the order of the columns is:
+    #             5,1,2,3,4
         
-        =======
-        Warning
-        =======
-        This function is meant to be called by the `mutate` function.
-        If you call this function outside the `mutate` function, the pssm
-        will be incorrect unless you update it by calling:
+    #     =======
+    #     Warning
+    #     =======
+    #     This function is meant to be called by the `mutate` function.
+    #     If you call this function outside the `mutate` function, the pssm
+    #     will be incorrect unless you update it by calling:
             
-            self.recalculate_pssm()
+    #         self.recalculate_pssm()
         
-        '''
-        # Shift to the left (50% probability)
-        if random.random() < 0.5:
-            # Shift PSSM from right to left, rolling over
-            self.pwm = np.roll(self.pwm, 1)
-            # The left bound of the PSSM shifts 1 bp to the left (-1)
-            displacement_code[0] -= 1
-            # The right bound of the PSSM shifts 1 bp to the left (-1)
-            displacement_code[1] -= 1
+    #     '''
+    #     # Shift to the left (50% probability)
+    #     if random.random() < 0.5:
+    #         # Shift PSSM from right to left, rolling over
+    #         self.pwm = np.roll(self.pwm, 1)
+    #         # The left bound of the PSSM shifts 1 bp to the left (-1)
+    #         displacement_code[0] -= 1
+    #         # The right bound of the PSSM shifts 1 bp to the left (-1)
+    #         displacement_code[1] -= 1
         
-        # Shift to the right (50% probability)
-        else:
-            # Shift PSSM from left to right, rolling over
-            self.pwm = np.roll(self.pwm, -1)
-            # The left bound of the PSSM shifts 1 bp to the right (+1)
-            displacement_code[0] += 1
-            # The right bound of the PSSM shifts 1 bp to the right (+1)
-            displacement_code[1] += 1
+    #     # Shift to the right (50% probability)
+    #     else:
+    #         # Shift PSSM from left to right, rolling over
+    #         self.pwm = np.roll(self.pwm, -1)
+    #         # The left bound of the PSSM shifts 1 bp to the right (+1)
+    #         displacement_code[0] += 1
+    #         # The right bound of the PSSM shifts 1 bp to the right (+1)
+    #         displacement_code[1] += 1
     
     def _increase_length(self, displacement_code, org_factory):
         '''

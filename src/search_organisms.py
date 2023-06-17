@@ -326,7 +326,6 @@ def main():
         
         generation += 1
         # END WHILE
-    print('\n\n\nIS FINISHED?????')
 
 
 def single_print(*argv):
