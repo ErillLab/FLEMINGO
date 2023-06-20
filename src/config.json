@@ -28,8 +28,6 @@
     "NULL_MODEL_PATH": "null_shape_models/"
   },
   "organism": {
-    "INSERTION_METHOD": "intelligent",
-    "DELETION_METHOD": "intelligent",
     "MUTATE_PROBABILITY_NODE_MUTATION": null,
     "MUTATE_PROBABILITY_DELETE_RECOGNIZER": 0.2,
     "MUTATE_PROBABILITY_INSERT_RECOGNIZER": 0.1,
