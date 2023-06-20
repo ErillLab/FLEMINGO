@@ -24,7 +24,7 @@ class OrganismObject:
     connections between the elements.
     """
     
-    def __init__(self, _id: int, conf: dict) -> None:
+    def __init__(self, _id: str, conf: dict) -> None:
         """Organism constructor
 
         Args:
@@ -274,7 +274,7 @@ class OrganismObject:
         """
         return self._id
 
-    def set_id(self, _id: int) -> None:
+    def set_id(self, _id: str) -> None:
         """Setter _id
 
         Args:
@@ -376,7 +376,6 @@ class OrganismObject:
             fit if it was 8 + 4 + 15 = 27.
             That's what we would get if we apply this function to the middle
             recognizer with a `shift` of -0.2.
-            
         '''
         # Choose a recognizer
         idx = random.randint(0, self.count_recognizers() - 1)
@@ -532,7 +531,6 @@ class OrganismObject:
         
         Args:
             org_factory : OrganismFactory
-        
         '''
         
         n_recognizers = self.count_recognizers()

@@ -132,7 +132,7 @@ class OrganismFactory:
 
         return
 
-    def get_id(self) -> int:
+    def get_id(self) -> str:
         """ Returns a new unique organism ID (as a string). If the program is
         run in parallel the organism ID is composed of process rank and the
         organism counter ('r_n' format). For example, '3_19' would be the ID of
