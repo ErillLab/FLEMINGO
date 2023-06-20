@@ -35,6 +35,7 @@ class PlacementObject:
         self.recognizers_positions = []
         self.connectors_positions = []
         self.recognizer_types = ""
+    
     # Compile placement features
     
     def set_energy(self, energy):

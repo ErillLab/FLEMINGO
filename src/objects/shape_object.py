@@ -141,9 +141,9 @@ class ShapeObject:
 
         Args:
             org_factory (has config information for determining mutations)
-            ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
-            !!! Obsolete argument
-            ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+            ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+            !!! Unused argument (just for consistency with the pssm mutate function)
+            ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
         """
         # keeps track of if a mutation happend. If it did, alternative model is updated
         mutated = False
@@ -171,13 +171,6 @@ class ShapeObject:
         if random.random() < self.mutate_probability_decrease_size and self.length > self.min_columns:
             self._decrease_length(displacement_code)
             mutated = True
-        
-        # # mu is bounded by the minimum and maximum observed values in the
-        # # null
-        # if self._mu < self.min_mu:
-        #     self._mu = self.min_mu
-        # elif self._mu > self.max_mu:
-        #     self._mu = self.max_mu
         
         if mutated:
             self.set_alt_model()

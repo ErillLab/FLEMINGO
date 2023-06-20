@@ -370,27 +370,30 @@ class OrganismFactory:
     
     
     def check_pwm_frequencies_of_imported_organisms(self, imported_organisms: list):
+        '''
+        Raises an error if the PWMs of the imported organisms are not compatible
+        with the value of PWM_NUM_OF_BINDING_SITES parameter specified in the
+        config file.
+        '''
         no_BSs = self.pwm_number_of_binding_sites
         smallest_freq = dec.Decimal('1') / dec.Decimal(str(no_BSs))
         
-        for idx in range(len(imported_organisms)):
-            org = imported_organisms[idx]
-            for i in range(len(org.recognizers)):
-                rec = org.recognizers[i]
+        for org_idx, org in enumerate(imported_organisms):
+            for rec_idx, rec in enumerate(org.recognizers):
                 if rec.type != 'p':
-                    break
-                for p in range(rec.length):
+                    continue
+                for pos in range(rec.length):
                     for b in ['a','c','g','t']:
-                        freq = rec.pwm[p][b]
+                        freq = rec.pwm[pos][b]
                         if dec.Decimal(str(freq)) % smallest_freq != 0:
                             raise Exception(
                                 ("Imported organism has PWM frequencies that are not "
                                  "compatible with the required number of binding sites "
                                  "(PWM_NUM_OF_BINDING_SITES parameter). The problem "
                                  "occurred for the frequency of base " + b.upper() +
-                                 " at position " + str(p) + " of the recognizer with "
-                                 "index " + str(i) + " of the organism with "
-                                 "index " + str(idx) + " in the list of organisms "
+                                 " at position " + str(pos) + " of the recognizer with "
+                                 "index " + str(rec_idx) + " of the organism with "
+                                 "index " + str(org_idx) + " in the list of organisms "
                                  "to be imported from the json file. "
                                  "Indeed, " + str(freq) + " is not "
                                  "k * " + str(smallest_freq) + " for any integer "
@@ -463,7 +466,7 @@ class OrganismFactory:
         """Export connector object
 
         Args:
-            o_connector: Connector to export
+            o_connector: Connector object to export
 
         Returns:
             Connector in dictionary format
@@ -480,11 +483,11 @@ class OrganismFactory:
         the type of the given recognizer
 
         Args:
-            None
+            o_rec: Recognizer object to export
 
         Returns:
-            None
-            
+            Recognizer in dictionary format
+        
         """
         if o_rec.get_type() == 'p':
             return self.export_pssm(o_rec)
@@ -1124,7 +1127,6 @@ class OrganismFactory:
         This function generates two children that are identical (in terms of
         nodes) to the provided parents.
         '''
-        
         child1 = copy.deepcopy(par1)
         child2 = copy.deepcopy(par2)
         # Assign IDs to organisms and increase factory counter
@@ -1144,9 +1146,8 @@ class OrganismFactory:
         connectors_tags = recogs_tags[1:]
         child2.assembly_instructions['recognizers'] = recogs_tags
         child2.assembly_instructions['connectors'] = connectors_tags
-        
         return child1, child2
-        
+
 
 
 

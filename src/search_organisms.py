@@ -340,12 +340,14 @@ def single_print(*argv):
     '''
     if i_am_main_process():
         # i_am_main_process returns True only if the process rank is 0.
-        # When running in serial mode, the only process has rank 0.
+        # When running in serial mode, the only running process has rank 0.
         print(" ".join([str(x) for x in argv]))
 
 def initialize_population(organism_factory):
     '''
-    !!! Docstring here ...
+    Returns the initial population of organisms as a list.
+    If running in parallel, in processes that have rank different from 0 the
+    funtion returns None.
     '''
     # Initialize the population of organisms
     if i_am_main_process():
