@@ -181,9 +181,10 @@ class OrganismFactory:
         min_n_recogs = new_organism.min_n_recognizers
         n_recogs = np.random.poisson(self.avg_n_recognizers_lambda - min_n_recogs)
         n_recogs += min_n_recogs
-        # Check upper bound
+        # Check upper bound (if specified)
         max_n_recogs = new_organism.max_n_recognizers
-        n_recogs = min(n_recogs, max_n_recogs)
+        if max_n_recogs != None:
+            n_recogs = min(n_recogs, max_n_recogs)
         
         # for each recognizer in the organism except for the last
         for i in range(n_recogs - 1):

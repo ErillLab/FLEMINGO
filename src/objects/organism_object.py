@@ -773,9 +773,10 @@ class OrganismObject:
         edited = False
         
         # If the number of nodes exceeded the maximum allowed, prune the organism
-        while self.count_recognizers() > self.max_n_recognizers:
-            self.delete_recognizer()
-            edited = True
+        if self.max_n_recognizers != None:
+            while self.count_recognizers() > self.max_n_recognizers:
+                self.delete_recognizer()
+                edited = True
         
         # If the number of nodes is not sufficient, insert recognizers
         while self.count_recognizers() < self.min_n_recognizers:

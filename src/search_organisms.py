@@ -880,9 +880,13 @@ def check_config_settings(config):
         raise Exception(("POPULATION_LENGTH must be an even number. " +
                          "Please correct the settings."))
     
-    # Check that min_n_recogs <= avg_n_recogs <= max_n_recogs
-    if (config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"] <
-        config["organism"]["MIN_N_RECOGNIZERS"]):
+    # Check that min_n_rec <= avg_n_rec <= max_n_rec
+    avg_n_rec = config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"]
+    min_n_rec = config["organism"]["MIN_N_RECOGNIZERS"]
+    max_n_rec = config["organism"]["MAX_N_RECOGNIZERS"]
+    if max_n_rec == None:
+        max_n_rec = np.inf
+    if avg_n_rec < min_n_rec:
         raise ValueError(("The average number of recognizers per organism " +
                           "must be a valid one, i.e. between the minimum " +
                           "and the maximum allowed (included). " +
@@ -891,8 +895,7 @@ def check_config_settings(config):
                           ", but MIN_N_RECOGNIZERS was set to " +
                           str(config["organism"]["MIN_N_RECOGNIZERS"]) +
                           ". Please correct the settings."))
-    elif (config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"] >
-        config["organism"]["MAX_N_RECOGNIZERS"]):
+    if avg_n_rec > max_n_rec:
         raise ValueError(("The average number of recognizers per organism " +
                           "must be a valid one, i.e. between the minimum " +
                           "and the maximum allowed (included). " +
@@ -901,6 +904,12 @@ def check_config_settings(config):
                           ", but MAX_N_RECOGNIZERS was set to " +
                           str(config["organism"]["MAX_N_RECOGNIZERS"]) +
                           ". Please correct the settings."))
+    if min_n_rec > max_n_rec:
+        raise ValueError(("The minimum number of recognizers per organism " +
+                          "specified in the settings (MIN_N_RECOGNIZERS) is" +
+                          " larger than the maximum number of recognizers per" +
+                          "organism (MAX_N_RECOGNIZERS). Please correct the" +
+                          " settings."))
     
     # Check that the fitness function is spelled correctly
     if (config["main"]["FITNESS_FUNCTION"] not in
