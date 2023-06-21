@@ -46,29 +46,16 @@ class OrganismObject:
         self.sum_recognizer_lengths = 0
         
         self.is_precomputed = conf["PRECOMPUTE"]
-        
-        # probability of replacing PSSM by random PSSM
-        self.mutate_probability_substitute_pssm = conf[
-            "MUTATE_PROBABILITY_SUBSTITUTE_PSSM"
-        ]
 	
         #probability of deleting/inserting a recognizer
-        self.mutate_probability_delete_recognizer = conf[
-            "MUTATE_PROBABILITY_DELETE_RECOGNIZER"
-        ]
-        self.mutate_probability_insert_recognizer = conf[
-            "MUTATE_PROBABILITY_INSERT_RECOGNIZER"
-        ]
+        self.mutate_probability_delete_recognizer = conf["MUTATE_PROBABILITY_DELETE_RECOGNIZER"]
+        self.mutate_probability_insert_recognizer = conf["MUTATE_PROBABILITY_INSERT_RECOGNIZER"]
 	
         # probability of mutating a node
-        self.mutate_probability_node_mutation = conf[
-            "MUTATE_PROBABILITY_NODE_MUTATION"
-        ]
+        self.mutate_probability_node_mutation = conf["MUTATE_PROBABILITY_NODE_MUTATION"]
         
         # probability of applying a nudge shift to a recognizer
-        self.mutate_probability_nudge_recognizer = conf[
-            "MUTATE_PROBABILITY_NUDGE_RECOGNIZER"
-        ]
+        self.mutate_probability_nudge_recognizer = conf["MUTATE_PROBABILITY_NUDGE_RECOGNIZER"]
         
         # min and maximum number of recognizers allowed
         self.min_n_recognizers = conf["MIN_N_RECOGNIZERS"]
