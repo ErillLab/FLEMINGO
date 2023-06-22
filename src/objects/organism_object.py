@@ -488,6 +488,7 @@ class OrganismObject:
             # set new mu and new sigma
             self.connectors[connector_to_keep].set_mu(adj_mu)
             self.connectors[connector_to_keep].set_sigma(adj_sigma)
+            self.connectors[connector_to_keep].set_precomputed_pdfs_cdfs()
         
         # Recreate arrays of recognizers and connectors skipping the recgonizer
         # and the connector selected for deletion				
@@ -619,10 +620,12 @@ class OrganismObject:
             # Update parameters of pre-existing connector
             self.connectors[connector_to_compress].set_mu(preexisting[0])
             self.connectors[connector_to_compress].set_sigma(preexisting[1])
+            self.connectors[connector_to_compress].set_precomputed_pdfs_cdfs()
             # Update paramters of inserted connector
             new_connector.set_mu(inserted[0])
             new_connector.set_sigma(inserted[1])
-                
+            new_connector.set_precomputed_pdfs_cdfs()
+        
         # recreate arrays of connectors and recognizers, adding
         # the newly minted recognizer+connector and comprising
         # also the "compressed" pre-existing connector
