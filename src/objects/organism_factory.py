@@ -265,8 +265,8 @@ class OrganismFactory:
         Returns:
             shape object with a specified length
         """
-        if length == None or length < 5:
-            length = 5
+        if length == None or length < self.conf_shape["MIN_COLUMNS"]:
+            length = self.conf_shape["MIN_COLUMNS"]
 
         rec_type = ''
         y = random.random()
