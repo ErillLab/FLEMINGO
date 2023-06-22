@@ -23,7 +23,8 @@ class OrganismFactory:
     """Factory class
     """
 
-    def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank, conf_shape, max_seq_length) -> None:
+    def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank,
+                 conf_shape, min_seq_length, max_seq_length) -> None:
         """
         Instantiates an OrganismFactory object.
         Reads in the configuration paramaters for the factory and for all object
@@ -36,13 +37,13 @@ class OrganismFactory:
         self._organism_counter = 0
         # Process rank (used to esure unique organism IDs when running in parallel mode)
         self._process_rank = p_rank
+        # Length of shortest and longest DNA sequence
+        self.min_seq_length = min_seq_length
         self.max_seq_length = max_seq_length
-        #self._id = 0
-        # lambda parameter for Poisson distribution that will instantiate
-        # organism. lambda is the expected number of recognizers in the
-        # organism (and also its variance)
-        self.num_recognizers_lambda_param = conf_org_fac[
-            "NUM_RECOGNIZERS_LAMBDA_PARAM"
+        # lambda parameter for Poisson distribution used to instantiate organisms.
+        # lambda is the expected number of recognizers per organism
+        self.avg_n_recognizers_lambda = conf_org_fac[
+            "AVG_N_RECOGNIZERS_LAMBDA"
         ]
 
         self.recombination_probability = conf_org_fac["RECOMBINATION_PROBABILITY"]
@@ -115,7 +116,6 @@ class OrganismFactory:
         Returns:
             None
         
-            
         """
 
         if shape_object.null_models == {}:
@@ -127,12 +127,12 @@ class OrganismFactory:
             return
 
         if max(shape_object.null_models[bins]["mgw"].keys()) < self.conf_shape["MAX_COLUMNS"]:
-            null.generate_range(max(shape_object.null_models["mgw"].keys()) + 1, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models, bins)
+            null.generate_range(max(shape_object.null_models[bins]["mgw"].keys()) + 1, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models, bins)
             return
 
         return
 
-    def get_id(self) -> int:
+    def get_id(self) -> str:
         """ Returns a new unique organism ID (as a string). If the program is
         run in parallel the organism ID is composed of process rank and the
         organism counter ('r_n' format). For example, '3_19' would be the ID of
@@ -148,46 +148,55 @@ class OrganismFactory:
             return str(self._process_rank) + "_" + str(self._organism_counter)
 
     def get_organism(self) -> OrganismObject:
-        """It creates and returns a full organism datastructure
-           An organism contains essentially two lists:
-           - a recognizer list
-           - a connector list
-           The placement of these elements in the lists defines
-           implicitly the connections between the elements.
+        """
+        It creates and returns a full organism datastructure.
+        An organism contains essentially two lists:
+            - a recognizer list
+            - a connector list
+        The index of these elements in the lists defines implicitly the
+        connections between them.
 
         Returns:
             A new organism based on JSON config file
         """
         
         # instantiates organism with organism configuration and pssm columns
-        new_organism = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
+        new_organism = OrganismObject(self.get_id(), self.conf_org)
         
-        # The number of recognizers of the organism is randomly chosen from a
-        # Poisson distribution with the lambda provided.
-        # The Poisson distribution is truncated to only allow integers larger than
-        # 0, so that null organisms are avoided. The truncation is achieved by using
-        # lambda - 1 instead of lambda (in this way the average number of
-        # recognizers will be lower by one unit) and then shifting up the
-        # values by one unit.
-        number_of_recognizers = np.random.poisson(self.num_recognizers_lambda_param - 1)
-        number_of_recognizers += 1
+        '''
+        The number of recognizer for the new organism is drawn from a Poisson
+        distribution. The Poisson distribution is shifted so that the lowest
+        bound is not 0, but `min_n_recogs`. The value of `min_n_recogs` is 1 unless
+        a larger number is required to comply with the parameter that specifies
+        the minimum number of nodes per organism in the config file. The shifted
+        Poisson distribution is constructed so that the average number of nodes
+        per organism matches the request from the config file.
+        In other words, the Poisson distribution is used to decide how many nodes
+        more than the minimum should an organism have, while ensureing the desired
+        average number of nodes.
+        However, if the number of recognizers drawn from the shifted Poisson
+        exceeds the maximum allowed by the config, it is set to the maximum.
+        '''
+        # Draw from shifted Poisson
+        min_n_recogs = new_organism.min_n_recognizers
+        n_recogs = np.random.poisson(self.avg_n_recognizers_lambda - min_n_recogs)
+        n_recogs += min_n_recogs
+        # Check upper bound (if specified)
+        max_n_recogs = new_organism.max_n_recognizers
+        if max_n_recogs != None:
+            n_recogs = min(n_recogs, max_n_recogs)
         
-        # avoid signle PSSM case, which breaks recombination operator, that 
-        # assumes at least one connector is present
-        if number_of_recognizers == 1:
-            number_of_recognizers += 1
-        
-        # for each recognizer in the organism
-        for i in range(number_of_recognizers - 1):
-            # instantiate new recognizer and append it to organism's recognizer list
+        # for each recognizer in the organism except for the last
+        for i in range(n_recogs - 1):
+            # Add one recognizer
             new_recognizer = self.create_recognizer(self.pwm_length)
             new_organism.recognizers.append(new_recognizer)
-            # instantiate new connector and append it to organism's connector list
+            # Add one connector
             _mu = random.randint(self.min_mu, self.max_mu)
             _sigma = random.randint(self.min_sigma, self.max_sigma)
             new_connector = ConnectorObject(_mu, _sigma, self.conf_con, self.max_seq_length)
             new_organism.connectors.append(new_connector)
-        # insert last recognizer in the chain and add it to list
+        # Add last recognizer
         new_recognizer = self.create_recognizer(self.pwm_length)
         new_organism.recognizers.append(new_recognizer)
         # Set attribute that will map organism nodes to alignment matrix rows
@@ -208,7 +217,6 @@ class OrganismFactory:
         new_connector = ConnectorObject(_mu, _sigma, self.conf_con, self.max_seq_length)
 
         return new_connector
-
 
     def create_recognizer(self, length = None):
         """Randomly creates either a PSSM or shape recognizer
@@ -257,8 +265,10 @@ class OrganismFactory:
         Returns:
             shape object with a specified length
         """
-        if length == None or length < 5:
-            length = 5
+        if length == None or length < self.conf_shape["MIN_COLUMNS"]:
+            length = self.conf_shape["MIN_COLUMNS"]
+        if length > self.conf_shape["MAX_COLUMNS"]:
+            length = self.conf_shape["MAX_COLUMNS"]
 
         rec_type = ''
         y = random.random()
@@ -330,7 +340,7 @@ class OrganismFactory:
         for organism in organism_json:
 
             new_organism = OrganismObject(
-                self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"]
+                self.get_id(), self.conf_org
             )
             
             new_org_recognizers = []  # The recognizers are collected here
@@ -363,27 +373,30 @@ class OrganismFactory:
     
     
     def check_pwm_frequencies_of_imported_organisms(self, imported_organisms: list):
+        '''
+        Raises an error if the PWMs of the imported organisms are not compatible
+        with the value of PWM_NUM_OF_BINDING_SITES parameter specified in the
+        config file.
+        '''
         no_BSs = self.pwm_number_of_binding_sites
         smallest_freq = dec.Decimal('1') / dec.Decimal(str(no_BSs))
         
-        for idx in range(len(imported_organisms)):
-            org = imported_organisms[idx]
-            for i in range(len(org.recognizers)):
-                rec = org.recognizers[i]
+        for org_idx, org in enumerate(imported_organisms):
+            for rec_idx, rec in enumerate(org.recognizers):
                 if rec.type != 'p':
-                    break
-                for p in range(rec.length):
+                    continue
+                for pos in range(rec.length):
                     for b in ['a','c','g','t']:
-                        freq = rec.pwm[p][b]
+                        freq = rec.pwm[pos][b]
                         if dec.Decimal(str(freq)) % smallest_freq != 0:
                             raise Exception(
                                 ("Imported organism has PWM frequencies that are not "
                                  "compatible with the required number of binding sites "
                                  "(PWM_NUM_OF_BINDING_SITES parameter). The problem "
                                  "occurred for the frequency of base " + b.upper() +
-                                 " at position " + str(p) + " of the recognizer with "
-                                 "index " + str(i) + " of the organism with "
-                                 "index " + str(idx) + " in the list of organisms "
+                                 " at position " + str(pos) + " of the recognizer with "
+                                 "index " + str(rec_idx) + " of the organism with "
+                                 "index " + str(org_idx) + " in the list of organisms "
                                  "to be imported from the json file. "
                                  "Indeed, " + str(freq) + " is not "
                                  "k * " + str(smallest_freq) + " for any integer "
@@ -456,7 +469,7 @@ class OrganismFactory:
         """Export connector object
 
         Args:
-            o_connector: Connector to export
+            o_connector: Connector object to export
 
         Returns:
             Connector in dictionary format
@@ -473,11 +486,11 @@ class OrganismFactory:
         the type of the given recognizer
 
         Args:
-            None
+            o_rec: Recognizer object to export
 
         Returns:
-            None
-            
+            Recognizer in dictionary format
+        
         """
         if o_rec.get_type() == 'p':
             return self.export_pssm(o_rec)
@@ -552,10 +565,10 @@ class OrganismFactory:
         '''
         
         # Initialize child 1 as an empty organism
-        child1 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
+        child1 = OrganismObject(self.get_id(), self.conf_org)
         
         # Initialize child 2 as an empty organism
-        child2 = OrganismObject(self.get_id(), self.conf_org, self.conf_pssm["MAX_COLUMNS"])
+        child2 = OrganismObject(self.get_id(), self.conf_org)
         
         # Place the parents on all the sequences in the sample of the positive set
         par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample)
@@ -995,7 +1008,7 @@ class OrganismFactory:
                                  p1_placements, p2_placements):
         '''
         This function is used to generate an appropriate connector to link two
-        recognizers of a child, when no one of the connectors of the parents
+        recognizers of a child, when no one of the connectors from the parents
         is appropriate.
 
         Parameters
@@ -1006,17 +1019,26 @@ class OrganismFactory:
             It identifies the recognizer to the right.
         p1_placements : list
             List of placements for parent 1.
+            Note:
+                Placements are assumed to be paired. I.e., p1_placements[i] and
+                p2_placements[i] are placements on the same DNA sequence
         p2_placements : list
             List of placements for parent 2.
-
+            Note:
+                Placements are assumed to be paired. I.e., p1_placements[i] and
+                p2_placements[i] are placements on the same DNA sequence
+        
         Returns
         -------
         synthetic_connector : ConnectorObject
-            A new connector, whose mu is the average distance between the left
-            and the right recognizers specified, observed in the provided
-            placements, and whose sigma is the standard deviation of the
-            observed distance in those same placements.
-
+            A new connector that connects the two input recognizers from two
+            different parents, for which we didn't have an available connector.
+            mu and sigma are inferred from the input placements. There are n
+            placements of parent 1 on n DNA sequences and n placements of
+            parent 2 on those same n DNA sequences. Therefore, for each of the
+            n DNA sequences, we can estimate the relative distance of those two
+            connectors. These stats are used to guess a reasonable value for mu
+            and sigma.
         '''
         # Get parent and node index that specify the left recognizer
         recog_left_parent, recog_left_idx = recog_left_name.split('_')
@@ -1025,8 +1047,9 @@ class OrganismFactory:
         recog_right_parent, recog_right_idx = recog_right_name.split('_')
         recog_right_idx = int(recog_right_idx)
         
+        n_DNA_sequences = len(p1_placements)
         gap_values = []
-        for i in range(len(p1_placements)):
+        for i in range(n_DNA_sequences):
             
             # Placement of the left recognizer
             if recog_left_parent == 'p1':
@@ -1047,23 +1070,32 @@ class OrganismFactory:
             gap = distance - 1
             gap_values.append(gap)
         
-        '''
-        # Estimate mu and sigma
-        avg_gap = sum(gap_values)/len(gap_values)
-        # Avoid negative mu values
-        if avg_gap < 0:
-            avg_gap = 0
-        '''
-        avg_gap = gap_values[0]
-        
-        
-        stdev_gap = np.std(gap_values)
+        # ESTIMATE SIGMA
+        # Compute sample standard deviation as an estimate for sigma
+        sigma = np.std(gap_values, ddof=1)
         # Avoid setting sigma to 0
-        if stdev_gap < 0.1:  # !!! temporarily hard-coded lower-bound
-            stdev_gap = 0.1
+        if sigma < 0.1:  # !!! temporarily hard-coded lower-bound
+            sigma = 0.1
         
-        synthetic_connector = ConnectorObject(avg_gap, stdev_gap, self.conf_con, self.max_seq_length)
-        return synthetic_connector
+        # ESTIMATE MU
+        '''
+        mu could be estimated as the average gap. However, due to the typically
+        small sample size, and the fact that in most use cases we expect several
+        gaps to be optimal and others to be random values (coming from bad
+        placements), we set mu to be equal to one of the gap values, instead of
+        the average. This will sometimes lead to bad mu estimates, but often
+        enough it will guess a clean estimate mu, avoiding the effect of bad
+        placements. Another approach to this problem could have been to use the
+        median instead of the average, but "bad placements" can produce
+        consistently small/consistently large gaps, so the median could easily
+        fail. Therefore we just choose one gap value to be our guess for mu.
+        '''
+        mu = gap_values[0]
+        # Avoid negative mu
+        mu = max(0, mu)
+        
+        # Return the synthetic connector
+        return ConnectorObject(mu, sigma, self.conf_con, self.max_seq_length)
     
     def get_recog_pos_on_DNA_seq(self, org_placement, recog_idx):
         '''
@@ -1098,7 +1130,6 @@ class OrganismFactory:
         This function generates two children that are identical (in terms of
         nodes) to the provided parents.
         '''
-        
         child1 = copy.deepcopy(par1)
         child2 = copy.deepcopy(par2)
         # Assign IDs to organisms and increase factory counter
@@ -1118,9 +1149,8 @@ class OrganismFactory:
         connectors_tags = recogs_tags[1:]
         child2.assembly_instructions['recognizers'] = recogs_tags
         child2.assembly_instructions['connectors'] = connectors_tags
-        
         return child1, child2
-        
+
 
 
 

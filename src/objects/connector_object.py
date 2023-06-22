@@ -18,8 +18,7 @@ def g(x, mu, sigma):
 
 def norm_cdf(x, mu, sigma):
     ''' Cumulative distribution function for the normal distribution. '''
-    z = (x-mu)/abs(sigma)
-
+    z = (x-mu)/abs(sigma)  # z-score
     return (1.0 + math.erf(z / math.sqrt(2.0))) / 2.0
 
 def norm_pf(x, mu, sigma):
@@ -67,14 +66,8 @@ def prob_of_d(d, L, N):
 class ConnectorObject():
     """Connector Object is a node that connects two recognizer objects
     """
-
-    def __init__(
-            self,
-            _mu: int,
-            _sigma: int,
-            config: dict,
-            max_seq_length: int
-    ):
+    
+    def __init__(self, _mu: int, _sigma: int, config: dict, max_seq_length: int):
         """Connector constructor: 
             - gets/sets mu and sigma
             - sets all connector-specific configuration items
@@ -131,11 +124,6 @@ class ConnectorObject():
         a pseudo count is added to each interval in the pdfs. The cdfs have
         a pseudo count of (pseudo_count * j) added where j is the number of
         pdf bins that have had the pseudo count added so far.
-
-        Args:
-            None
-        Returns:
-            None
         """
         
         # Delete previous values
@@ -160,9 +148,7 @@ class ConnectorObject():
             self.stored_cdfs[offset] = np.double(auc)
             offset += 1
             prev_cdf = cdf
-
     
-
     def mutate(self, org_factory) -> None:
         """mutation for a connector
 
@@ -170,49 +156,83 @@ class ConnectorObject():
             org_factory(organism_factory): Organism Facory
         """
         
-        # SIGMA MUTATION
-        if random.random() < self.mutate_probability_sigma:
-            #determine type of mutation (linear or log)
-            if self.sigma_mutator=="linear":
-                # Update sigma with a random permutation within allowed interval
-                self._sigma = abs(
-                    self._sigma + random.uniform(-self.mutate_variance_sigma,
-                                                 self.mutate_variance_sigma)
-                )
-            elif self.sigma_mutator=="log":
-                base = self.mutate_variance_sigma
-                logb_sigma = np.log(self._sigma) / np.log(base)
-                shift = random.uniform(-1, 1)
-                # Apply a shift in the range (-1, 1) to the log-sigma
-                logb_sigma += shift
-                self._sigma = base**logb_sigma
-                
-       
-        # MU MUTATION
-        if random.random() < self.mutate_probability_mu:
-            #determine type of mutation (linear or log)
-            if self.mu_mutator=="linear":
-                # Update mu with a random permutation within allowed interval
-                self._mu = abs(
-                    self._mu + random.uniform(-self.mutate_variance_mu,
-                                              self.mutate_variance_mu)
-                )
-            elif self.mu_mutator=="log":
-                base = self.mutate_variance_mu
-                logb_mu = np.log(self._mu) / np.log(base)
-                shift = random.uniform(-1, 1)
-                # Apply a shift in the range (-1, 1) to the log-mu
-                logb_mu += shift
-                self._mu = base**logb_mu
-            
-            elif self.mu_mutator=="standard":
-                self._mu = abs(random.gauss(self._mu, self._sigma))
+        mutated = False
         
-        # Recompute PDF and CDF values
-        self.set_precomputed_pdfs_cdfs()
+        # Mutate sigma
+        if random.random() < self.mutate_probability_sigma:
+            self._mutate_sigma()
+            mutated = True
+        
+        # Mutate mu
+        if random.random() < self.mutate_probability_mu:
+            self._mutate_mu()
+            mutated = True
+        
+        if mutated:
+            # Recompute PDF and CDF values
+            self.set_precomputed_pdfs_cdfs()
     
+    def _mutate_sigma(self):
+        '''
+        Change the value of the sigma parameter. The way it's modified depends
+        on the `sigma_mutator` parameter specified in the config file.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pdfs and
+        cdfs values will be incorrect unless you update them by calling:
+            
+            self.set_precomputed_pdfs_cdfs()
+        
+        '''
+        if self.sigma_mutator=="linear":
+            # Update sigma with a random mutation within allowed interval
+            self._sigma = abs(
+                self._sigma + random.uniform(-self.mutate_variance_sigma,
+                                             self.mutate_variance_sigma)
+            )
+        elif self.sigma_mutator=="log":
+            base = self.mutate_variance_sigma
+            logb_sigma = np.log(self._sigma) / np.log(base)
+            shift = random.uniform(-1, 1)
+            # Apply a shift in the range (-1, 1) to the log-sigma
+            logb_sigma += shift
+            self._sigma = base**logb_sigma
     
-    # !!! New null model function
+    def _mutate_mu(self):
+        '''
+        Change the value of the mu parameter. The way it's modified depends
+        on the `mu_mutator` parameter specified in the config file.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pdfs and
+        cdfs values will be incorrect unless you update them by calling:
+            
+            self.set_precomputed_pdfs_cdfs()
+        
+        '''
+        if self.mu_mutator=="linear":
+            # Update mu with a random permutation within allowed interval
+            self._mu = abs(
+                self._mu + random.uniform(-self.mutate_variance_mu,
+                                          self.mutate_variance_mu)
+            )
+        elif self.mu_mutator=="log":
+            base = self.mutate_variance_mu
+            logb_mu = np.log(self._mu) / np.log(base)
+            shift = random.uniform(-1, 1)
+            # Apply a shift in the range (-1, 1) to the log-mu
+            logb_mu += shift
+            self._mu = base**logb_mu
+        
+        elif self.mu_mutator=="standard":
+            self._mu = abs(random.gauss(self._mu, self._sigma))
+    
     def null_gap_likelihood(self, gap_size, recog_sizes, seq_len):
         # For each recog of size s, we must subtract (s-1). E.g., for a recog of
         # size 5 we must subtract 4.
@@ -328,6 +348,7 @@ class ConnectorObject():
         """Prints the connector mu and sigma values
         """
         print(" m: {} s: {}".format(self._mu, self._sigma))
+        # XXX Remove when done with debugging
         if debug:
             print(" adjust_score_threshold: {}".format(self.adjust_score_threshold))
 

@@ -69,8 +69,7 @@ def main():
     Main function for the motif seek
     """
     
-    if i_am_main_process():
-        print("Loading parameters...")
+    single_print("Loading parameters...")
     
     # Read positive set from specified file
     positive_dataset = read_fasta_file(DATASET_BASE_PATH_DIR + POSITIVE_FILENAME)
@@ -81,30 +80,275 @@ def main():
     else:
         # If no file was specified for negative set, it's generated from positive set
         if i_am_main_process():
+            # This is executed by process 0 (or by the only process if RUN_MODE is serial)
             print("Generateing negative set...")
             negative_dataset = generate_negative_set(positive_dataset)
         else:
             negative_dataset = None  # this will only happen in parallel runs
         if RUN_MODE == 'parallel':
-            # make sure all processes share the same negative set (the one of process 0)
+            # make sure all processes share the same negative set (the one made by process 0)
             negative_dataset = comm.bcast(negative_dataset, root=0)
 
     mean_nodes = 0
     mean_fitness = 0
     
-    if i_am_main_process():
-        print("Instantiating population...")
+    single_print("Instantiating population...")
     
     """
     Generate initial population
     """
     # Instantiate organism Factory object with object configurations
+    min_seq_length = min([len(i) for i in (positive_dataset + negative_dataset)])
     max_seq_length = max([len(i) for i in (positive_dataset + negative_dataset)])
-    print(max_seq_length)
+    single_print("min_seq_length =", min_seq_length)
+    single_print("max_seq_length =", max_seq_length)
     organism_factory = OrganismFactory(
-        configOrganism, configOrganismFactory, configConnector, configPssm, rank, configShape, max_seq_length
+        configOrganism, configOrganismFactory, configConnector, configPssm, rank,
+        configShape, min_seq_length, max_seq_length
     )
     
+    # Initialize the population of organisms
+    organism_population = initialize_population(organism_factory)
+    
+    """
+    Initialize iteration variables.
+    """
+    generation = 0
+    max_score = float("-inf")
+    last_max_score = 0.0
+    timeformat = "%Y-%m-%d--%H-%M-%S"
+    
+    best_org = None
+    best_org_fitness = -np.inf
+    
+    single_print("Starting execution...")
+    
+    # Main loop, it iterates until organisms do not get a significant change
+    # or MIN_ITERATIONS or MIN_FITNESS is reached.
+    
+    while not is_finished(END_WHILE_METHOD, generation, max_score, last_max_score):
+        
+        if i_am_main_process():
+            # Shuffle population
+            # Organisms are shuffled for deterministic crowding selection
+            random.shuffle(organism_population)
+        
+        if RUN_MODE == 'parallel':
+            # FRAGMENT AND SCATTER THE POPULATION
+            organism_population = fragment_population(organism_population)
+            organism_population = comm.scatter(organism_population, root=0)
+            
+            # print to check that the sub-populations are correct
+            # my_ids = [org._id for org in organism_population]
+            # print("From process " + str(rank) + ": loc pop is " + str(my_ids))
+        
+        # Shuffle datasets (if required)
+        if RANDOM_SHUFFLE_SAMPLING_POS:
+            positive_dataset = shuffle_dataset(positive_dataset)
+        if RANDOM_SHUFFLE_SAMPLING_NEG:
+            negative_dataset = shuffle_dataset(negative_dataset)
+        
+        # Reset max_score
+        last_max_score = max_score  # !!! Obsolete code. To be deleted/updated
+        max_score = float("-inf")
+        changed_best_score = False
+        initial = time.time()
+        
+        pop_id_list = []
+        pop_fitness_list = []
+        pop_n_nodes_list = []
+        
+        # Deterministic crowding
+        # Iterate over pairs of organisms
+        for i in range(0, len(organism_population) - 1, 2):
+            org1 = organism_population[i]
+            org2 = organism_population[i + 1]
+            
+            pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
+            ref_seq = pos_set_sample[0]
+            
+            # Decide if the parents will do sexual or clonal reproduction (recombination VS mutation)
+            if random.random() < organism_factory.recombination_probability:
+                # Recombination case; no mutation
+                child1, child2 = organism_factory.get_children(
+                    org1, org2, ref_seq, pos_set_sample)
+            
+            else:
+                # Non-recomination case; the children are mutated
+                child1, child2 = organism_factory.clone_parents(org1, org2)
+                # The children in this non-recombination scenario are just
+                # mutated versions of the parents
+                child1.mutate(organism_factory)
+                child2.mutate(organism_factory)
+            
+            # Check that new organisms comply with size contraints (modify them if necessary)
+            child1.check_size(organism_factory)
+            child2.check_size(organism_factory)
+            
+            # Pair parents and offspring
+            two_parent_child_pairs = pair_parents_and_children(org1, org2, child1, child2)
+            
+            # Make the two organisms in each pair compete
+            # j index is used to re insert winning organism into the population
+            for j in range(len(two_parent_child_pairs)):
+                '''
+                when j is 0 we are dealing with organism i
+                when j is 1 we are dealing with organism i+1
+                
+                Therefore, the winner of the competition will replace element
+                i+j in  organism_population
+                '''
+                
+                parent, child = two_parent_child_pairs[j]
+                
+                p_fitness = parent.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
+                                               negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
+                                               FITNESS_FUNCTION, GAMMA)
+                
+                c_fitness = child.get_fitness( positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
+                                               negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
+                                               FITNESS_FUNCTION, GAMMA)
+                
+                # Competition
+                if p_fitness > c_fitness:
+                    # The parent wins
+                    organism_population[i + j] = parent
+                    pop_id_list.append(parent)
+                    pop_fitness_list.append(p_fitness)
+                    pop_n_nodes_list.append(parent.count_nodes())
+                
+                else:
+                    # The child wins
+                    organism_population[i + j] = child
+                    pop_id_list.append(child)
+                    pop_fitness_list.append(c_fitness)
+                    pop_n_nodes_list.append(child.count_nodes())
+                
+                # END FOR j
+
+            # END FOR i
+        
+        if RUN_MODE == 'parallel':
+            # MPI GATHER
+            organism_population = comm.gather(organism_population, root=0)
+            organism_population = flatten_population(organism_population)
+            
+            pop_fitness_list = comm.gather(pop_fitness_list, root=0)
+            pop_fitness_list = flatten_population(pop_fitness_list)
+            
+            pop_n_nodes_list = comm.gather(pop_n_nodes_list,   root=0)
+            pop_n_nodes_list = flatten_population(pop_n_nodes_list)
+            
+            pop_id_list = comm.gather(pop_id_list, root=0)
+            pop_id_list = flatten_population(pop_id_list)
+        
+        if i_am_main_process():
+            # Mean fitness in the population
+            mean_fitness = np.mean(pop_fitness_list)
+            # Standard deviation of fitness in the population
+            standard_dev_fitness = np.std(pop_fitness_list)
+            # Inequality of fitness in the population (measured with the Gini coefficient)
+            gini_fitness = gini_RSV(pop_fitness_list)
+            # Mean number of nodes per organism in the population
+            mean_nodes = np.mean(pop_n_nodes_list)
+            
+            # `max_org`: Organism with highest fitness within current population
+            idx_of_max_org = np.argmax(pop_fitness_list)
+            max_org = organism_population[idx_of_max_org]
+            max_org_fitness = pop_fitness_list[idx_of_max_org]
+            
+            # `best_org`: Organism with highest fitness ever encountered in the run
+            if max_org_fitness >= best_org_fitness:
+                best_org = max_org
+                best_org_fitness = max_org_fitness
+                changed_best_score = True
+            
+            # Print info about the current generation
+            _m, _s = divmod((time.time() - initial), 60)
+            _h, _m = divmod(_m, 60)
+            s_time = "{}h:{}m:{:.2f}s".format(int(_h), int(_m), _s)
+            print_ln(
+                (
+                    "Generation {} | AF:{:.2f} SDF:{:.2f} GF:{:.2f} AN:{:.2f}"
+                    + " | MO: {} MF: {:.2f} MN: {}"
+                    + " | BO: {} BF: {:.2f} BN: {} | Time: {}"
+                ).format(
+                    generation,  # "Generation"
+                    mean_fitness,  # "AF"
+                    standard_dev_fitness,  # "SDF"
+                    gini_fitness,  # "GF"
+                    mean_nodes,  # "AN"
+                    max_org._id,  # "MO"
+                    max_org_fitness,  # "MF"
+                    max_org.count_nodes(),  # "MN"
+                    best_org._id,  # "BO"
+                    best_org_fitness,  # "BF"
+                    best_org.count_nodes(),  # "BN"
+                    s_time,  # Time
+                ),
+                RESULT_BASE_PATH_DIR + OUTPUT_FILENAME,
+            )
+            
+            # Print against a random positive sequence
+            placement = max_org.get_placement(random.choice(positive_dataset))
+            placement.print_placement(stdout = True)
+            
+            # Print against a random negative sequence
+            placement = max_org.get_placement(random.choice(negative_dataset))
+            placement.print_placement(stdout = True)
+            
+            if RANDOM_SHUFFLE_SAMPLING_POS:
+                # If the dataset is shuffled, prepare a sorted version for the
+                # 'export' functions, so that regardless of the current status of
+                # the dataset, the sequences exported are always the same and
+                # always appear in the same order.
+                pos_set_for_export = sorted(positive_dataset)
+            else:
+                pos_set_for_export = positive_dataset
+            
+            # Export organism if new best organism
+            if changed_best_score:
+                filename = "{}_{}".format(time.strftime(timeformat), best_org._id)
+                export_organism(best_org, pos_set_for_export, filename, organism_factory)
+            # Periodic organism export
+            if generation % PERIODIC_ORG_EXPORT == 0:
+                filename = "{}_{}".format(time.strftime(timeformat), max_org._id)
+                export_organism(max_org, pos_set_for_export, filename, organism_factory)
+            
+            # Periodic population export (+ update plot)
+            if generation % PERIODIC_POP_EXPORT == 0:
+                # Select a random positive DNA sequence to use for the population export
+                seq_idx = random.randint(0, len(pos_set_for_export)-1)
+                export_population(organism_population, pos_set_for_export,
+                                  organism_factory,generation, seq_idx)
+                # Export plot, too
+                export_plots()
+        
+        generation += 1
+        # END WHILE
+
+
+def single_print(*argv):
+    '''
+    Prints to standard output the input as strings. It ensures the message is
+    printed only once, even if running in parallel with more than one process.
+    It recapitulates the behaviour of the print function in Python3:
+        - if more than one argument is passsed, they are printed sequentially,
+          separated by a space
+        - the input arguments don't have to be strings. They only need to be
+          types that can be converted to strings
+    '''
+    if i_am_main_process():
+        # i_am_main_process returns True only if the process rank is 0.
+        # When running in serial mode, the only running process has rank 0.
+        print(" ".join([str(x) for x in argv]))
+
+def initialize_population(organism_factory):
+    '''
+    Returns the initial population of organisms as a list.
+    If running in parallel, in processes that have rank different from 0 the
+    funtion returns None.
+    '''
     # Initialize the population of organisms
     if i_am_main_process():
         
@@ -117,6 +361,7 @@ def main():
             # For a random origin, we can generate #POPULATION_LENGTH organisms.
             for i in range(POPULATION_LENGTH):
                 new_organism = organism_factory.get_organism()
+                new_organism.check_size(organism_factory)  # XXX
                 organism_population.append(new_organism)
         elif POPULATION_ORIGIN.lower() == "file":
             #if the population is seeded from file
@@ -153,340 +398,7 @@ def main():
     else:
         organism_population = None
     
-    
-    """
-    Initialize iteration variables.
-    """
-    iterations = 0
-    max_score = float("-inf")
-    last_max_score = 0.0
-    # Organism with highest fitness in the simulation
-    best_organism = (
-        None,  # the organism object
-        -np.inf,  # its fitness
-        0  # number of nodes it is made of
-    )
-    # Organism with highest fitness in the iteration
-    max_organism = (
-        None,  # the organism object
-        -np.inf,  # its fitness
-        0  # number of nodes it is made of
-    )
-    timeformat = "%Y-%m-%d--%H-%M-%S"
-    
-    if i_am_main_process():
-        print("Starting execution...")
-
-    # Main loop, it iterates until organisms do not get a significant change
-    # or MIN_ITERATIONS or MIN_FITNESS is reached.
-
-    while not is_finished(END_WHILE_METHOD, iterations, max_score, 
-                          last_max_score):
-        
-        
-        if i_am_main_process():
-            # Shuffle population
-            # Organisms are shuffled for deterministic crowding selection
-            random.shuffle(organism_population)        
-        
-        
-        if RUN_MODE == 'parallel':
-            # FRAGMENT AND SCATTER THE POPULATION
-            organism_population = fragment_population(organism_population)
-            organism_population = comm.scatter(organism_population, root=0)
-            
-            # print to check that the sub-populations are correct
-            # my_ids = [org._id for org in organism_population]
-            # print("From process " + str(rank) + ": loc pop is " + str(my_ids))
-        
-        # Shuffle datasets (if required)
-        if RANDOM_SHUFFLE_SAMPLING_POS:
-            positive_dataset = shuffle_dataset(positive_dataset)
-        if RANDOM_SHUFFLE_SAMPLING_NEG:
-            negative_dataset = shuffle_dataset(negative_dataset)
-        
-        # Reset max_score
-        last_max_score = max_score
-        max_score = float("-inf")
-        changed_best_score = False
-        initial = time.time()
-        
-        a_fitness = []
-        a_nodes = []
-        
-        # Deterministic crowding
-        # Iterate over pairs of organisms
-        for i in range(0, len(organism_population) - 1, 2):
-            org1 = organism_population[i]
-            org2 = organism_population[i + 1]
-            
-            pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
-            ref_seq = pos_set_sample[0]
-            
-            # Decide if the parents will do sexual or clonal reproduction (recombination VS mutation)
-            if random.random() < organism_factory.recombination_probability:
-                # Recombination case; no mutation
-                child1, child2 = organism_factory.get_children(
-                    org1, org2, ref_seq, pos_set_sample)
-            
-            else:
-                # Non-recomination case; the children are mutated
-                child1, child2 = organism_factory.clone_parents(org1, org2)
-                # The children in this non-recombination scenario are just
-                # mutated versions of the parents
-                child1.mutate(organism_factory)
-                child2.mutate(organism_factory)
-            
-            # Pair parents and offspring
-            two_parent_child_pairs = pair_parents_and_children(org1, org2, child1, child2)
-            
-            # # Make two pairs: each parent is paired with the more similar child
-            # # (the child with higher ratio of nodes from that parent).
-            # two_parent_child_pairs = []
-            # ''' `two_parent_child_pairs` is a list of two elements. The two parents
-            # we are now working with are elements i and i+1 in `organism_population`.
-            # We need to pair each of them with one of the two children obtained
-            # with the  get_children  method.
-            
-            #     - The first element in `two_parent_child_pairs` will be a tuple where
-            #       the first element is organism i, and the second one is a
-            #       child
-                  
-            #     - The second element in `two_parent_child_pairs` will be a tuple where
-            #       the first element is organism i+1, and the second one is the
-            #       other child
-            # '''
-            
-            # # get parent1/parent2 ratio for the children
-            # child1_p1p2_ratio = child1.get_parent1_parent2_ratio()
-            # child2_p1p2_ratio = child2.get_parent1_parent2_ratio()
-            
-            # # If a parent gets paired with an empty child, the empty child is
-            # # substituted by a deepcopy of the parent, i.e. the parent escapes
-            # # competition
-            # if child1_p1p2_ratio > child2_p1p2_ratio:
-            #     # org1 with child1
-            #     if child1.count_nodes() > 0:
-            #         two_parent_child_pairs.append( (org1, child1) )
-            #     else:
-            #         two_parent_child_pairs.append( (org1, copy.deepcopy(org1)) )
-            #     # org2 with child2
-            #     if child2.count_nodes() > 0:
-            #         two_parent_child_pairs.append( (org2, child2) )
-            #     else:
-            #         two_parent_child_pairs.append( (org2, copy.deepcopy(org2)) )
-            # else:
-            #     # org1 with child2
-            #     if child2.count_nodes() > 0:
-            #         two_parent_child_pairs.append( (org1, child2) )
-            #     else:
-            #         two_parent_child_pairs.append( (org1, copy.deepcopy(org1)) )
-            #     # org2 with child1
-            #     if child1.count_nodes() > 0:
-            #         two_parent_child_pairs.append( (org2, child1) )
-            #     else:
-            #         two_parent_child_pairs.append( (org2, copy.deepcopy(org2)) )
-            
-            # Make the two organisms in each pair compete
-            # j index is used to re insert winning organism into the population
-            for j in range(len(two_parent_child_pairs)):
-                '''
-                when j is 0 we are dealing with organism i
-                when j is 1 we are dealing with organism i+1
-                
-                Therefore, the winner of the competition will replace element
-                i+j in  organism_population
-                '''
-
-                first_organism = two_parent_child_pairs[j][0]  # Parent Organism
-                second_organism = two_parent_child_pairs[j][1]  # Child Organism
-                
-                fitness1 = first_organism.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                      negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                      FITNESS_FUNCTION, GAMMA)
-                fitness2 = second_organism.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                                       negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                                       FITNESS_FUNCTION, GAMMA)
-                
-                if MAX_NODES != None:  # Upper_bound to complexity
-                    
-                    if first_organism.count_nodes() > MAX_NODES:
-                        fitness1 = -1000 * int(first_organism.count_nodes())
-                    
-                    if second_organism.count_nodes() > MAX_NODES:
-                        fitness2 = -1000 * int(second_organism.count_nodes())
-
-                if MIN_NODES != None:  # Lower_bound to complexity
-                    
-                    if first_organism.count_nodes() < MIN_NODES:
-                        fitness1 = -1000 * int(first_organism.count_nodes())
-                    
-                    if second_organism.count_nodes() < MIN_NODES:
-                        fitness2 = -1000 * int(second_organism.count_nodes())
-                
-                
-                # Competition
-                if fitness1 > fitness2:  # The first organism wins (the parent wins)
-                    # Set it back to the population and save fitness
-                    # for next iteration
-                    organism_population[i + j] = first_organism
-                    a_fitness.append(fitness1)
-                    # If the parent wins, mean_nodes don't change
-                    a_nodes.append(first_organism.count_nodes())
-
-                    # Check if its the max score in that iteration
-                    if fitness1 > max_score:
-                        max_score = fitness1
-                        max_organism = (
-                            first_organism,
-                            fitness1,
-                            first_organism.count_nodes()
-                        )
-
-                    # Check if its the max score so far and if it is set it as
-                    # best organism
-                    if max_organism[1] > best_organism[1]:
-                        # ID, EF, Nodes, Penalty applied
-                        best_organism = max_organism
-                        changed_best_score = True
-
-                else:  # The second organism wins (the child wins)
-                    # Set it back to the population and save fitness for next
-                    # iteration
-                    organism_population[i + j] = second_organism
-                    a_fitness.append(fitness2)
-                    # If the child wins, update mean_nodes
-                    # mean_nodes = ((meanNodes * POPULATION_LENGTH) +
-                    # second_organism.count_nodes() -
-                    # first_organism.count_nodes()) / POPULATION_LENGTH
-                    a_nodes.append(second_organism.count_nodes())
-
-                    # Check if its the max score in that iteration
-                    if fitness2 > max_score:
-                        max_score = fitness2
-                        max_organism = (
-                            second_organism,
-                            fitness2,
-                            second_organism.count_nodes()
-                        )
-
-                    # Check if its the max score so far and if it is set it as
-                    # best organism
-                    if fitness2 > best_organism[1]:
-                        # ID, EF, Nodes, Penalty applied
-                        best_organism = max_organism
-                        changed_best_score = True
-
-                # END FOR j
-
-            # END FOR i
-        
-        if RUN_MODE == 'parallel':
-            # GATHER AND FLATTEN THE POPULATION
-            organism_population = comm.gather(organism_population, root=0)
-            organism_population = flatten_population(organism_population)
-            
-            # print to check that the population is correct
-            # This is just for code testing/debugging
-            # if rank == 0:
-            #     my_ids = [org._id for org in organism_population]
-            #     print("From process " + str(rank) + ": gathered pop is " + str(my_ids))
-            
-            # Also gather a_fitness and a_nodes
-            a_fitness = comm.gather(a_fitness, root=0)
-            a_fitness = flatten_population(a_fitness)
-            a_nodes   = comm.gather(a_nodes,   root=0)
-            a_nodes   = flatten_population(a_nodes)
-        
-        if i_am_main_process():
-            # Mean fitness in the population
-            mean_fitness = np.mean(a_fitness)
-            # Standard deviation of fitness in the population
-            standard_dev_fitness = np.std(a_fitness)
-            # Inequality of fitness in the population (measured with the Gini coefficient)
-            gini_fitness = gini_RSV(a_fitness)
-            # Mean number of nodes per organism in the population
-            mean_nodes = np.mean(a_nodes)
-            
-            # Show IDs of final array
-            # print("-"*10)
-            _m, _s = divmod((time.time() - initial), 60)
-            _h, _m = divmod(_m, 60)
-            s_time = "{}h:{}m:{:.2f}s".format(int(_h), int(_m), _s)
-            print_ln(
-                (
-                    "Iter: {} AF:{:.2f} SDF:{:.2f} GF:{:.2f} AN:{:.2f}"
-                    + " - MO: {} MF: {:.2f} MN: {}"
-                    + " -  BO: {} BF: {:.2f} BN: {} Time: {}"
-                ).format(
-                    iterations,  # "Iter"
-                    mean_fitness,  # "AF"
-                    standard_dev_fitness,  # "SDF"
-                    gini_fitness,  # "GF"
-                    mean_nodes,  # "AN"
-                    max_organism[0]._id,  # "MO"
-                    max_organism[1],  # "MF" (fitness)
-                    max_organism[2],  # "MN" (nodes)
-                    best_organism[0]._id,  # "BO"
-                    best_organism[1],  # "BF" (fitness)
-                    best_organism[2],  # "BN" (nodes)
-                    s_time,  # Time
-                ),
-                RESULT_BASE_PATH_DIR + OUTPUT_FILENAME,
-            )
-            
-            # Print against a random positive sequence
-            placement = max_organism[0].get_placement(random.choice(positive_dataset))
-            placement.print_placement(stdout = True)
-            
-            # Print against a random negative sequence
-            placement = max_organism[0].get_placement(random.choice(negative_dataset))
-            placement.print_placement(stdout = True)
-            
-            
-            if RANDOM_SHUFFLE_SAMPLING_POS:
-                # If the dataset is shuffled, prepare a sorted version for the
-                # 'export' functions, so that regardless of the current status of
-                # the dataset, the sequences exported are always the same and
-                # always appear in the same order.
-                pos_set_for_export = sorted(positive_dataset)
-            else:
-                pos_set_for_export = positive_dataset
-            
-            
-            # Export organism if new best organism
-            if changed_best_score:
-                filename = "{}_{}".format(
-                    time.strftime(timeformat), best_organism[0]._id
-                )
-                export_organism(
-                    best_organism[0], pos_set_for_export, filename, organism_factory
-                )
-            # Periodic organism export
-            if iterations % PERIODIC_ORG_EXPORT == 0:
-                filename = "{}_{}".format(
-                    time.strftime(timeformat), max_organism[0]._id
-                )
-                export_organism(
-                    max_organism[0], pos_set_for_export, filename, organism_factory
-                )
-            
-            # Periodic population export
-            if iterations % PERIODIC_POP_EXPORT == 0:
-                # Select a random positive DNA sequence to use for the population export
-                seq_idx = random.randint(0, len(pos_set_for_export)-1)
-                
-                export_population(
-                    organism_population, pos_set_for_export, organism_factory,
-                    iterations, seq_idx
-                )
-                
-                # Export plot, too
-                export_plots()
-        
-        iterations += 1
-        # END WHILE
-
+    return organism_population
 
 def pair_parents_and_children(parent1, parent2, child1, child2):
     '''
@@ -540,7 +452,7 @@ def shuffle_dataset(dataset: list) -> list:
     parallel mode. Indeed, we want all the processes to compute fitness on the
     same subset, defined as dataset[:MAX_SEQUENCES_TO_FIT_***]. So we want the
     processes to share the same random permutation of the datset. This function
-    ensures that by MPI broadcasting the indexes that define the permutation,
+    ensures that, by MPI broadcasting the indexes that define the permutation,
     instead of broadcasting the shuffled dataset of sequences.
     '''
     indexes = list(range(len(dataset)))
@@ -612,7 +524,7 @@ def generate_negative_set(positive_set: list) -> list:
 
 
 def is_finished(
-        method: str, iterations: int, max_score: float, last_max_score: float
+        method: str, generation: int, max_score: float, last_max_score: float
 ) -> bool:
     """Checks if main while loop is finished
     methods: 'Iterations', 'minScore', 'Threshold'
@@ -621,7 +533,7 @@ def is_finished(
         method: Name of the finishing method
         max_score: max score recorded on the current iteration
         last_max_score: max score recorded on the laset iteration
-        iterations: Number of the current iteration
+        generation: Number of the current iteration
 
     Returns:
         True if program should finnish.
@@ -629,7 +541,7 @@ def is_finished(
     """
 
     if method.lower() == "iterations":
-        return iterations >= MIN_ITERATIONS
+        return generation >= MIN_ITERATIONS
 
     if method.lower() == "fitness":
         return max_score >= MIN_FITNESS
@@ -768,11 +680,11 @@ def i_am_main_process():
     return not rank
 
 
-def check_mpi_settings():
+def check_mpi_settings(p, config):
     ''' If the number of processes exceeds the number of pairs of organisms in
     the population, some processes will be left with an empty population. In
     that case, to avoid wasting computing power, an error is raised. '''
-    if p > int(POPULATION_LENGTH / 2):
+    if p > int(config["main"]["POPULATION_LENGTH"] / 2):
         raise ValueError("The minimum number of organisms assigned to each " +
                          "process is 2 (you need a pair for recombination events " +
                          "to take place). Thus, the maximum number of processes" +
@@ -808,8 +720,8 @@ def set_up():
     global RESULT_BASE_PATH_DIR
     global POSITIVE_FILENAME
     global NEGATIVE_FILENAME
-    global GENERATED_NEG_SET_SIZE  # XXX
-    global GENERATED_NEG_SET_KMER_LEN  # XXX
+    global GENERATED_NEG_SET_SIZE
+    global GENERATED_NEG_SET_KMER_LEN
     global RESULT_PATH_PATH_DIR
     global MAX_SEQUENCES_TO_FIT_POS
     global MAX_SEQUENCES_TO_FIT_NEG
@@ -817,7 +729,6 @@ def set_up():
     global RANDOM_SHUFFLE_SAMPLING_NEG
     global FITNESS_FUNCTION
     global GAMMA
-    global GENOME_LENGTH
     global MIN_ITERATIONS
     global MIN_FITNESS
     global THRESHOLD
@@ -827,8 +738,6 @@ def set_up():
     global OUTPUT_FILENAME
     global PERIODIC_ORG_EXPORT
     global PERIODIC_POP_EXPORT
-    global MAX_NODES
-    global MIN_NODES
 
     # Config data
     global configOrganism
@@ -844,23 +753,27 @@ def set_up():
 
     config = read_json_file(JSON_CONFIG_FILENAME)
     
-    POPULATION_LENGTH = config["main"]["POPULATION_LENGTH"]
-    if POPULATION_LENGTH % 2 != 0:
-        raise Exception("POPULATION_LENGTH must be an even number.")
-    
+    # Check the config settings and set up MPI if running in parallel
     RUN_MODE = config["main"]["RUN_MODE"]
     if RUN_MODE == "parallel":
         from mpi4py import MPI  # mpi4py is only imported if needed
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
         p = comm.Get_size()
-        check_mpi_settings()
+        check_mpi_settings(p, config)
+        # Check the settings in the config file
+        if rank==0:
+            check_config_settings(config)
+        # Make all processes wait for process 0 to complete the check
+        comm.Barrier()
     elif RUN_MODE == "serial":
         comm, rank, p = None, None, None
+        # Check the settings in the config file
+        check_config_settings(config)
     else:
-        raise ValueError('RUN_MODE should be "serial" or "parallel".')
+        raise ValueError('RUN_MODE should be "serial" or "parallel".')    
     
-    
+    POPULATION_LENGTH = config["main"]["POPULATION_LENGTH"]
     DATASET_BASE_PATH_DIR = config["main"]["DATASET_BASE_PATH_DIR"]
     if i_am_main_process():
         print('\n==================\nRUN_MODE: {}\n==================\n'.format(
@@ -878,7 +791,6 @@ def set_up():
     RANDOM_SHUFFLE_SAMPLING_NEG = config["main"]["RANDOM_SHUFFLE_SAMPLING_NEG"]
     FITNESS_FUNCTION = config["main"]["FITNESS_FUNCTION"]
     GAMMA = config["main"]["GAMMA"]
-    GENOME_LENGTH = config["main"]["GENOME_LENGTH"]
     MIN_ITERATIONS = config["main"]["MIN_ITERATIONS"]
     MIN_FITNESS = config["main"]["MIN_FITNESS"]
     THRESHOLD = config["main"]["THRESHOLD"]
@@ -889,9 +801,7 @@ def set_up():
     OUTPUT_FILENAME = config["main"]["OUTPUT_FILENAME"]
     PERIODIC_ORG_EXPORT = config["main"]["PERIODIC_ORG_EXPORT"]
     PERIODIC_POP_EXPORT = config["main"]["PERIODIC_POP_EXPORT"]
-    MAX_NODES = config["organism"]["MAX_NODES"]
-    MIN_NODES = config["organism"]["MIN_NODES"]
-
+    
     # Create directory where the output and results will be stored
     if i_am_main_process():
         check_dir(RESULT_BASE_PATH_DIR)
@@ -949,19 +859,64 @@ def read_fasta_file(filename: str) -> list:
 
 
 def read_json_file(filename: str) -> dict:
-    """Reads a JSON file and returns a dictionary with the content
-
+    """Reads a JSON file and returns a dictionary with the content.
+    
     Args:
         filename: Name of the json file to read
-
     Returns:
         Dictionary with the json file info
-
     """
-
     with open(filename) as json_content:
-
         return json.load(json_content)
+
+
+def check_config_settings(config):
+    '''
+    Checks that the input parameters set in the config file are valid.
+    '''
+    
+    # Check that the population size is an even number
+    if config["main"]["POPULATION_LENGTH"] % 2 != 0:
+        raise Exception(("POPULATION_LENGTH must be an even number. " +
+                         "Please correct the settings."))
+    
+    # Check that min_n_rec <= avg_n_rec <= max_n_rec
+    avg_n_rec = config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"]
+    min_n_rec = config["organism"]["MIN_N_RECOGNIZERS"]
+    max_n_rec = config["organism"]["MAX_N_RECOGNIZERS"]
+    if max_n_rec == None:
+        max_n_rec = np.inf
+    if avg_n_rec < min_n_rec:
+        raise ValueError(("The average number of recognizers per organism " +
+                          "must be a valid one, i.e. between the minimum " +
+                          "and the maximum allowed (included). " +
+                          "AVG_N_RECOGNIZERS_LAMBDA was set to " +
+                          str(config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"]) +
+                          ", but MIN_N_RECOGNIZERS was set to " +
+                          str(config["organism"]["MIN_N_RECOGNIZERS"]) +
+                          ". Please correct the settings."))
+    if avg_n_rec > max_n_rec:
+        raise ValueError(("The average number of recognizers per organism " +
+                          "must be a valid one, i.e. between the minimum " +
+                          "and the maximum allowed (included). " +
+                          "AVG_N_RECOGNIZERS_LAMBDA was set to " +
+                          str(config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"]) +
+                          ", but MAX_N_RECOGNIZERS was set to " +
+                          str(config["organism"]["MAX_N_RECOGNIZERS"]) +
+                          ". Please correct the settings."))
+    if min_n_rec > max_n_rec:
+        raise ValueError(("The minimum number of recognizers per organism " +
+                          "specified in the settings (MIN_N_RECOGNIZERS) is" +
+                          " larger than the maximum number of recognizers per" +
+                          "organism (MAX_N_RECOGNIZERS). Please correct the" +
+                          " settings."))
+    
+    # Check that the fitness function is spelled correctly
+    if (config["main"]["FITNESS_FUNCTION"] not in
+        ["Welch", "Yuen", "Trim-left-M", "Trim-left-M-SD"]):
+        raise ValueError("Unknown fitness function. Please choose one of the " +
+                         "following: 'Welch', 'Yuen', 'Trim-left-M', 'Trim-left-M-SD'.")
+    
 
 
 def print_config_json(config: dict, name: str, path: str) -> None:
@@ -1074,17 +1029,14 @@ def fragment_population(population):
     
     # Number of pairs of organisms
     n_pairs = int(len(population) / 2)
-    q = n_pairs // p  # p is the number of processes
-    r = n_pairs % p  # p is the number of processes
+    q, r = divmod(n_pairs, p)  # p is the number of processes
     # Number of pairs of organisms assigned to each process
-    local_n_pairs_list = [q + 1] * r + [q] * (p - r)
+    pairs_counts = [q + 1] * r + [q] * (p - r)
     # Number of organisms assigned to each process
-    sendcounts = [n*2 for n in local_n_pairs_list]
-    # Make a list where each element is the list of organism for a process
+    org_counts = [n*2 for n in pairs_counts]
+    # Fragment population: 1D list -> 2D list
     it = iter(population)
-    population = [[next(it) for _ in range(size)] for size in sendcounts]
-    # Now the population list is "fragmented" (list -> list of lists)
-    return population
+    return [[next(it) for _ in range(count)] for count in org_counts]
 
 
 def flatten_population(population):
@@ -1101,11 +1053,9 @@ def flatten_population(population):
     if population is None:
         return None
     
-    flat_population = []
-    for sublist in population:
-        for item in sublist:
-            flat_population.append(item)
-    return flat_population
+    # Flatten population: 2D list -> 1D list
+    return [org for sublist in population for org in sublist]
+
 
 if __name__ == "__main__":
     

@@ -17,11 +17,8 @@ class PlacementObject:
         PlacementObject object constructor.
 
         Args:
-            energy: 
-            recognizers_scores: 
-            connectors_scores: 
-            nodes_placement_right_ends: 
-            null_gaps: 
+            organism_id: str
+            dna_sequence: str
         """
         
         self.organism_id = organism_id
@@ -35,6 +32,7 @@ class PlacementObject:
         self.recognizers_positions = []
         self.connectors_positions = []
         self.recognizer_types = ""
+    
     # Compile placement features
     
     def set_energy(self, energy):

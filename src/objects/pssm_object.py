@@ -40,30 +40,13 @@ class PssmObject():
         self.type = 'pssm'
         
         # assign PSSM-specific configuration elements
-        self.mutate_probability_random_col = config[
-            "MUTATE_PROBABILITY_RANDOM_COL"
-        ]
-        self.mutate_probability_mutate_col = config[
-            "MUTATE_PROBABILITY_MUTATE_COL"
-        ]
-        self.mutate_probability_flip_cols = config[
-            "MUTATE_PROBABILITY_FLIP_COL"
-        ]
-        self.mutate_probability_flip_rows = config[
-            "MUTATE_PROBABILITY_FLIP_ROW"
-        ]
-        self.mutate_probability_shift_left = config[
-            "MUTATE_PROBABILITY_SHIFT_LEFT"
-        ]
-        self.mutate_probability_shift_right = config[
-            "MUTATE_PROBABILITY_SHIFT_RIGHT"
-        ]
-        self.mutate_probability_increase_pwm = config[
-            "MUTATE_PROBABILITY_INCREASE_PWM"
-                ]
-        self.mutate_probability_decrease_pwm = config[
-            "MUTATE_PROBABILITY_DECREASE_PWM"
-                ]
+        self.mutate_probability_random_col = config["MUTATE_PROBABILITY_RANDOM_COL"]
+        self.mutate_probability_mutate_col = config["MUTATE_PROBABILITY_MUTATE_COL"]
+        self.mutate_probability_flip_cols = config["MUTATE_PROBABILITY_FLIP_COL"]
+        self.mutate_probability_flip_rows = config["MUTATE_PROBABILITY_FLIP_ROW"]
+        self.mutate_probability_increase_pwm = config["MUTATE_PROBABILITY_INCREASE_PWM"]
+        self.mutate_probability_decrease_pwm = config["MUTATE_PROBABILITY_DECREASE_PWM"]
+        
         self.min_columns = config["MIN_COLUMNS"]
         self.max_columns = config["MAX_COLUMNS"]
 
@@ -86,166 +69,299 @@ class PssmObject():
         """Mutation operators associated to the PSSM recognizer
 
         Args:
-            org_factory (OrganismFactory): Creates objects
+            org_factory (OrganismFactory)
         """
         
-        # Code to keep track if mutations that shift the boundaries of the
-        # PSSM placement have occurred (shift left/shift right/increase pwm/
-        # decrease pwm).
-        pssm_displacement_code = [0, 0]
+        mutated = False
         
+        # Mutations that can shift the boundaries of the PSSM placement
+        # (increase pwm / decrease pwm) will modify
+        # the values in `displacement_code`
+        displacement_code = [0, 0]  # left and right displacement (in bp)
+        
+        # Randomize column
         if random.random() < self.mutate_probability_random_col:
-
-            # Randomize PSSM column 
-            # [substitutes column with a randomized column]
-            new_col = org_factory.get_pwm_column()
-            # Select a random col in self.pwm
-            column_to_update = random.randint(0, self.length - 1)
-            # Insert it in that position
-            self.pwm[column_to_update] = new_col
+            self._randomize_column(org_factory)
+            mutated = True
         
+        # Mutate column
         if random.random() < self.mutate_probability_mutate_col:
-            '''Mutate a column of the PSSM. The mutation involves transferring
-            some of the weight from a "donor" base to an "acceptor" base'''
-            # Chose a random column of that PSSM
-            idx_of_random_col = random.randint(0, self.length - 1)
-            
-            # Chose from which base to which base the transfer of weight will occur
-            donor_base, acceptor_base = random.sample(['a','c','g','t'], 2)
-            
-            # Current values of the two bases
-            donor_current_prob = self.pwm[idx_of_random_col][donor_base]            
-            acceptor_current_prob = self.pwm[idx_of_random_col][acceptor_base]
-            
-            no_BSs = org_factory.pwm_number_of_binding_sites
-            donor_current_count = donor_current_prob * no_BSs            
-            acceptor_current_count = acceptor_current_prob * no_BSs
-            
-            # entity of the transfer of counts
-            transfer = random.randint(0, int(donor_current_count) - 1)
-            
-            # New count values for the two bases
-            donor_new_count = donor_current_count - transfer
-            acceptor_new_count = acceptor_current_count + transfer
-            
-            # Back to probabilities
-            donor_new_prob = donor_new_count / no_BSs
-            acceptor_new_prob = acceptor_new_count / no_BSs
-            
-            # To avoid extra decimals due to floating point errors:
-            # Define the number of decimal digits actually required.
-            # All frequencies are multiples of 1/no_BSs
-            smallest_freq = dec.Decimal('1') / dec.Decimal(str(no_BSs))
-            # Number of decimals in the smallest frequency
-            no_decimals = len(str(smallest_freq).split(".")[1])
-            # No frequency value needs more decimal digits than  smallest_freq.
-            # Therefore we can round according to  no_decimals
-            donor_new_prob = round(donor_new_prob, no_decimals)
-            acceptor_new_prob = round(acceptor_new_prob, no_decimals)
-            # Update pwm
-            self.pwm[idx_of_random_col][donor_base] = donor_new_prob
-            self.pwm[idx_of_random_col][acceptor_base] = acceptor_new_prob
-
-        if random.random() < self.mutate_probability_flip_cols:
-            # Swaps two PSSM columns
-            # col1 --> col2, col2 --> col1
-            col1, col2 = random.sample(range(self.length), 2)
-            # Select two random columns and swap them
-            tmp_col = self.pwm[col1]
-            self.pwm[col1] = self.pwm[col2]
-            self.pwm[col2] = tmp_col
-
-        if random.random() < self.mutate_probability_flip_rows:
-            # Swaps two PSSM rows
-            
-            # Pick rows (A, C, T or G) to be swapped
-            bases = ["a", "c", "g", "t"]
-            random.shuffle(bases)
-            base1, base2 = bases[:2]
-
-            # Swap rows
-            for i in range(self.length):
-                tmp_base = self.pwm[i][base1]
-                self.pwm[i][base1] = self.pwm[i][base2]
-                self.pwm[i][base2] = tmp_base
-
-        if random.random() < self.mutate_probability_shift_left:
-            # Shift PSSM from right to left, rolling over
-            self.pwm = np.roll(self.pwm, 1)
-            
-            # The left bound of the PSSM shifts 1 bp to the left (-1)
-            pssm_displacement_code[0] -= 1
-            # The right bound of the PSSM shifts 1 bp to the left (-1)
-            pssm_displacement_code[1] -= 1
-
-        if random.random() < self.mutate_probability_shift_right:
-            # Shift PSSM from left to right, rolling over
-            self.pwm = np.roll(self.pwm, -1)
-            
-            # The left bound of the PSSM shifts 1 bp to the right (+1)
-            pssm_displacement_code[0] += 1
-            # The right bound of the PSSM shifts 1 bp to the right (+1)
-            pssm_displacement_code[1] += 1
-
-        if random.random() < self.mutate_probability_increase_pwm:
-            # Increase length of PWM
-            if self.length < self.max_columns: # do only if allowed
-
-                #generate a new column
-                new_col = org_factory.get_pwm_column()
-
-                # Add the new column to one side (chose randomly left or right)
-                if random.random() < 0.5:
-                    # Insert to the left
-                    tmp_array = [new_col] + self.pwm.tolist()
-                    
-                    # The left bound of the PSSM shifts 1 bp to the left (-1)
-                    pssm_displacement_code[0] -= 1
-                    
-                else:
-                    # Insert to the right
-                    tmp_array = self.pwm.tolist() + [new_col]
-                    
-                    # The right bound of the PSSM shifts 1 bp to the right (+1)
-                    pssm_displacement_code[1] += 1
-
-                # assign newly made PWM
-                self.pwm = np.array(tmp_array)
-                # Update length attribute
-                self.update_length()
-
-        if random.random() < self.mutate_probability_decrease_pwm:
-            # Decrease length of PWM
-            if self.length > self.min_columns:
-                
-                # Remove a column from one side (chose randomly left or right)
-                if random.random() < 0.5:
-                    # Remove from the left
-                    self.pwm = self.pwm[1:]
-                    
-                    # The left bound of the PSSM shifts 1 bp to the right (+1)
-                    pssm_displacement_code[0] += 1
-                
-                else:
-                    # Remove from the right
-                    self.pwm = self.pwm[:-1]
-                    
-                    # The right bound of the PSSM shifts 1 bp to the left (-1)
-                    pssm_displacement_code[1] -= 1
-                
-                # Update length attribute
-                self.update_length()
+            self._mutate_column(org_factory)
+            mutated = True
         
-        # recompute PSSM
-        # mutation operators affect the PWM (frequency matrix)
-        # so the PSSM is re-computed after mutations take place
-        self.recalculate_pssm()
+        # Flip columns
+        if random.random() < self.mutate_probability_flip_cols:
+            self._flip_cols()
+            mutated = True
+        
+        # Flip rows
+        if random.random() < self.mutate_probability_flip_rows:
+            self._flip_rows()
+            mutated = True
+        
+        # Increase length
+        if random.random() < self.mutate_probability_increase_pwm:
+            self._increase_length(displacement_code, org_factory)
+            mutated = True
+        
+        # Decrease length
+        if random.random() < self.mutate_probability_decrease_pwm:
+            self._decrease_length(displacement_code)
+            mutated = True
+        
+        if mutated:
+            # Recompute PSSM. Mutation operators affect the PWM (frequency matrix),
+            # so the PSSM is re-computed after mutations take place
+            self.recalculate_pssm()
         
         # If the PSSM boundaries have changed, report the pssm-displacement
         # code, so that connectors can eventually be adjusted if necessary
-        if pssm_displacement_code != [0, 0]:
-            return pssm_displacement_code
+        if displacement_code != [0, 0]:
+            return displacement_code
+    
+    def _randomize_column(self, org_factory):
+        '''
+        Randomize PSSM column. Substitutes column with a random column.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
+        '''
+        # Select a random column
+        column_to_update = random.randint(0, self.length - 1)
+        # Substitute it with a new random column
+        self.pwm[column_to_update] = org_factory.get_pwm_column()
+    
+    def _mutate_column(self, org_factory):
+        '''
+        Mutate a column of the PSSM. The mutation involves transferring
+        some of the weight from a "donor" base to an "acceptor" base.
+        The transfer quantification is based on counts, not on frequencies. In
+        this way we ensure that the final frequencies are compatible with the
+        virtual number of binding sites, i.e., the "PWM_NUM_OF_BINDING_SITES"
+        paramter specified in the config file.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
+        '''
+        # Chose a random column of that PSSM
+        idx_of_random_col = random.randint(0, self.length - 1)
+        
+        # Chose from which base to which base the transfer of weight will occur
+        donor_base, acceptor_base = random.sample(['a','c','g','t'], 2)
+        
+        # Current values of the two bases
+        donor_current_prob = self.pwm[idx_of_random_col][donor_base]            
+        acceptor_current_prob = self.pwm[idx_of_random_col][acceptor_base]
+        
+        no_BSs = org_factory.pwm_number_of_binding_sites
+        donor_current_count = donor_current_prob * no_BSs            
+        acceptor_current_count = acceptor_current_prob * no_BSs
+        
+        # entity of the transfer of counts
+        transfer = random.randint(0, int(donor_current_count) - 1)
+        
+        # New count values for the two bases
+        donor_new_count = donor_current_count - transfer
+        acceptor_new_count = acceptor_current_count + transfer
+        
+        # Back to probabilities
+        donor_new_prob = donor_new_count / no_BSs
+        acceptor_new_prob = acceptor_new_count / no_BSs
+        
+        # To avoid extra decimals due to floating point errors:
+        # Define the number of decimal digits actually required.
+        # All frequencies are multiples of 1/no_BSs
+        smallest_freq = dec.Decimal('1') / dec.Decimal(str(no_BSs))
+        # Number of decimals in the smallest frequency
+        no_decimals = len(str(smallest_freq).split(".")[1])
+        # No frequency value needs more decimal digits than  smallest_freq.
+        # Therefore we can round according to  no_decimals
+        donor_new_prob = round(donor_new_prob, no_decimals)
+        acceptor_new_prob = round(acceptor_new_prob, no_decimals)
+        # Update pwm
+        self.pwm[idx_of_random_col][donor_base] = donor_new_prob
+        self.pwm[idx_of_random_col][acceptor_base] = acceptor_new_prob
+    
+    def _flip_cols(self):
+        '''
+        Swaps two PSSM columns.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
+        '''
+        # Pick two columns to be swapped
+        col1, col2 = random.sample(range(self.length), 2)
+        tmp_col = self.pwm[col1]
+        self.pwm[col1] = self.pwm[col2]
+        self.pwm[col2] = tmp_col
+    
+    def _flip_rows(self):
+        '''
+        Swaps two PSSM rows.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
+        '''
+        # Pick two rows (A, C, T or G) to be swapped
+        base1, base2 = random.sample(["a", "c", "g", "t"], 2)
+        # Swap rows
+        for i in range(self.length):
+            tmp_base = self.pwm[i][base1]
+            self.pwm[i][base1] = self.pwm[i][base2]
+            self.pwm[i][base2] = tmp_base
+    
+    # def _shift(self, displacement_code):
+    #     '''
+    #     Shifts with roll-over the PSSM.
+    #     Example:
+    #         Five columns:
+    #             1,2,3,4,5
+    #         After shifting towards the left the order of the columns is:
+    #             5,1,2,3,4
+        
+    #     =======
+    #     Warning
+    #     =======
+    #     This function is meant to be called by the `mutate` function.
+    #     If you call this function outside the `mutate` function, the pssm
+    #     will be incorrect unless you update it by calling:
+            
+    #         self.recalculate_pssm()
+        
+    #     '''
+    #     # Shift to the left (50% probability)
+    #     if random.random() < 0.5:
+    #         # Shift PSSM from right to left, rolling over
+    #         self.pwm = np.roll(self.pwm, 1)
+    #         # The left bound of the PSSM shifts 1 bp to the left (-1)
+    #         displacement_code[0] -= 1
+    #         # The right bound of the PSSM shifts 1 bp to the left (-1)
+    #         displacement_code[1] -= 1
+        
+    #     # Shift to the right (50% probability)
+    #     else:
+    #         # Shift PSSM from left to right, rolling over
+    #         self.pwm = np.roll(self.pwm, -1)
+    #         # The left bound of the PSSM shifts 1 bp to the right (+1)
+    #         displacement_code[0] += 1
+    #         # The right bound of the PSSM shifts 1 bp to the right (+1)
+    #         displacement_code[1] += 1
+    
+    def _increase_length(self, displacement_code, org_factory):
+        '''
+        Increase length of PSSM recognizer, by adding a column to the left or
+        to the right.
+        The `displacement_code` is updated to report the shift of the
+        right / left bound of the PSSM. This info is used to adjust the
+        adjacent connectors accordingly.
+        Example: if the PSSM grows one new column on the left, the connector on
+        the left must reduce its `mu` by one.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
+        '''
+        # do only if allowed
+        if self.length < self.max_columns:
 
+            #generate a new column
+            new_col = org_factory.get_pwm_column()
+
+            # Add the new column to one side (chose randomly left or right)
+            if random.random() < 0.5:
+                # Insert to the left
+                tmp_array = [new_col] + self.pwm.tolist()
+                
+                # The left bound ([0]) of the PSSM shifts 1 bp to the left (-1)
+                displacement_code[0] -= 1
+                
+            else:
+                # Insert to the right
+                tmp_array = self.pwm.tolist() + [new_col]
+                
+                # The right bound ([1]) of the PSSM shifts 1 bp to the right (+1)
+                displacement_code[1] += 1
+
+            # assign newly made PWM
+            self.pwm = np.array(tmp_array)
+            # Update length attribute
+            self.update_length()
+    
+    def _decrease_length(self, displacement_code):
+        '''
+        Decrease length of PSSM recognizer, by removing a column to the left or
+        to the right.
+        The `displacement_code` is updated to report the shift of the
+        right / left bound of the PSSM. This info is used to adjust the
+        adjacent connectors accordingly.
+        Example: if the PSSM loses one column on the left, the connector on
+        the left must increase its `mu` by one.
+        
+        =======
+        Warning
+        =======
+        This function is meant to be called by the `mutate` function.
+        If you call this function outside the `mutate` function, the pssm
+        will be incorrect unless you update it by calling:
+            
+            self.recalculate_pssm()
+        
+        '''
+        # do only if allowed
+        if self.length > self.min_columns:
+            
+            # Remove a column from one side (chose randomly left or right)
+            if random.random() < 0.5:
+                # Remove from the left
+                self.pwm = self.pwm[1:]
+                
+                # The left bound of the PSSM shifts 1 bp to the right (+1)
+                displacement_code[0] += 1
+            
+            else:
+                # Remove from the right
+                self.pwm = self.pwm[:-1]
+                
+                # The right bound of the PSSM shifts 1 bp to the left (-1)
+                displacement_code[1] -= 1
+            
+            # Update length attribute
+            self.update_length()
+    
     # Calculate self.pssm based on self.pwm
     def recalculate_pssm(self) -> None:
         """ Calculates the PSSM based on the pwm values
