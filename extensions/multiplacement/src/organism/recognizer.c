@@ -187,10 +187,10 @@ notes:           .
 void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
   // n_pent: number of pentamers that the recognizer is placed on for a single 
   //         placement
-  // n_bins: the number of bin edges for the recogninzers models
-  // alt_f:  frequency obtained based on which interval the placement score falls
+  // bin_s:  the number of bin edges for the recogninzers models
+  // alt_s:  frequency obtained based on which interval the placement score falls
   //         in for the alternative model
-  // null_f: frequency obtained based on which interval the placement score falls
+  // null_s: frequency obtained based on which interval the placement score falls
   //         in for the null model
   // edges:  boundaries of each interval for the models
   // pent_s: array to hold the placement scores for each pentamer that the
@@ -198,16 +198,11 @@ void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
   // score:  score for the placement, obtained by averaging pentamer scores
   // idx:    index in the constant array of scores based on pentamer sequence
   int n_pent = rec->len - 4;
-  int n_bins = rec->bin_s;
-  double alt_f = 0.0;
-  double null_f = 0.0;
-  double* alt = rec->alt_f;
-  double* null = rec->null_f;
-  double* edges = rec->edges;
+  double alt_s = 0.0;
+  double null_s = 0.0;
   double* pent_s = (double*)malloc(n_pent * sizeof(double));
   double score = 0.0;
   int idx = 0;
-
 
   // for each possible starting position, i, we record the scores into row
   for (int i = 0; i < len; i++){
@@ -252,15 +247,16 @@ void mgw_row( Recognizer* rec,  const char* seq,  int len, double* row){
     // for the alternative and null models
     // NOTE, the logs of the frequencies are actually what is stored, so we just
     // subtract the obtained "frequencies" to obtain our log-liklihood ratio
-    alt_f = get_bin_frequency(score, alt, edges, n_bins);
-    null_f = get_bin_frequency(score, null, edges, n_bins);
-    score = alt_f - null_f;
+    alt_s = get_bin_frequency(score, rec->alt_f, rec->edges, rec->bin_s);
+    null_s = get_bin_frequency(score, rec->null_f, rec->edges, rec->bin_s);
+    score = alt_s - null_s;
     if (score < BIG_NEGATIVE)
       score = BIG_NEGATIVE;
 
     // this can only occur if a problem occurs when finding where the score
     // belongs in the null model, se the program exits.
-    if (score > BIG_POSITIVE){
+    if (isnan(null_s)){
+      printf("Something went wrong, impossible score selected from null model...\n");
       print_rec(rec);
       exit(1);
     }
@@ -361,7 +357,8 @@ void prot_row( Recognizer* rec,  const char* seq,  int len, double* row){
 
     // this can only occur if a problem occurs when finding where the score
     // belongs in the null model, se the program exits.
-    if (score > BIG_POSITIVE){
+    if (isnan(null_f)){
+      printf("Something went wrong, impossible score selected from null model...\n");
       print_rec(rec);
       exit(1);
     }
@@ -465,7 +462,8 @@ void roll_row( Recognizer* rec,  const char* seq,  int len, double* row){
 
     // this can only occur if a problem occurs when finding where the score
     // belongs in the null model, se the program exits.
-    if (score > BIG_POSITIVE){
+    if (isnan(null_f)){
+      printf("Something went wrong, impossible score selected from null model...\n");
       print_rec(rec);
       exit(1);
     }
@@ -577,7 +575,9 @@ void helt_row( Recognizer* rec,  const char* seq,  int len, double* row){
 
     // this can only occur if a problem occurs when finding where the score
     // belongs in the null model, se the program exits.
-    if (score > BIG_POSITIVE){
+    if (isnan(null_f)){
+      printf("Something went wrong, impossible score selected from null model...\n");
+      print_rec(rec);
       exit(1);
     }
 
