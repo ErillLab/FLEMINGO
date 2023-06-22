@@ -267,6 +267,8 @@ class OrganismFactory:
         """
         if length == None or length < self.conf_shape["MIN_COLUMNS"]:
             length = self.conf_shape["MIN_COLUMNS"]
+        if length > self.conf_shape["MAX_COLUMNS"]:
+            length = self.conf_shape["MAX_COLUMNS"]
 
         rec_type = ''
         y = random.random()
