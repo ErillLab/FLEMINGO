@@ -48,7 +48,11 @@ def get_null_mgw(sequences, n, num_bins):
 
     hist = np.histogram(scores, bins=num_bins, density=True)
     for i in range(len(hist[0])):
-        hist[0][i] = np.log(hist[0][i])
+        if hist[0][i] != 0.00:
+            hist[0][i] = np.log(hist[0][i])
+        else:
+            hist[0][i] = np.nan
+            
     return hist
 
 def get_null_prot(sequences, n, num_bins):
@@ -82,7 +86,10 @@ def get_null_prot(sequences, n, num_bins):
     hist = np.histogram(scores, bins=num_bins, density=True)
 
     for i in range(len(hist[0])):
-        hist[0][i] = np.log(hist[0][i])
+        if hist[0][i] != 0.00:
+            hist[0][i] = np.log(hist[0][i])
+        else:
+            hist[0][i] = np.nan
     return hist
 
 def get_null_roll(sequences, n, num_bins):
@@ -117,7 +124,10 @@ def get_null_roll(sequences, n, num_bins):
     hist = np.histogram(scores, bins=num_bins, density=True)
 
     for i in range(len(hist[0])):
-        hist[0][i] = np.log(hist[0][i])
+        if hist[0][i] != 0.00:
+            hist[0][i] = np.log(hist[0][i])
+        else:
+            hist[0][i] = np.nan
 
     return hist
 
@@ -152,7 +162,10 @@ def get_null_helt(sequences, n, num_bins):
         scores.append((pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / (len(pentamer_scores) + 2))
     hist = np.histogram(scores, bins=num_bins, density=True)
     for i in range(len(hist[0])):
-        hist[0][i] = np.log(hist[0][i])
+        if hist[0][i] != 0.00:
+            hist[0][i] = np.log(hist[0][i])
+        else:
+            hist[0][i] = np.nan
     return hist
 
 def generate_range(a, b, models, bins):
