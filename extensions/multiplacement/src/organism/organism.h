@@ -14,7 +14,8 @@
 typedef struct Organism Organism;
 
 struct Organism {
-  int len;
+  int n_rec;
+  int sum_rec_lens;
   Recognizer* recs;
   Connector* cons;
 };
