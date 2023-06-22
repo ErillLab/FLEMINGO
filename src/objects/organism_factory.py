@@ -127,7 +127,7 @@ class OrganismFactory:
             return
 
         if max(shape_object.null_models[bins]["mgw"].keys()) < self.conf_shape["MAX_COLUMNS"]:
-            null.generate_range(max(shape_object.null_models["mgw"].keys()) + 1, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models, bins)
+            null.generate_range(max(shape_object.null_models[bins]["mgw"].keys()) + 1, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models, bins)
             return
 
         return
