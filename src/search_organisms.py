@@ -19,9 +19,8 @@ import matplotlib.pyplot as plt
 from objects.organism_factory import OrganismFactory
 from Bio import SeqIO
 
-"""
-Variable definition
-"""
+
+# Variable definition
 POPULATION_LENGTH = 0
 DATASET_BASE_PATH_DIR = ""
 RESULT_BASE_PATH_DIR = ""
@@ -38,10 +37,7 @@ MIN_FITNESS = 0
 RECOMBINATION_PROBABILITY = 0.0
 THRESHOLD = 0.0
 JSON_CONFIG_FILENAME = "config.json"
-"""
-Configuration of the object types
-Populated by JSON read.
-"""
+
 configOrganism: dict = {}
 configOrganismFactory: dict = {}
 configConnector: dict = {}
@@ -52,9 +48,9 @@ configShape: dict = {}
 # list that holds the population
 organism_population: list = []
 
-# mean_nodes are the average number of nodes per organism in the population
-# used to calculate organism complexity
-mean_nodes: float = 0
+# `mean_n_rec` is the average number of recognizers per organism in the population
+# (used to keep track of organism complexity)
+mean_n_rec: float = 0
 # mean_fitness is the average fitness per organism in the population
 # used to calculate organism complexity
 mean_fitness: float = 0
@@ -89,7 +85,7 @@ def main():
             # make sure all processes share the same negative set (the one made by process 0)
             negative_dataset = comm.bcast(negative_dataset, root=0)
 
-    mean_nodes = 0
+    mean_n_rec = 0
     mean_fitness = 0
     
     single_print("Instantiating population...")
@@ -156,7 +152,7 @@ def main():
         
         pop_id_list = []
         pop_fitness_list = []
-        pop_n_nodes_list = []
+        pop_n_recogs_list = []
         
         # Deterministic crowding
         # Iterate over pairs of organisms
@@ -215,14 +211,14 @@ def main():
                     organism_population[i + j] = parent
                     pop_id_list.append(parent)
                     pop_fitness_list.append(p_fitness)
-                    pop_n_nodes_list.append(parent.count_nodes())
+                    pop_n_recogs_list.append(parent.count_nodes())
                 
                 else:
                     # The child wins
                     organism_population[i + j] = child
                     pop_id_list.append(child)
                     pop_fitness_list.append(c_fitness)
-                    pop_n_nodes_list.append(child.count_nodes())
+                    pop_n_recogs_list.append(child.count_nodes())
                 
                 # END FOR j
 
@@ -236,8 +232,8 @@ def main():
             pop_fitness_list = comm.gather(pop_fitness_list, root=0)
             pop_fitness_list = flatten_population(pop_fitness_list)
             
-            pop_n_nodes_list = comm.gather(pop_n_nodes_list,   root=0)
-            pop_n_nodes_list = flatten_population(pop_n_nodes_list)
+            pop_n_recogs_list = comm.gather(pop_n_recogs_list,   root=0)
+            pop_n_recogs_list = flatten_population(pop_n_recogs_list)
             
             pop_id_list = comm.gather(pop_id_list, root=0)
             pop_id_list = flatten_population(pop_id_list)
@@ -250,7 +246,7 @@ def main():
             # Inequality of fitness in the population (measured with the Gini coefficient)
             gini_fitness = gini_RSV(pop_fitness_list)
             # Mean number of nodes per organism in the population
-            mean_nodes = np.mean(pop_n_nodes_list)
+            mean_n_rec = np.mean(pop_n_recogs_list)
             
             # `max_org`: Organism with highest fitness within current population
             idx_of_max_org = np.argmax(pop_fitness_list)
@@ -269,21 +265,21 @@ def main():
             s_time = "{}h:{}m:{:.2f}s".format(int(_h), int(_m), _s)
             print_ln(
                 (
-                    "Generation {} | AF:{:.2f} SDF:{:.2f} GF:{:.2f} AN:{:.2f}"
-                    + " | MO: {} MF: {:.2f} MN: {}"
-                    + " | BO: {} BF: {:.2f} BN: {} | Time: {}"
+                    "Generation {} | AF:{:.2f} SDF:{:.2f} GF:{:.2f} A#R:{:.2f}"
+                    + " | MO: {} MF: {:.2f} M#R: {}"
+                    + " | BO: {} BF: {:.2f} B#R: {} | Time: {}"
                 ).format(
                     generation,  # "Generation"
                     mean_fitness,  # "AF"
                     standard_dev_fitness,  # "SDF"
                     gini_fitness,  # "GF"
-                    mean_nodes,  # "AN"
+                    mean_n_rec,  # "A#R"
                     max_org._id,  # "MO"
                     max_org_fitness,  # "MF"
-                    max_org.count_nodes(),  # "MN"
+                    max_org.count_nodes(),  # "M#R"
                     best_org._id,  # "BO"
                     best_org_fitness,  # "BF"
-                    best_org.count_nodes(),  # "BN"
+                    best_org.count_nodes(),  # "B#R"
                     s_time,  # Time
                 ),
                 RESULT_BASE_PATH_DIR + OUTPUT_FILENAME,
@@ -361,7 +357,7 @@ def initialize_population(organism_factory):
             # For a random origin, we can generate #POPULATION_LENGTH organisms.
             for i in range(POPULATION_LENGTH):
                 new_organism = organism_factory.get_organism()
-                new_organism.check_size(organism_factory)  # XXX
+                new_organism.check_size(organism_factory)
                 organism_population.append(new_organism)
         elif POPULATION_ORIGIN.lower() == "file":
             #if the population is seeded from file

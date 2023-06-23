@@ -42,9 +42,7 @@ class OrganismFactory:
         self.max_seq_length = max_seq_length
         # lambda parameter for Poisson distribution used to instantiate organisms.
         # lambda is the expected number of recognizers per organism
-        self.avg_n_recognizers_lambda = conf_org_fac[
-            "AVG_N_RECOGNIZERS_LAMBDA"
-        ]
+        self.avg_n_recognizers_lambda = conf_org_fac["AVG_N_RECOGNIZERS_LAMBDA"]
 
         self.recombination_probability = conf_org_fac["RECOMBINATION_PROBABILITY"]
         # minimum and maximum values allowed for connector mu's
@@ -227,7 +225,6 @@ class OrganismFactory:
 
         Returns:
             a recognizer with the specified length (if its valid)
-            
         """
         if random.random() < self.pssm_vs_shape_probability:
             return self.create_pssm(length)
@@ -429,7 +426,6 @@ class OrganismFactory:
 
         Returns:
             PSSM Object from given  pssm dictionary
-
         """
         return PssmObject(np.array(pssm["pwm"]), self.conf_pssm)
 
@@ -441,7 +437,6 @@ class OrganismFactory:
 
         Returns:
             Shape Object from given shape dictionary
-
         """
         return ShapeObject(shape["recType"], shape["length"], self.conf_shape, shape["mu"], shape["sigma"])
 
@@ -490,7 +485,6 @@ class OrganismFactory:
 
         Returns:
             Recognizer in dictionary format
-        
         """
         if o_rec.get_type() == 'p':
             return self.export_pssm(o_rec)
@@ -505,7 +499,6 @@ class OrganismFactory:
 
         Returns:
             pssm in dictionary format
-
         """
         pssm = {}
         pssm["objectType"] = "pssm"
@@ -521,7 +514,6 @@ class OrganismFactory:
 
         Returns:
             shape in dictionary format
-
         """
         shape = {}
         shape["objectType"] = "shape"
@@ -561,7 +553,6 @@ class OrganismFactory:
             First child.
         child2 : OrganismObject
             Second child.
-
         '''
         
         # Initialize child 1 as an empty organism
@@ -756,7 +747,6 @@ class OrganismFactory:
         Returns
         -------
         pos_to_recog_dict : dictionary
-
         '''
         org_placement = org.get_placement(dna_seq)        
         recog_positions = org_placement.recognizers_positions
@@ -808,7 +798,6 @@ class OrganismFactory:
         connectors_table : 2D list
             This table stores at row i, column j the connector(s) available to
             link index i to index j.
-
         '''
         
         n = len(parents_repres.organism1)
@@ -1115,7 +1104,6 @@ class OrganismFactory:
             First DNA position occupied by the specified node.
         last_bp : int
             Last DNA position occupied by the specified node.
-
         '''
         
         start, stop = org_placement.recognizers_positions[recog_idx]
