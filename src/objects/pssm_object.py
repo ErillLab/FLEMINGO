@@ -49,6 +49,8 @@ class PssmObject():
         
         self.min_columns = config["MIN_COLUMNS"]
         self.max_columns = config["MAX_COLUMNS"]
+        if self.max_columns == None:
+            self.max_columns = np.inf
 
         self.pseudo_count = config["PSEUDO_COUNT"]
 
