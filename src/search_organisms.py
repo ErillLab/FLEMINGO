@@ -276,10 +276,10 @@ def main():
                     mean_n_rec,  # "A#R"
                     max_org._id,  # "MO"
                     max_org_fitness,  # "MF"
-                    max_org.count_nodes(),  # "M#R"
+                    max_org.count_recognizers(),  # "M#R"
                     best_org._id,  # "BO"
                     best_org_fitness,  # "BF"
-                    best_org.count_nodes(),  # "B#R"
+                    best_org.count_recognizers(),  # "B#R"
                     s_time,  # Time
                 ),
                 RESULT_BASE_PATH_DIR + OUTPUT_FILENAME,
