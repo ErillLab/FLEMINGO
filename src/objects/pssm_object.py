@@ -47,10 +47,10 @@ class PssmObject():
         self.mutate_probability_increase_pwm = config["MUTATE_PROBABILITY_INCREASE_PWM"]
         self.mutate_probability_decrease_pwm = config["MUTATE_PROBABILITY_DECREASE_PWM"]
         
-        self.min_columns = config["MIN_COLUMNS"]
-        self.max_columns = config["MAX_COLUMNS"]
-        if self.max_columns == None:
-            self.max_columns = np.inf
+        self.min_length = config["MIN_LENGTH"]
+        self.max_length = config["MAX_LENGTH"]
+        if self.max_length == None:
+            self.max_length = np.inf
 
         self.pseudo_count = config["PSEUDO_COUNT"]
 
@@ -298,7 +298,7 @@ class PssmObject():
         
         '''
         # do only if allowed
-        if self.length < self.max_columns:
+        if self.length < self.max_length:
 
             #generate a new column
             new_col = org_factory.get_pwm_column()
@@ -344,7 +344,7 @@ class PssmObject():
         
         '''
         # do only if allowed
-        if self.length > self.min_columns:
+        if self.length > self.min_length:
             
             # Remove a column from one side (chose randomly left or right)
             if random.random() < 0.5:

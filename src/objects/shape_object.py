@@ -83,8 +83,8 @@ class ShapeObject:
         self.mutate_probability_change_rec_type = config["MUTATE_PROBABILITY_CHANGE_REC_TYPE"]
         self.mutate_probability_increase_size = config["MUTATE_PROBABILITY_INCREASE_SIZE"]
         self.mutate_probability_decrease_size = config["MUTATE_PROBABILITY_DECREASE_SIZE"]
-        self.min_columns = config["MIN_COLUMNS"]
-        self.max_columns = config["MAX_COLUMNS"]
+        self.min_length = config["MIN_LENGTH"]
+        self.max_length = config["MAX_LENGTH"]
 
         if mu == None or sigma == None:
             self._mu = np.random.uniform(self.min_mu, self.max_mu)
@@ -164,11 +164,11 @@ class ShapeObject:
 
         # size mutations, bounded by min and max lengths specified by config
         # null models must be updated whenever size changes
-        if random.random() < self.mutate_probability_increase_size and self.length < self.max_columns:
+        if random.random() < self.mutate_probability_increase_size and self.length < self.max_length:
             self._increase_length(displacement_code)
             mutated = True
 
-        if random.random() < self.mutate_probability_decrease_size and self.length > self.min_columns:
+        if random.random() < self.mutate_probability_decrease_size and self.length > self.min_length:
             self._decrease_length(displacement_code)
             mutated = True
         
@@ -265,7 +265,7 @@ class ShapeObject:
         # do only if allowed
         # Checking this condition is useful when calling this function from
         # outside the `mutate` function
-        if self.length < self.max_columns:
+        if self.length < self.max_length:
             self.length += 1 
             self.set_null_model()
             
@@ -306,7 +306,7 @@ class ShapeObject:
         # do only if allowed
         # Checking this condition is useful when calling this function from
         # outside the `mutate` function
-        if self.length > self.min_columns:
+        if self.length > self.min_length:
             self.length -= 1 
             self.set_null_model()
             

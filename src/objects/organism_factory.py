@@ -100,11 +100,11 @@ class OrganismFactory:
         """Determines if null models must be computed or not, and calls 
         computing function if necessary.
 
-        generates models for all shapes for lengths [5, MAX_COLUMNS] if
+        generates models for all shapes for lengths [5, MAX_LENGTH] if
         shape_object.null_models is empty, or empty for the specified number
         of intervals. If it isn't empty for the specified number of bins,
         and the maximum length that has been computed already is less than
-        MAX_COLUMNS, then it will compute the remaining null models and adds
+        MAX_LENGTH, then it will compute the remaining null models and adds
         them to the dictionary. If all of the required null models have been
         computed already, it will do nothing and return None.
 
@@ -117,15 +117,19 @@ class OrganismFactory:
         """
 
         if shape_object.null_models == {}:
-            null.generate_range(5, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models, bins)
+            null.generate_range(5, self.conf_shape["MAX_LENGTH"] + 1,
+                                shape_object.null_models, bins)
             return
 
         if bins not in shape_object.null_models.keys():
-            null.generate_range(5, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models, bins)
+            null.generate_range(5, self.conf_shape["MAX_LENGTH"] + 1,
+                                shape_object.null_models, bins)
             return
 
-        if max(shape_object.null_models[bins]["mgw"].keys()) < self.conf_shape["MAX_COLUMNS"]:
-            null.generate_range(max(shape_object.null_models[bins]["mgw"].keys()) + 1, self.conf_shape["MAX_COLUMNS"] + 1, shape_object.null_models, bins)
+        if max(shape_object.null_models[bins]["mgw"].keys()) < self.conf_shape["MAX_LENGTH"]:
+            null.generate_range(max(shape_object.null_models[bins]["mgw"].keys()) + 1,
+                                self.conf_shape["MAX_LENGTH"] + 1,
+                                shape_object.null_models, bins)
             return
 
         return
@@ -262,10 +266,10 @@ class OrganismFactory:
         Returns:
             shape object with a specified length
         """
-        if length == None or length < self.conf_shape["MIN_COLUMNS"]:
-            length = self.conf_shape["MIN_COLUMNS"]
-        if length > self.conf_shape["MAX_COLUMNS"]:
-            length = self.conf_shape["MAX_COLUMNS"]
+        if length == None or length < self.conf_shape["MIN_LENGTH"]:
+            length = self.conf_shape["MIN_LENGTH"]
+        if length > self.conf_shape["MAX_LENGTH"]:
+            length = self.conf_shape["MAX_LENGTH"]
 
         rec_type = ''
         y = random.random()
