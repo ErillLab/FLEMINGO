@@ -62,17 +62,25 @@ class ShapeObject:
         """
         self.type = rec_type
         self.length = rec_size
-
+        
+        # The following attributes are set by set_null_model()
         self.null_model = []
         self.edges = []
-        self.alt_model = []
-        self.set_null_model()
-
-        self.min_mu = self.edges[0]
-        self.max_mu = self.edges[-1]
+        self.min_mu = None
+        self.max_mu = None
+        self.set_null_model()  # Sets attributes above
+        
+        # Set mu and sigma
+        # self.min_mu = self.edges[0]  # !!! redundant code (happens in set_null_model)
+        # self.max_mu = self.edges[-1]  # !!! redundant code (happens in set_null_model)
         self._mu = mu
         self._sigma = sigma
-
+        
+        if mu == None:
+            self._set_random_mu()
+        if sigma == None:
+            self._set_random_sigma()
+        
         self.pseudo_count = config["PSEUDO_COUNT"]
         self.mutate_probability_sigma = config["MUTATE_PROBABILITY_SIGMA"]
         self.mutate_probability_mu = config["MUTATE_PROBABILITY_MU"]
@@ -85,13 +93,41 @@ class ShapeObject:
         self.mutate_probability_decrease_size = config["MUTATE_PROBABILITY_DECREASE_SIZE"]
         self.min_length = config["MIN_LENGTH"]
         self.max_length = config["MAX_LENGTH"]
-
-        if mu == None or sigma == None:
-            self._mu = np.random.uniform(self.min_mu, self.max_mu)
-            self._sigma = np.random.uniform(0, 1)
-
+        self.num_bins = config["NUM_BINS"]
+        
+        self.alt_model = []
         # array for alt model must be filled prior to placement
         self.set_alt_model()
+    
+    def _set_random_mu(self):
+        '''
+        Chooses a random value for mu during Shape object initialization. The
+        value is chosen uniformly from the possible values for the given shape.
+        This function is called by the __init__ function.
+        '''
+        self._mu = np.random.uniform(self.min_mu, self.max_mu)
+    
+    def _set_random_sigma(self):
+        '''
+        Chooses a random value for sigma during Shape object initialization.
+        Sigma can be any non-negative real number. The value is drawn from an
+        exponential distribution. The parameter of the exponential is chosen so
+        that the expected value of sigma (avg_sigma) is such that the interval
+        from mu-3*avg_sigma to mu+3*avg_sigma spans as much as half of the total
+        range. This means that the interval from mu to mu+3*avg_sigma must span
+        one quarter of the total range:
+            range/4 = mu+3*avg_sigma - mu
+            range/4 = 3*avg_sigma
+        Therefore,
+            avg_sigma = range/12
+        
+        This function is called by the __init__ function.
+        '''        
+        avg_sigma = (self.edges[-1] - self.edges[0]) / 12
+        # Random Generator
+        rng = np.random.default_rng()
+        # Draw value of sigma from exponential distribution
+        self._sigma = rng.exponential(avg_sigma)
     
     def set_null_model(self):
         """Sets the null model corresponding to shape recognizer's feature

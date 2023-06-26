@@ -1,7 +1,7 @@
 {
   "main": {
     "RUN_MODE": "parallel",
-    "POPULATION_LENGTH": 20,
+    "POPULATION_LENGTH": 50,
     "POPULATION_ORIGIN": "random",
     "POPULATION_FILL_TYPE": "uniform",
     "DATASET_BASE_PATH_DIR": "datasets/",

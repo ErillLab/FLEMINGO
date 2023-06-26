@@ -260,14 +260,16 @@ def main():
                 changed_best_score = True
             
             # Print info about the current generation
+            print("")
             _m, _s = divmod((time.time() - initial), 60)
             _h, _m = divmod(_m, 60)
             s_time = "{}h:{}m:{:.2f}s".format(int(_h), int(_m), _s)
             print_ln(
                 (
-                    "Generation {} | AF:{:.2f} SDF:{:.2f} GF:{:.2f} A#R:{:.2f}"
-                    + " | MO: {} MF: {:.2f} M#R: {}"
-                    + " | BO: {} BF: {:.2f} B#R: {} | Time: {}"
+                    "Generation {}" +
+                    " | AF:{:.2f} SDF:{:.2f} GF:{:.2f} A#R:{:.2f}" +
+                    " | MO: {} MF: {:.2f} M#R: {} | BO: {} BF: {:.2f} B#R: {}" +
+                    " | Time: {}"
                 ).format(
                     generation,  # "Generation"
                     mean_fitness,  # "AF"
