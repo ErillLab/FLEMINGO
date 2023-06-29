@@ -80,6 +80,7 @@ class OrganismObject:
                                       'recognizers': None,
                                       'connectors': None}
         
+        self.fitness = None
     
     def set_assembly_instructions(self, aligned_repres, connectors_table, p1_id, p2_id):
         '''
@@ -893,9 +894,9 @@ class OrganismObject:
                              'the FITNESS_FUNCTION paramter in the config file.')
         return mean, sterr
     
-    def get_fitness(self, pos_set, neg_set, method, gamma=0.2):
+    def set_fitness(self, pos_set, neg_set, method, gamma=0.2):
         '''
-        Returns the fitness of the organism.
+        Sets the fitness of the organism.
 
         Parameters
         ----------
@@ -911,7 +912,7 @@ class OrganismObject:
         '''
         M_p, SE_p = self.get_M_and_SE_on_DNA_set(pos_set, method, gamma)
         M_n, SE_n = self.get_M_and_SE_on_DNA_set(neg_set, method, gamma)
-        return (M_p - M_n) / (SE_p**2 + SE_n**2)**(1/2)
+        self.fitness = (M_p - M_n) / (SE_p**2 + SE_n**2)**(1/2)
     
     def get_binding_energies(self, dna_set):
         '''

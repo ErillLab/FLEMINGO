@@ -226,15 +226,8 @@ class OrganismFactory:
         """It returns a connector object with its internal parameters (mu, sigma)
         assigned
         """
-
-        # # Assign a random value to mu and sigma
-        # _mu = random.randint(self.min_mu, self.max_mu)
-        # _sigma = random.randint(self.min_sigma, self.max_sigma)
-
-        # Create the new connector
-        new_connector = ConnectorObject(self.conf_con, self.max_seq_length)
-
-        return new_connector
+        
+        return ConnectorObject(self.conf_con, self.max_seq_length)
 
     def create_recognizer(self, length = None):
         """Randomly creates either a PSSM or shape recognizer
@@ -289,17 +282,8 @@ class OrganismFactory:
             length = self.conf_shape["MIN_LENGTH"]
         if length > self.conf_shape["MAX_LENGTH"]:
             length = self.conf_shape["MAX_LENGTH"]
-
-        rec_type = ''
-        y = random.random()
-        if y >= 0.00 and y < 0.25:
-            rec_type  = 'mgw'
-        if y >= 0.25 and y < 0.50:
-            rec_type  = 'prot'
-        if y >= 0.50 and y < 0.75:
-            rec_type  = 'roll'
-        if y >= 0.75 and y <= 1.00:
-            rec_type  = 'helt'
+        
+        rec_type = random.choice(['mgw', 'prot', 'roll', 'helt'])
         return ShapeObject(rec_type, length, self.conf_shape)
 
 

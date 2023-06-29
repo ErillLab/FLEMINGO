@@ -139,10 +139,11 @@ def main():
             # print("From process " + str(rank) + ": loc pop is " + str(my_ids))
         
         # Shuffle datasets (if required)
-        if RANDOM_SHUFFLE_SAMPLING_POS:
-            positive_dataset = shuffle_dataset(positive_dataset)
-        if RANDOM_SHUFFLE_SAMPLING_NEG:
-            negative_dataset = shuffle_dataset(negative_dataset)
+        if generation % PERIODIC_DATASETS_SHUFFLE == 0:
+            if RANDOM_SHUFFLE_SAMPLING_POS:
+                positive_dataset = shuffle_dataset(positive_dataset)
+            if RANDOM_SHUFFLE_SAMPLING_NEG:
+                negative_dataset = shuffle_dataset(negative_dataset)
         
         # Reset max_score
         last_max_score = max_score  # !!! Obsolete code. To be deleted/updated
@@ -157,8 +158,15 @@ def main():
         # Deterministic crowding
         # Iterate over pairs of organisms
         for i in range(0, len(organism_population) - 1, 2):
-            org1 = organism_population[i]
-            org2 = organism_population[i + 1]
+            parent1 = organism_population[i]
+            parent2 = organism_population[i + 1]
+            
+            # Reset parents' fitness if the datasets used for fitness computation
+            # have changed
+            if generation % PERIODIC_DATASETS_SHUFFLE == 0:
+                if RANDOM_SHUFFLE_SAMPLING_POS or RANDOM_SHUFFLE_SAMPLING_NEG:
+                    parent1.fitness = None
+                    parent2.fitness = None
             
             pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
             ref_seq = pos_set_sample[0]
@@ -167,11 +175,11 @@ def main():
             if random.random() < organism_factory.recombination_probability:
                 # Recombination case; no mutation
                 child1, child2 = organism_factory.get_children(
-                    org1, org2, ref_seq, pos_set_sample)
+                    parent1, parent2, ref_seq, pos_set_sample)
             
             else:
                 # Non-recomination case; the children are mutated
-                child1, child2 = organism_factory.clone_parents(org1, org2)
+                child1, child2 = organism_factory.clone_parents(parent1, parent2)
                 # The children in this non-recombination scenario are just
                 # mutated versions of the parents
                 child1.mutate(organism_factory)
@@ -182,7 +190,7 @@ def main():
             child2.check_size(organism_factory)
             
             # Pair parents and offspring
-            two_parent_child_pairs = pair_parents_and_children(org1, org2, child1, child2)
+            two_parent_child_pairs = pair_parents_and_children(parent1, parent2, child1, child2)
             
             # Make the two organisms in each pair compete
             # j index is used to re insert winning organism into the population
@@ -197,27 +205,30 @@ def main():
                 
                 parent, child = two_parent_child_pairs[j]
                 
-                p_fitness = parent.get_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                               negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                               FITNESS_FUNCTION, GAMMA)
+                # Parent fitness
+                if parent.fitness == None:
+                    parent.set_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
+                                       negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
+                                       FITNESS_FUNCTION, GAMMA)
                 
-                c_fitness = child.get_fitness( positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
-                                               negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                               FITNESS_FUNCTION, GAMMA)
+                # Child fitness
+                child.set_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
+                                  negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
+                                  FITNESS_FUNCTION, GAMMA)
                 
                 # Competition
-                if p_fitness > c_fitness:
+                if parent.fitness > child.fitness:
                     # The parent wins
                     organism_population[i + j] = parent
                     pop_id_list.append(parent)
-                    pop_fitness_list.append(p_fitness)
+                    pop_fitness_list.append(parent.fitness)
                     pop_n_recogs_list.append(parent.count_nodes())
                 
                 else:
                     # The child wins
                     organism_population[i + j] = child
                     pop_id_list.append(child)
-                    pop_fitness_list.append(c_fitness)
+                    pop_fitness_list.append(child.fitness)
                     pop_n_recogs_list.append(child.count_nodes())
                 
                 # END FOR j
@@ -510,8 +521,7 @@ def generate_negative_set(positive_set: list) -> list:
         neg_set_size = len(positive_set)
     else:
         neg_set_size = GENERATED_NEG_SET_SIZE
-    q = neg_set_size // len(positive_set)
-    r = neg_set_size % len(positive_set)
+    q, r = divmod(neg_set_size, len(positive_set))
     negative_set = []
     for i in range(q):
         for seq in positive_set:
@@ -725,6 +735,7 @@ def set_up():
     global MAX_SEQUENCES_TO_FIT_NEG
     global RANDOM_SHUFFLE_SAMPLING_POS
     global RANDOM_SHUFFLE_SAMPLING_NEG
+    global PERIODIC_DATASETS_SHUFFLE
     global FITNESS_FUNCTION
     global GAMMA
     global MIN_ITERATIONS
@@ -787,6 +798,7 @@ def set_up():
     MAX_SEQUENCES_TO_FIT_NEG = config["main"]["MAX_SEQUENCES_TO_FIT_NEG"]
     RANDOM_SHUFFLE_SAMPLING_POS = config["main"]["RANDOM_SHUFFLE_SAMPLING_POS"]
     RANDOM_SHUFFLE_SAMPLING_NEG = config["main"]["RANDOM_SHUFFLE_SAMPLING_NEG"]
+    PERIODIC_DATASETS_SHUFFLE = config["main"]["PERIODIC_DATASETS_SHUFFLE"]
     FITNESS_FUNCTION = config["main"]["FITNESS_FUNCTION"]
     GAMMA = config["main"]["GAMMA"]
     MIN_ITERATIONS = config["main"]["MIN_ITERATIONS"]
@@ -914,6 +926,16 @@ def check_config_settings(config):
         ["Welch", "Yuen", "Trim-left-M", "Trim-left-M-SD"]):
         raise ValueError("Unknown fitness function. Please choose one of the " +
                          "following: 'Welch', 'Yuen', 'Trim-left-M', 'Trim-left-M-SD'.")
+    
+    # Check that PERIODIC_DATASETS_SHUFFLE is a positive integer
+    if (not isinstance(config["main"]["PERIODIC_DATASETS_SHUFFLE"], int) or
+        config["main"]["PERIODIC_DATASETS_SHUFFLE"] < 1):
+        raise ValueError("PERIODIC_DATASETS_SHUFFLE should be an integer, " +
+                         "specifying every how many generations to shuffle " +
+                         "the DNA sets. If you don't want to shuffle the " +
+                         "DNA sets, just set this parameter to any integer, " +
+                         "and set to false RANDOM_SHUFFLE_SAMPLING_POS and " +
+                         "RANDOM_SHUFFLE_SAMPLING_NEG.")
     
 
 
