@@ -79,6 +79,7 @@ class OrganismObject:
                                       'p2': None,  # ID number of the second parent
                                       'recognizers': None,
                                       'connectors': None}
+        
     
     def set_assembly_instructions(self, aligned_repres, connectors_table, p1_id, p2_id):
         '''

@@ -67,7 +67,7 @@ class ConnectorObject():
     """Connector Object is a node that connects two recognizer objects
     """
     
-    def __init__(self, _mu: int, _sigma: int, config: dict, max_seq_length: int):
+    def __init__(self, config, max_seq_length, mu=None, sigma=None):
         """Connector constructor: 
             - gets/sets mu and sigma
             - sets all connector-specific configuration items
@@ -78,10 +78,9 @@ class ConnectorObject():
             config: Node-level configuration specs as loaded from config.json
 
         """
-        # set mu and sigma
-        self._mu = _mu  # Mean discance between the connected nodes
-        self._sigma = _sigma  # Standard deviation of the distance
+        
         # set connector-specific configuration parameters
+        self.avg_mu_lambda = config["AVG_MU_LAMBDA"]
         self.mutate_probability_sigma = config["MUTATE_PROBABILITY_SIGMA"]
         self.mutate_probability_mu = config["MUTATE_PROBABILITY_MU"]
         self.mutate_variance_sigma = config["MUTATE_VARIANCE_SIGMA"]
@@ -91,6 +90,15 @@ class ConnectorObject():
         self.mu_mutator = config["MU_MUTATOR"] #log or linear
         self.pseudo_count = config["PSEUDO_COUNT"]
         
+        # set mu and sigma
+        self._mu = mu  # Mean discance between the connected nodes
+        self._sigma = sigma  # Standard deviation of the distance
+        
+        if mu == None:
+            self._set_random_mu()
+        if sigma == None:
+            self._set_random_sigma()
+        
         # precompute connector energies for expected length range
         self.stored_pdfs = []
         self.stored_cdfs = []
@@ -99,7 +107,7 @@ class ConnectorObject():
         self.adjust_score_threshold = 0
     
     # Setters
-    def set_mu(self, _mu: int) -> None:
+    def set_mu(self, _mu) -> None:
         """Set mu variable
 
         Args:
@@ -107,7 +115,7 @@ class ConnectorObject():
         """
         self._mu = _mu
 
-    def set_sigma(self, sigma: int) -> None:
+    def set_sigma(self, sigma) -> None:
         """Set sigma variable
 
         Args:
@@ -115,6 +123,44 @@ class ConnectorObject():
             by connector
         """
         self._sigma = sigma
+    
+    def _set_random_mu(self):
+        '''
+        Chooses a random value for mu during Connector object initialization.
+        
+        # The value is chosen uniformly from the range [0, max_seq_length-2]. Under no
+        # circumnstance is a larger mu ever required to model the target signal,
+        # since max_seq_length is the length of the longest sequence in the
+        # datasets, and the largest gap observable on that sequence is
+        # max_seq_length-2.
+        
+        This function is called by the __init__ function.
+        '''
+        
+        self._mu = np.random.poisson(self.avg_mu_lambda)
+        #self._mu = np.random.uniform(self.max_seq_length - 2)
+    
+    def _set_random_sigma(self):
+        '''
+        Chooses a random value for sigma during Connector object initialization.
+        Sigma can be any non-negative real number. The value is drawn from an
+        exponential distribution. The parameter of the exponential is chosen so
+        that the expected value of sigma (avg_sigma) is such that the interval
+        from mu-3*avg_sigma to mu+3*avg_sigma spans as much as half of the total
+        range. This means that the interval from mu to mu+3*avg_sigma must span
+        one quarter of the total range:
+            range/4 = mu+3*avg_sigma - mu
+            range/4 = 3*avg_sigma
+        Therefore,
+            avg_sigma = range/12
+        
+        This function is called by the __init__ function.
+        '''        
+        avg_sigma = self.max_seq_length / 12  # !!! 12 here is 2*2*3. The "2" that specifies half the range could become a parameter
+        # Random Generator
+        rng = np.random.default_rng()
+        # Draw value of sigma from exponential distribution
+        self._sigma = rng.exponential(avg_sigma)
     
     def set_precomputed_pdfs_cdfs(self) -> None:
         """Set stored_pdfs variable and stored_cdfs variable. This is done
@@ -276,33 +322,35 @@ class ConnectorObject():
         return np.log2(numerator / auc)
 
     def get_score(self, d, s_dna_len, recog_sizes) -> float:
-        """ Returns the score of the connector, given the observed distance
-            and the length of the DNA sequence on which it is being evaluated.
-            Parameters
-            ----------
-            d : observed distancce
-            s_dna_len : length of DNA sequence on which connector is placed
-    
-            Returns
-            -------
-            e_connector : the connector's score
-            
-            The score of the connector is computed as a log-likelihood ratio.
-            The numerator is the probability of observing the distance provided
-            given the connector's parameters.
-            The probability of observing distance d, given the connector's
-            parameters is given by norm_pf.
-            The probability is then normalized by the cumulative probability
-            function within the observable range on the sequence.
-            
-            The denominator is the probability of observing the distance
-            provided under the null hypothesis.
-            
-            To speed up the process, pdfs and cdfs are precomputed for the
-            "expected" distance range during connector construction, and looked
-            up, rather than recomputed here.
-
         """
+        Returns the score of the connector, given the observed distance
+        and the length of the DNA sequence on which it is being evaluated.
+        
+        Parameters
+        ----------
+        d : observed distancce
+        s_dna_len : length of DNA sequence on which connector is placed
+
+        Returns
+        -------
+        e_connector : the connector's score
+        
+        The score of the connector is computed as a log-likelihood ratio.
+        The numerator is the probability of observing the distance provided
+        given the connector's parameters.
+        The probability of observing distance d, given the connector's
+        parameters is given by norm_pf.
+        The probability is then normalized by the cumulative probability
+        function within the observable range on the sequence.
+        
+        The denominator is the probability of observing the distance
+        provided under the null hypothesis.
+        
+        To speed up the process, pdfs and cdfs are precomputed for the
+        "expected" distance range during connector construction, and looked
+        up, rather than recomputed here.
+        """
+        
         # Numerator
         if d<self.max_seq_length:
             numerator = self.stored_pdfs[d]

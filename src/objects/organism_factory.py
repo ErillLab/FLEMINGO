@@ -180,13 +180,16 @@ class OrganismFactory:
         exceeds the maximum allowed by the config, it is set to the maximum.
         '''
         # Draw from shifted Poisson
-        min_n_recogs = new_organism.min_n_recognizers
-        n_recogs = np.random.poisson(self.avg_n_recognizers_lambda - min_n_recogs)
-        n_recogs += min_n_recogs
-        # Check upper bound (if specified)
-        max_n_recogs = new_organism.max_n_recognizers
-        if max_n_recogs != None:
-            n_recogs = min(n_recogs, max_n_recogs)
+        # min_n_recogs = new_organism.min_n_recognizers
+        # n_recogs = np.random.poisson(self.avg_n_recognizers_lambda - min_n_recogs)
+        # n_recogs += min_n_recogs
+        # # Check upper bound (if specified)
+        # max_n_recogs = new_organism.max_n_recognizers
+        # if max_n_recogs != None:
+        #     n_recogs = min(n_recogs, max_n_recogs)
+        n_recogs = self.from_shifted_poisson(self.avg_n_recognizers_lambda,
+                                             new_organism.min_n_recognizers,
+                                             new_organism.max_n_recognizers)
         
         # for each recognizer in the organism except for the last
         for i in range(n_recogs - 1):
@@ -194,9 +197,10 @@ class OrganismFactory:
             new_recognizer = self.create_recognizer(self.pwm_length)
             new_organism.recognizers.append(new_recognizer)
             # Add one connector
-            _mu = random.randint(self.min_mu, self.max_mu)
-            _sigma = random.randint(self.min_sigma, self.max_sigma)
-            new_connector = ConnectorObject(_mu, _sigma, self.conf_con, self.max_seq_length)
+            # _mu = random.randint(self.min_mu, self.max_mu)
+            # _sigma = random.randint(self.min_sigma, self.max_sigma)
+            # new_connector = ConnectorObject(self.conf_con, self.max_seq_length, _mu, _sigma)
+            new_connector = self.create_connector()
             new_organism.connectors.append(new_connector)
         # Add last recognizer
         new_recognizer = self.create_recognizer(self.pwm_length)
@@ -206,17 +210,29 @@ class OrganismFactory:
         new_organism.flatten()
         return new_organism
     
+    def from_shifted_poisson(self, average, minimum, maximum):
+        '''
+        !!! Docstring here ...
+        '''
+        # Draw from shifted Poisson
+        n = np.random.poisson(average - minimum)
+        n += minimum
+        # Check upper bound (if specified)
+        if maximum != None:
+            n = min(n, maximum)
+        return n
+    
     def create_connector(self) -> ConnectorObject:
         """It returns a connector object with its internal parameters (mu, sigma)
         assigned
         """
 
-        # Assign a random value to mu and sigma
-        _mu = random.randint(self.min_mu, self.max_mu)
-        _sigma = random.randint(self.min_sigma, self.max_sigma)
+        # # Assign a random value to mu and sigma
+        # _mu = random.randint(self.min_mu, self.max_mu)
+        # _sigma = random.randint(self.min_sigma, self.max_sigma)
 
         # Create the new connector
-        new_connector = ConnectorObject(_mu, _sigma, self.conf_con, self.max_seq_length)
+        new_connector = ConnectorObject(self.conf_con, self.max_seq_length)
 
         return new_connector
 
@@ -246,10 +262,13 @@ class OrganismFactory:
             A pssm object with an initializated PWM
         """
         if length == None:
-            length = self.pwm_length
+            # length = self.pwm_length
+            length = self.from_shifted_poisson(self.pwm_length,
+                                               self.conf_pssm["MIN_LENGTH"],
+                                               self.conf_pssm["MAX_LENGTH"])
         
-        pwm = []
         # Generate as many PSSM columns as needed
+        pwm = []
         for _ in range(length):
             pwm.append(self.get_pwm_column())
 
@@ -418,8 +437,7 @@ class OrganismFactory:
         Returns:
             Connector object from given connector dictionary
         """
-        return ConnectorObject(connector["mu"], connector["sigma"], \
-            self.conf_con, self.max_seq_length )
+        return ConnectorObject(self.conf_con, self.max_seq_length, connector["mu"], connector["sigma"])
 
 
     def import_pssm(self, pssm: dict) -> PssmObject:
@@ -974,15 +992,9 @@ class OrganismFactory:
                     else:
                         recog_L_name, recog_R_name = p2_left, p1_right
                 # Make an appropriate connector
-                conn = self.make_synthetic_connector(recog_L_name, recog_R_name,
-                                                par1_placements, par2_placements)
-                '''
-                # Put a random connector instead
-                # instantiate new connector and append it to organism's connector list
-                _mu = random.randint(self.min_mu, self.max_mu)
-                _sigma = random.randint(self.min_sigma, self.max_sigma)
-                conn = ConnectorObject(_mu, _sigma, self.conf_con)
-                '''
+                conn = self.make_synthetic_connector(
+                    recog_L_name, recog_R_name, par1_placements, par2_placements)
+            
             # Else, the connector can be grabbed from one of the parents
             else:
                 parent, connector_idx = connector_name.split('_')
@@ -1088,7 +1100,7 @@ class OrganismFactory:
         mu = max(0, mu)
         
         # Return the synthetic connector
-        return ConnectorObject(mu, sigma, self.conf_con, self.max_seq_length)
+        return ConnectorObject(self.conf_con, self.max_seq_length, mu, sigma)
     
     def get_recog_pos_on_DNA_seq(self, org_placement, recog_idx):
         '''
