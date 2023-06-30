@@ -42,22 +42,22 @@ class OrganismFactory:
         self.max_seq_length = max_seq_length
         # lambda parameter for Poisson distribution used to instantiate organisms.
         # lambda is the expected number of recognizers per organism
-        self.avg_n_recognizers_lambda = conf_org_fac["AVG_N_RECOGNIZERS_LAMBDA"]
+        self.avg_num_of_recognizers = conf_org_fac["AVG_NUM_OF_RECOGNIZERS"]
 
-        self.recombination_probability = conf_org_fac["RECOMBINATION_PROBABILITY"]
+        self.probability_recombination = conf_org_fac["PROBABILITY_RECOMBINATION"]
         # minimum and maximum values allowed for connector mu's
-        self.min_mu = conf_org_fac["MIN_MU"]
-        self.max_mu = conf_org_fac["MAX_MU"]
+        self.connector_min_mu = conf_org_fac["CONNECTOR_MIN_MU"]
+        self.connector_max_mu = conf_org_fac["CONNECTOR_MAX_MU"]
 
         # minimum and maximum values allowed for connector sigma's
-        self.min_sigma = conf_org_fac["MIN_SIGMA"]
-        self.max_sigma = conf_org_fac["MAX_SIGMA"]
+        self.connector_min_sigma = conf_org_fac["CONNECTOR_MIN_SIGMA"]
+        self.connector_max_sigma = conf_org_fac["CONNECTOR_MAX_SIGMA"]
         
-        # length of PSSM's
-        self.pwm_length = conf_org_fac["PWM_LENGTH"]
+        # Average length of PSSM
+        self.recognizer_avg_length = conf_org_fac["RECOGNIZER_AVG_LENGTH"]
         
         # Number of binding sites used to generate the PWM
-        self.pwm_number_of_binding_sites = conf_org_fac["PWM_NUM_OF_BINDING_SITES"]
+        self.pssm_number_of_binding_sites = conf_org_fac["PSSM_NUM_OF_BINDING_SITES"]
         self.pssm_vs_shape_probability = conf_org_fac["PSSM_VS_SHAPE_PROBABILITY"]
         
         # assign organism, connector and pssm configurations
@@ -180,30 +180,23 @@ class OrganismFactory:
         exceeds the maximum allowed by the config, it is set to the maximum.
         '''
         # Draw from shifted Poisson
-        # min_n_recogs = new_organism.min_n_recognizers
-        # n_recogs = np.random.poisson(self.avg_n_recognizers_lambda - min_n_recogs)
-        # n_recogs += min_n_recogs
-        # # Check upper bound (if specified)
-        # max_n_recogs = new_organism.max_n_recognizers
-        # if max_n_recogs != None:
-        #     n_recogs = min(n_recogs, max_n_recogs)
-        n_recogs = self.from_shifted_poisson(self.avg_n_recognizers_lambda,
-                                             new_organism.min_n_recognizers,
-                                             new_organism.max_n_recognizers)
+        n_recogs = self.from_shifted_poisson(self.avg_num_of_recognizers,
+                                             new_organism.min_num_of_recognizers,
+                                             new_organism.max_num_of_recognizers)
         
         # for each recognizer in the organism except for the last
         for i in range(n_recogs - 1):
             # Add one recognizer
-            new_recognizer = self.create_recognizer(self.pwm_length)
+            new_recognizer = self.create_recognizer(self.recognizer_avg_length)
             new_organism.recognizers.append(new_recognizer)
             # Add one connector
-            # _mu = random.randint(self.min_mu, self.max_mu)
-            # _sigma = random.randint(self.min_sigma, self.max_sigma)
+            # _mu = random.randint(self.connector_min_mu, self.connector_max_mu)
+            # _sigma = random.randint(self.connector_min_sigma, self.max_sigma)
             # new_connector = ConnectorObject(self.conf_con, self.max_seq_length, _mu, _sigma)
             new_connector = self.create_connector()
             new_organism.connectors.append(new_connector)
         # Add last recognizer
-        new_recognizer = self.create_recognizer(self.pwm_length)
+        new_recognizer = self.create_recognizer(self.recognizer_avg_length)
         new_organism.recognizers.append(new_recognizer)
         # Set attribute that will map organism nodes to alignment matrix rows
         new_organism.set_row_to_pssm()
@@ -249,14 +242,15 @@ class OrganismFactory:
 
         Args:
             length: length (columns) of the PSSM
-            if None, the default self.pwm_length value is used
+            if None ...
+            !!!
 
         Returns:
             A pssm object with an initializated PWM
         """
         if length == None:
-            # length = self.pwm_length
-            length = self.from_shifted_poisson(self.pwm_length,
+            # length = self.recognizer_avg_length
+            length = self.from_shifted_poisson(self.recognizer_avg_length,
                                                self.conf_pssm["MIN_LENGTH"],
                                                self.conf_pssm["MAX_LENGTH"])
         
@@ -294,7 +288,7 @@ class OrganismFactory:
             a random probability for each base [a, c, g, t]
         """
         
-        number_of_BS_to_assign = self.pwm_number_of_binding_sites
+        number_of_BS_to_assign = self.pssm_number_of_binding_sites
         
         # we assign a number of sites (a count) to each row (to each base)
         counts: list = []
@@ -317,7 +311,7 @@ class OrganismFactory:
         random.shuffle(counts)
 
         # Convert counts to probabilities
-        np_probabilities = np.array(counts) / self.pwm_number_of_binding_sites
+        np_probabilities = np.array(counts) / self.pssm_number_of_binding_sites
         probabilities = np_probabilities.tolist()
         
         return {
@@ -369,7 +363,7 @@ class OrganismFactory:
             organism_list.append(new_organism)
         
         # Check if the frequency values in the PWMs of the imported organisms
-        # are consistent with  PWM_NUM_OF_BINDING_SITES  set in the config file
+        # are consistent with  PSSM_NUM_OF_BINDING_SITES  set in the config file
         self.check_pwm_frequencies_of_imported_organisms(organism_list)
         for organism in organism_list:
             organism.flatten()
@@ -379,10 +373,10 @@ class OrganismFactory:
     def check_pwm_frequencies_of_imported_organisms(self, imported_organisms: list):
         '''
         Raises an error if the PWMs of the imported organisms are not compatible
-        with the value of PWM_NUM_OF_BINDING_SITES parameter specified in the
+        with the value of PSSM_NUM_OF_BINDING_SITES parameter specified in the
         config file.
         '''
-        no_BSs = self.pwm_number_of_binding_sites
+        no_BSs = self.pssm_number_of_binding_sites
         smallest_freq = dec.Decimal('1') / dec.Decimal(str(no_BSs))
         
         for org_idx, org in enumerate(imported_organisms):
@@ -396,7 +390,7 @@ class OrganismFactory:
                             raise Exception(
                                 ("Imported organism has PWM frequencies that are not "
                                  "compatible with the required number of binding sites "
-                                 "(PWM_NUM_OF_BINDING_SITES parameter). The problem "
+                                 "(PSSM_NUM_OF_BINDING_SITES parameter). The problem "
                                  "occurred for the frequency of base " + b.upper() +
                                  " at position " + str(pos) + " of the recognizer with "
                                  "index " + str(rec_idx) + " of the organism with "
@@ -405,7 +399,7 @@ class OrganismFactory:
                                  "Indeed, " + str(freq) + " is not "
                                  "k * " + str(smallest_freq) + " for any integer "
                                  "value of k. "
-                                 "Please change the PWM_NUM_OF_BINDING_SITES parameter "
+                                 "Please change the PSSM_NUM_OF_BINDING_SITES parameter "
                                  "in the config file, or modify the organism to be "
                                  "imported, accordingly to the desired number of "
                                  "binding sites. ")

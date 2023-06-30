@@ -40,12 +40,12 @@ class PssmObject():
         self.type = 'pssm'
         
         # assign PSSM-specific configuration elements
-        self.mutate_probability_random_col = config["MUTATE_PROBABILITY_RANDOM_COL"]
-        self.mutate_probability_mutate_col = config["MUTATE_PROBABILITY_MUTATE_COL"]
-        self.mutate_probability_flip_cols = config["MUTATE_PROBABILITY_FLIP_COL"]
-        self.mutate_probability_flip_rows = config["MUTATE_PROBABILITY_FLIP_ROW"]
-        self.mutate_probability_increase_pwm = config["MUTATE_PROBABILITY_INCREASE_PWM"]
-        self.mutate_probability_decrease_pwm = config["MUTATE_PROBABILITY_DECREASE_PWM"]
+        self.probability_column_randomization = config["PROBABILITY_COLUMN_RANDOMIZATION"]
+        self.probability_column_mutation = config["PROBABILITY_COLUMN_MUTATION"]
+        self.probability_flip_columns = config["PROBABILITY_FLIP_COLUMNS"]
+        self.probability_flip_rows = config["PROBABILITY_FLIP_ROWS"]
+        self.probability_increase_length = config["PROBABILITY_INCREASE_LENGTH"]
+        self.probability_decrease_length = config["PROBABILITY_DECREASE_LENGTH"]
         
         self.min_length = config["MIN_LENGTH"]
         self.max_length = config["MAX_LENGTH"]
@@ -82,32 +82,32 @@ class PssmObject():
         displacement_code = [0, 0]  # left and right displacement (in bp)
         
         # Randomize column
-        if random.random() < self.mutate_probability_random_col:
+        if random.random() < self.probability_column_randomization:
             self._randomize_column(org_factory)
             mutated = True
         
         # Mutate column
-        if random.random() < self.mutate_probability_mutate_col:
+        if random.random() < self.probability_column_mutation:
             self._mutate_column(org_factory)
             mutated = True
         
         # Flip columns
-        if random.random() < self.mutate_probability_flip_cols:
+        if random.random() < self.probability_flip_columns:
             self._flip_cols()
             mutated = True
         
         # Flip rows
-        if random.random() < self.mutate_probability_flip_rows:
+        if random.random() < self.probability_flip_rows:
             self._flip_rows()
             mutated = True
         
         # Increase length
-        if random.random() < self.mutate_probability_increase_pwm:
+        if random.random() < self.probability_increase_length:
             self._increase_length(displacement_code, org_factory)
             mutated = True
         
         # Decrease length
-        if random.random() < self.mutate_probability_decrease_pwm:
+        if random.random() < self.probability_decrease_length:
             self._decrease_length(displacement_code)
             mutated = True
         
@@ -169,7 +169,7 @@ class PssmObject():
         donor_current_prob = self.pwm[idx_of_random_col][donor_base]            
         acceptor_current_prob = self.pwm[idx_of_random_col][acceptor_base]
         
-        no_BSs = org_factory.pwm_number_of_binding_sites
+        no_BSs = org_factory.pssm_number_of_binding_sites
         donor_current_count = donor_current_prob * no_BSs            
         acceptor_current_count = acceptor_current_prob * no_BSs
         

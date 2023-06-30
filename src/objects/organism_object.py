@@ -48,18 +48,18 @@ class OrganismObject:
         self.is_precomputed = conf["PRECOMPUTE"]
 	
         #probability of deleting/inserting a recognizer
-        self.mutate_probability_delete_recognizer = conf["MUTATE_PROBABILITY_DELETE_RECOGNIZER"]
-        self.mutate_probability_insert_recognizer = conf["MUTATE_PROBABILITY_INSERT_RECOGNIZER"]
+        self.probability_delete_recognizer = conf["PROBABILITY_DELETE_RECOGNIZER"]
+        self.probability_insert_recognizer = conf["PROBABILITY_INSERT_RECOGNIZER"]
 	
         # probability of mutating a node
-        self.mutate_probability_node_mutation = conf["MUTATE_PROBABILITY_NODE_MUTATION"]
+        self.probability_node_mutation = conf["PROBABILITY_NODE_MUTATION"]
         
         # probability of applying a nudge shift to a recognizer
-        self.mutate_probability_nudge_recognizer = conf["MUTATE_PROBABILITY_NUDGE_RECOGNIZER"]
+        self.probability_nudge_recognizer = conf["PROBABILITY_NUDGE_RECOGNIZER"]
         
         # min and maximum number of recognizers allowed
-        self.min_n_recognizers = conf["MIN_N_RECOGNIZERS"]
-        self.max_n_recognizers = conf["MAX_N_RECOGNIZERS"]
+        self.min_num_of_recognizers = conf["MIN_NUM_OF_RECOGNIZERS"]
+        self.max_num_of_recognizers = conf["MAX_NUM_OF_RECOGNIZERS"]
         
         # !!! maximum length of PSSMs allowed
         # self.max_pssm_length = max_pssm_length
@@ -310,17 +310,17 @@ class OrganismObject:
         """
         
         # Deletion
-        if random.random() < self.mutate_probability_delete_recognizer:
+        if random.random() < self.probability_delete_recognizer:
             # Delete a recognizer (and a connector)
             self.delete_recognizer()
         
         # Insertion
-        if random.random() < self.mutate_probability_insert_recognizer:
+        if random.random() < self.probability_insert_recognizer:
             # Insert a recognizer (and a connector)
             self.insert_recognizer(org_factory)
         
         # Nudge
-        if random.random() < self.mutate_probability_nudge_recognizer:
+        if random.random() < self.probability_nudge_recognizer:
             # Nudge a recognizer (two connectors are modified)
             self.nudge_recognizer()
         
@@ -646,9 +646,9 @@ class OrganismObject:
         '''
         Triggers node-specific mutations on the nodes of the organism.
         
-        If `mutate_probability_node_mutation` is specified, only one node will
+        If `probability_node_mutation` is specified, only one node will
         become prone to mutations, with a probability equal to
-        `mutate_probability_node_mutation`. Otherwise, all the nodes are always
+        `probability_node_mutation`. Otherwise, all the nodes are always
         prone to mutations.
         
         When a node is prone to mutations it doesn't mean it will necessarily
@@ -656,11 +656,11 @@ class OrganismObject:
         proability (specified in the config).
         '''
         
-        # If MUTATE_PROBABILITY_NODE_MUTATION is set to real value, a single
+        # If PROBABILITY_NODE_MUTATION is set to real value, a single
         # node is selected. If set to null, all nodes are prone to mutations
-        if self.mutate_probability_node_mutation:
+        if self.probability_node_mutation:
             # Mutate a random node
-            if random.random() < self.mutate_probability_node_mutation:
+            if random.random() < self.probability_node_mutation:
                 
                 n_nodes = self.count_nodes()
                 random_node_idx = random.randint(0, n_nodes - 1)
@@ -778,13 +778,13 @@ class OrganismObject:
         edited = False
         
         # If the number of nodes exceeded the maximum allowed, prune the organism
-        if self.max_n_recognizers != None:
-            while self.count_recognizers() > self.max_n_recognizers:
+        if self.max_num_of_recognizers != None:
+            while self.count_recognizers() > self.max_num_of_recognizers:
                 self.delete_recognizer()
                 edited = True
         
         # If the number of nodes is not sufficient, insert recognizers
-        while self.count_recognizers() < self.min_n_recognizers:
+        while self.count_recognizers() < self.min_num_of_recognizers:
             self.insert_recognizer(org_factory)
             edited = True
         

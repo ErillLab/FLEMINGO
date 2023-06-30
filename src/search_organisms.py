@@ -21,7 +21,7 @@ from Bio import SeqIO
 
 
 # Variable definition
-POPULATION_LENGTH = 0
+POPULATION_SIZE = 0
 DATASET_BASE_PATH_DIR = ""
 RESULT_BASE_PATH_DIR = ""
 POSITIVE_FILENAME = ""
@@ -34,7 +34,7 @@ MAX_SEQUENCES_TO_FIT_POS = 0
 MAX_SEQUENCES_TO_FIT_NEG = 0
 MIN_ITERATIONS = 0
 MIN_FITNESS = 0
-RECOMBINATION_PROBABILITY = 0.0
+PROBABILITY_RECOMBINATION = 0.0
 THRESHOLD = 0.0
 JSON_CONFIG_FILENAME = "config.json"
 
@@ -172,7 +172,7 @@ def main():
             ref_seq = pos_set_sample[0]
             
             # Decide if the parents will do sexual or clonal reproduction (recombination VS mutation)
-            if random.random() < organism_factory.recombination_probability:
+            if random.random() < organism_factory.probability_recombination:
                 # Recombination case; no mutation
                 child1, child2 = organism_factory.get_children(
                     parent1, parent2, ref_seq, pos_set_sample)
@@ -367,17 +367,17 @@ def initialize_population(organism_factory):
         # Generate population depending on origin and fill type.
         # Origin can be "random" or "file"(read a set of organisms from a file).
         if POPULATION_ORIGIN.lower() == "random":
-            # For a random origin, we can generate #POPULATION_LENGTH organisms.
-            for i in range(POPULATION_LENGTH):
+            # For a random origin, we can generate #POPULATION_SIZE organisms.
+            for i in range(POPULATION_SIZE):
                 new_organism = organism_factory.get_organism()
                 new_organism.check_size(organism_factory)
                 organism_population.append(new_organism)
         elif POPULATION_ORIGIN.lower() == "file":
             #if the population is seeded from file
             # Set the file organisms and fill with random/same organisms
-            # POPULATION_LENGTH must be >= len(fileOrganisms)
+            # POPULATION_SIZE must be >= len(fileOrganisms)
             file_organisms = organism_factory.import_organisms(INPUT_FILENAME)
-            remaining_organisms = POPULATION_LENGTH - len(file_organisms)
+            remaining_organisms = POPULATION_SIZE - len(file_organisms)
             fill_organism_population = []
     
             if POPULATION_FILL_TYPE.lower() == "random":
@@ -692,15 +692,15 @@ def check_mpi_settings(p, config):
     ''' If the number of processes exceeds the number of pairs of organisms in
     the population, some processes will be left with an empty population. In
     that case, to avoid wasting computing power, an error is raised. '''
-    if p > int(config["main"]["POPULATION_LENGTH"] / 2):
+    if p > int(config["main"]["POPULATION_SIZE"] / 2):
         raise ValueError("The minimum number of organisms assigned to each " +
                          "process is 2 (you need a pair for recombination events " +
                          "to take place). Thus, the maximum number of processes" +
-                         "to be used is POPULATION_LENGTH / 2 (case in which " +
+                         "to be used is POPULATION_SIZE / 2 (case in which " +
                          "each process works on one single pair of organisms). " +
                          "Please decrease number of processes to avoid wastes, " +
                          "i.e., processes being assigned an empty subpopulation, " +
-                         "or increase the POPULATION_LENGTH.")
+                         "or increase the POPULATION_SIZE.")
 
 
 def check_dir(dir_path):
@@ -723,7 +723,7 @@ def set_up():
 
     global RUN_MODE
     global END_WHILE_METHOD
-    global POPULATION_LENGTH
+    global POPULATION_SIZE
     global DATASET_BASE_PATH_DIR
     global RESULT_BASE_PATH_DIR
     global POSITIVE_FILENAME
@@ -782,7 +782,7 @@ def set_up():
     else:
         raise ValueError('RUN_MODE should be "serial" or "parallel".')    
     
-    POPULATION_LENGTH = config["main"]["POPULATION_LENGTH"]
+    POPULATION_SIZE = config["main"]["POPULATION_SIZE"]
     DATASET_BASE_PATH_DIR = config["main"]["DATASET_BASE_PATH_DIR"]
     if i_am_main_process():
         print('\n==================\nRUN_MODE: {}\n==================\n'.format(
@@ -886,39 +886,39 @@ def check_config_settings(config):
     '''
     
     # Check that the population size is an even number
-    if config["main"]["POPULATION_LENGTH"] % 2 != 0:
-        raise Exception(("POPULATION_LENGTH must be an even number. " +
+    if config["main"]["POPULATION_SIZE"] % 2 != 0:
+        raise Exception(("POPULATION_SIZE must be an even number. " +
                          "Please correct the settings."))
     
     # Check that min_n_rec <= avg_n_rec <= max_n_rec
-    avg_n_rec = config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"]
-    min_n_rec = config["organism"]["MIN_N_RECOGNIZERS"]
-    max_n_rec = config["organism"]["MAX_N_RECOGNIZERS"]
+    avg_n_rec = config["organismFactory"]["AVG_NUM_OF_RECOGNIZERS"]
+    min_n_rec = config["organism"]["MIN_NUM_OF_RECOGNIZERS"]
+    max_n_rec = config["organism"]["MAX_NUM_OF_RECOGNIZERS"]
     if max_n_rec == None:
         max_n_rec = np.inf
     if avg_n_rec < min_n_rec:
         raise ValueError(("The average number of recognizers per organism " +
                           "must be a valid one, i.e. between the minimum " +
                           "and the maximum allowed (included). " +
-                          "AVG_N_RECOGNIZERS_LAMBDA was set to " +
-                          str(config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"]) +
-                          ", but MIN_N_RECOGNIZERS was set to " +
-                          str(config["organism"]["MIN_N_RECOGNIZERS"]) +
+                          "AVG_NUM_OF_RECOGNIZERS was set to " +
+                          str(config["organismFactory"]["AVG_NUM_OF_RECOGNIZERS"]) +
+                          ", but MIN_NUM_OF_RECOGNIZERS was set to " +
+                          str(config["organism"]["MIN_NUM_OF_RECOGNIZERS"]) +
                           ". Please correct the settings."))
     if avg_n_rec > max_n_rec:
         raise ValueError(("The average number of recognizers per organism " +
                           "must be a valid one, i.e. between the minimum " +
                           "and the maximum allowed (included). " +
-                          "AVG_N_RECOGNIZERS_LAMBDA was set to " +
-                          str(config["organismFactory"]["AVG_N_RECOGNIZERS_LAMBDA"]) +
-                          ", but MAX_N_RECOGNIZERS was set to " +
-                          str(config["organism"]["MAX_N_RECOGNIZERS"]) +
+                          "AVG_NUM_OF_RECOGNIZERS was set to " +
+                          str(config["organismFactory"]["AVG_NUM_OF_RECOGNIZERS"]) +
+                          ", but MAX_NUM_OF_RECOGNIZERS was set to " +
+                          str(config["organism"]["MAX_NUM_OF_RECOGNIZERS"]) +
                           ". Please correct the settings."))
     if min_n_rec > max_n_rec:
         raise ValueError(("The minimum number of recognizers per organism " +
-                          "specified in the settings (MIN_N_RECOGNIZERS) is" +
+                          "specified in the settings (MIN_NUM_OF_RECOGNIZERS) is" +
                           " larger than the maximum number of recognizers per" +
-                          "organism (MAX_N_RECOGNIZERS). Please correct the" +
+                          "organism (MAX_NUM_OF_RECOGNIZERS). Please correct the" +
                           " settings."))
     
     # Check that the fitness function is spelled correctly

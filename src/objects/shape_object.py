@@ -82,15 +82,15 @@ class ShapeObject:
             self._set_random_sigma()
         
         self.pseudo_count = config["PSEUDO_COUNT"]
-        self.mutate_probability_sigma = config["MUTATE_PROBABILITY_SIGMA"]
-        self.mutate_probability_mu = config["MUTATE_PROBABILITY_MU"]
-        self.sigma_mutator = config["SIGMA_MUTATOR"]
+        self.probability_mu_mutation = config["PROBABILITY_MU_MUTATION"]
+        self.probability_sigma_mutation = config["PROBABILITY_SIGMA_MUTATION"]
+        self.magnitude_mu_mutation = config["MAGNITUDE_MU_MUTATION"]
+        self.magnitude_sigma_mutation = config["MAGNITUDE_SIGMA_MUTATION"]
         self.mu_mutator = config["MU_MUTATOR"]
-        self.mutate_variance_sigma = config["MUTATE_VARIANCE_SIGMA"]
-        self.mutate_variance_mu = config["MUTATE_VARIANCE_MU"] 
-        self.mutate_probability_change_rec_type = config["MUTATE_PROBABILITY_CHANGE_REC_TYPE"]
-        self.mutate_probability_increase_size = config["MUTATE_PROBABILITY_INCREASE_SIZE"]
-        self.mutate_probability_decrease_size = config["MUTATE_PROBABILITY_DECREASE_SIZE"]
+        self.sigma_mutator = config["SIGMA_MUTATOR"]
+        self.probability_change_rec_type = config["PROBABILITY_CHANGE_REC_TYPE"]
+        self.probability_increase_length = config["PROBABILITY_INCREASE_LENGTH"]
+        self.probability_decrease_length = config["PROBABILITY_DECREASE_LENGTH"]
         self.min_length = config["MIN_LENGTH"]
         self.max_length = config["MAX_LENGTH"]
         self.num_bins = config["NUM_BINS"]
@@ -189,22 +189,22 @@ class ShapeObject:
         displacement_code = [0, 0]  # left and right displacement (in bp)
         
         # Mutate sigma
-        if random.random() < self.mutate_probability_sigma:
+        if random.random() < self.probability_sigma_mutation:
             self._mutate_sigma()
             mutated = True
         
         # Mutate mu
-        if random.random() < self.mutate_probability_mu:
+        if random.random() < self.probability_mu_mutation:
             self._mutate_mu()
             mutated = True
 
         # size mutations, bounded by min and max lengths specified by config
         # null models must be updated whenever size changes
-        if random.random() < self.mutate_probability_increase_size and self.length < self.max_length:
+        if random.random() < self.probability_increase_length and self.length < self.max_length:
             self._increase_length(displacement_code)
             mutated = True
 
-        if random.random() < self.mutate_probability_decrease_size and self.length > self.min_length:
+        if random.random() < self.probability_decrease_length and self.length > self.min_length:
             self._decrease_length(displacement_code)
             mutated = True
         
@@ -235,11 +235,11 @@ class ShapeObject:
         if self.sigma_mutator=="linear":
             # Update sigma with a random permutation within allowed interval
             self._sigma = abs(
-                self._sigma + random.uniform(-self.mutate_variance_sigma,
-                                             self.mutate_variance_sigma)
+                self._sigma + random.uniform(-self.magnitude_sigma_mutation,
+                                             self.magnitude_sigma_mutation)
             )
         elif self.sigma_mutator=="log":
-            base = self.mutate_variance_sigma
+            base = self.magnitude_sigma_mutation
             logb_sigma = np.log(self._sigma) / np.log(base)
             shift = random.uniform(-1, 1)
             # Apply a shift in the range (-1, 1) to the log-sigma
@@ -264,10 +264,10 @@ class ShapeObject:
         '''
         if self.mu_mutator=="linear":
             # Update mu with a random permutation within allowed interval
-            self._mu = self._mu + random.uniform(-self.mutate_variance_mu, self.mutate_variance_mu)
+            self._mu = self._mu + random.uniform(-self.magnitude_mu_mutation, self.magnitude_mu_mutation)
 
         elif self.mu_mutator=="log":
-            base = self.mutate_variance_mu
+            base = self.magnitude_mu_mutation
             logb_mu = np.log(self._mu) / np.log(base)
             shift = random.uniform(-1, 1)
             # Apply a shift in the range (-1, 1) to the log-mu
