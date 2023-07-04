@@ -1,6 +1,5 @@
 import objects.organism_factory as organism_factory
 import json
-import models.models as models  
 
    
 def test_placement(organism, sequence):
@@ -26,7 +25,7 @@ def build_organism():
     configPssm = config["pssm"]
     configShape = config["shape"]
     
-    org_fac = organism_factory.OrganismFactory( configOrganism, configOrganismFactory, configConnector, configPssm, 0, configShape )
+    org_fac = organism_factory.OrganismFactory( configOrganism, configOrganismFactory, configConnector, configPssm, 0, configShape, 0, 100)
     org_list = org_fac.import_organisms("organism2.json")
     return org_list[0]
 

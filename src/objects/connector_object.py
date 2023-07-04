@@ -425,3 +425,38 @@ class ConnectorObject():
         """
         return False
 
+    def adjust_scores(self, c_scores, sequence_length, sum_recognizer_lengths):
+                
+        sigma = min(self._sigma, 1E-100)
+        g_curr = g(sequence_length - sum_recognizer_lengths, self._mu, sigma)
+        h_curr = 1
+
+        h_list = [1 + self.pseudo_count]
+        tot_sum =  h_list[0]
+
+        for i in range(sequence_length - 1 - sum_recognizer_lengths, -1, -1):
+            g_next = g(i, self._mu, sigma)
+            h_next = h_curr * math.exp(g_next - g_curr)
+
+            h_list.append(h_next + self.pseudo_count)
+            tot_sum += h_next + self.pseudo_count
+
+            g_curr = g_next
+            h_curr = h_next
+
+        h_list_sorted = h_list[::-1]
+        p_list = [h/tot_sum for h in h_list_sorted]
+
+        
+        prob_sum = 0.0
+        for i in range(len(p_list)):
+            prob_sum += p_list[i]
+
+            # here, the offset is used so that the correc indices in our 1D array of connector info
+            # is modified
+
+            # the line below corresponds the the pfs for the connector, and the line below it 
+            # is for the aucs of the same connector
+            c_scores[i] = np.log(p_list[i])
+            c_scores[self.max_seq_length + i] = np.log(prob_sum)
+            
