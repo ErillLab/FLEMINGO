@@ -222,14 +222,14 @@ def main():
                     organism_population[i + j] = parent
                     pop_id_list.append(parent)
                     pop_fitness_list.append(parent.fitness)
-                    pop_n_recogs_list.append(parent.count_nodes())
+                    pop_n_recogs_list.append(parent.count_recognizers())
                 
                 else:
                     # The child wins
                     organism_population[i + j] = child
                     pop_id_list.append(child)
                     pop_fitness_list.append(child.fitness)
-                    pop_n_recogs_list.append(child.count_nodes())
+                    pop_n_recogs_list.append(child.count_recognizers())
                 
                 # END FOR j
 
