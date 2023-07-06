@@ -73,13 +73,13 @@ notes:           prints all of the values in the pssm (rows are bases)
 */
 void print_pssm(Recognizer *rec){
   for (int j = 0; j < 4; j++){
-    if (j = 0)
+    if (j == 0)
       printf(" A");
-    if (j = 1)
+    if (j == 1)
       printf(" G");
-    if (j = 2)
+    if (j == 2)
       printf(" C");
-    if (j = 3)
+    if (j == 3)
       printf(" T");
     for (int k = 0; k < rec->len; k++){
       printf("%5.2f ", rec->matrix[k * 4 + j]);

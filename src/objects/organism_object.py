@@ -1160,6 +1160,7 @@ class OrganismObject:
         placement.print_placement(stdout = True)
 
     def adjust_connector_scores(self, c_idx, c_scores, sequence_length):
+        #####DEPRECATED####
         """
         Rescales the probabilties for a connector when all possible gap lengths are
         below a certain threshold (this could cause the placement function to 
@@ -1173,7 +1174,9 @@ class OrganismObject:
         """
         # con is just used as a shorthand to refer to the desired connector
         con = self.connectors[c_idx]
-
+        #offset = sum([(self.connectors[c_idx].max_seq_length * 2 + 2) for i in range(0, c_idx)]) + 2
+        #self.connectors[c_idx].adjust_scores(c_scores[offset:], sequence_length, self.sum_recognizer_lengths)
+        #return
         # treat sigma to be 1E-100 if it is lower, otherwise overflow potential
         # is greater
         sigma = min(con._sigma, 1E-100)
@@ -1279,9 +1282,18 @@ class OrganismObject:
                     # if the alternative model prediction for the gap of the maximum length is below our
                     # threshold then we rescale the scores for that connector
                     if self.connectors[i].stored_pdfs[idx] <= np.log(1E-15):
+
+                        # the offset in the overall array of c scores will be the summation of the lengths of
+                        # pfs, aucs, mu, and sigma for each connector
+                        # each connector has max_seq_length pfs and aucs, and 1 for mu and 1 for sigma
+                        # thats how we get (max_seq_length * 2 + 2) for each connector before the current one
+                        # then 2 more indices for the current mu and sigma
+                        offset = sum([(self.connectors[i].max_seq_length * 2 + 2) for i in range(0, i)]) + 2
+                        self.connectors[i].adjust_scores(c_scores[offset:], len(sequence), self.sum_recognizer_lengths)
                         print("rescaling...")
-                        self.adjust_connector_scores(i, c_scores, len(sequence))
-        
+                        print(len(c_scores))
+                        #self.adjust_connector_scores(i, c_scores, len(sequence))
+
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), \
             self.recognizers_flat, self.recognizer_lengths,  c_scores, recognizer_scores, gap_scores, \
             gaps, max_length, self.recognizer_models, self.recognizer_bin_edges, self.recognizer_bin_nums)
