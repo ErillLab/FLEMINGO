@@ -391,9 +391,6 @@ class ShapeObject:
         return True
 
     def get_type(self):
-        return 'p'
-
-    def get_type(self):
         """Returns the one character definiton of a recognizers type
         used for generating string of recognizer types.
         """
