@@ -479,20 +479,13 @@ class PssmObject():
         export_file.write("\n" + recognized)
 
     def is_connector(self) -> bool:
-        """node is not a connector
-
-        Returns:
-            False because is a pssm recognizer
-        """
         return False
 
-    def is_pssm(self):
-        """node is a pssm recognizer
-
-        Returns:
-            True because is a pssm recognizer
-        """
+    def is_pssm(self) -> bool:
         return True
+    
+    def is_shape(self) -> bool:
+        return False
 
     def get_type(self):
         return 'p'

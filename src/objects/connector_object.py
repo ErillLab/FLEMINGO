@@ -410,19 +410,12 @@ class ConnectorObject():
         export_file.write("\n m: {} s: {}".format(self._mu, self._sigma))
 
     def is_connector(self) -> bool:
-        """node is connector
-
-        Returns:
-            True because is a connector
-        """
         return True
 
     def is_pssm(self) -> bool:
-        """node is not a pssm
-
-        Returns:
-            False because is a connector
-        """
+        return False
+    
+    def is_shape(self) -> bool:
         return False
 
     def adjust_scores(self, c_scores, sequence_length, sum_recognizer_lengths):

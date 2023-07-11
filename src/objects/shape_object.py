@@ -380,6 +380,18 @@ class ShapeObject:
             export_file: File to write the output
         """
         export_file.write("\n" + str(self._mu) + " " + str(self._sigma) + " " + self.type + " " + str(self.length))
+    
+    def is_connector(self) -> bool:
+        return False
+    
+    def is_pssm(self) -> bool:
+        return False
+    
+    def is_shape(self) -> bool:
+        return True
+
+    def get_type(self):
+        return 'p'
 
     def get_type(self):
         """Returns the one character definiton of a recognizers type
