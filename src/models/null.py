@@ -21,7 +21,6 @@ def get_null_mgw(sequences, n, num_bins):
     num_pentamers = n - 4
     pentamer_scores = []
     scores = []
-    counter = n
 
     for sequence in sequences:
         
@@ -44,22 +43,23 @@ def get_null_mgw(sequences, n, num_bins):
 
             pentamer_scores.append(constants.MGW_SCORES[index])
 
-        scores.append(sum(pentamer_scores)/len(pentamer_scores))
-
-    hist = np.histogram(scores, bins=num_bins, density=True)
-    for i in range(len(hist[0])):
-        if hist[0][i] != 0.00:
-            hist[0][i] = np.log(hist[0][i])
+        scores.append(sum(pentamer_scores)/num_pentamers)
+    
+    # Compute frequency for each bin
+    counts, edges = np.histogram(scores, bins=num_bins)
+    frequencies = counts / sum(counts)
+    for i in range(len(frequencies)):
+        if frequencies[i] != 0.00:
+            frequencies[i] = np.log(frequencies[i])
         else:
-            hist[0][i] = np.nan
-            
-    return hist
+            frequencies[i] = np.nan
+    
+    return (frequencies, edges)
 
 def get_null_prot(sequences, n, num_bins):
     num_pentamers = n - 4
     pentamer_scores = []
     scores = []
-    counter = n
 
     for sequence in sequences:
         
@@ -82,21 +82,23 @@ def get_null_prot(sequences, n, num_bins):
 
             pentamer_scores.append(constants.PROT_SCORES[index])
 
-        scores.append(sum(pentamer_scores)/len(pentamer_scores))
-    hist = np.histogram(scores, bins=num_bins, density=True)
-
-    for i in range(len(hist[0])):
-        if hist[0][i] != 0.00:
-            hist[0][i] = np.log(hist[0][i])
+        scores.append(sum(pentamer_scores)/num_pentamers)
+    
+    # Compute frequency for each bin
+    counts, edges = np.histogram(scores, bins=num_bins)
+    frequencies = counts / sum(counts)
+    for i in range(len(frequencies)):
+        if frequencies[i] != 0.00:
+            frequencies[i] = np.log(frequencies[i])
         else:
-            hist[0][i] = np.nan
-    return hist
+            frequencies[i] = np.nan
+    
+    return (frequencies, edges)
 
 def get_null_roll(sequences, n, num_bins):
     num_pentamers = n - 4
     pentamer_scores = []
     scores = []
-    counter = n
 
     for sequence in sequences:
         
@@ -119,23 +121,26 @@ def get_null_roll(sequences, n, num_bins):
 
             pentamer_scores.append(constants.ROLL_SCORES[index])
             pentamer_scores.append(constants.ROLL_SCORES[1024 + index])
-
-        scores.append( (pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / (len(pentamer_scores) + 2) )
-    hist = np.histogram(scores, bins=num_bins, density=True)
-
-    for i in range(len(hist[0])):
-        if hist[0][i] != 0.00:
-            hist[0][i] = np.log(hist[0][i])
+        
+        # Weighted average where first and last element have double weight (counted twice)
+        # Note that the number of elements in pentamer_scores is 2*num_pentamers
+        scores.append( (pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / ((2*num_pentamers) + 2) )
+    
+    # Compute frequency for each bin
+    counts, edges = np.histogram(scores, bins=num_bins)
+    frequencies = counts / sum(counts)
+    for i in range(len(frequencies)):
+        if frequencies[i] != 0.00:
+            frequencies[i] = np.log(frequencies[i])
         else:
-            hist[0][i] = np.nan
-
-    return hist
+            frequencies[i] = np.nan
+    
+    return (frequencies, edges)
 
 def get_null_helt(sequences, n, num_bins):
     num_pentamers = n - 4
     pentamer_scores = []
     scores = []
-    counter = n
 
     for sequence in sequences:
         
@@ -158,15 +163,21 @@ def get_null_helt(sequences, n, num_bins):
 
             pentamer_scores.append(constants.HELT_SCORES[index])
             pentamer_scores.append(constants.HELT_SCORES[1024 + index])
-
-        scores.append((pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / (len(pentamer_scores) + 2))
-    hist = np.histogram(scores, bins=num_bins, density=True)
-    for i in range(len(hist[0])):
-        if hist[0][i] != 0.00:
-            hist[0][i] = np.log(hist[0][i])
+        
+        # Weighted average where first and last element have double weight (counted twice)
+        # Note that the number of elements in pentamer_scores is 2*num_pentamers
+        scores.append( (pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / ((2*num_pentamers) + 2) )
+    
+    # Compute frequency for each bin
+    counts, edges = np.histogram(scores, bins=num_bins)
+    frequencies = counts / sum(counts)
+    for i in range(len(frequencies)):
+        if frequencies[i] != 0.00:
+            frequencies[i] = np.log(frequencies[i])
         else:
-            hist[0][i] = np.nan
-    return hist
+            frequencies[i] = np.nan
+    
+    return (frequencies, edges)
 
 def generate_range(a, b, models, bins):
     if models == {} or (bins not in models.keys()):
