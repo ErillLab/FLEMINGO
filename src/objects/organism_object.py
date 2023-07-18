@@ -807,7 +807,7 @@ class OrganismObject:
             # If it was not possible to decrease the length (it was already
             # at the minimum length allowed for a recognizer) delete it
             else:
-                self.delete_recognizer(recognizer_idx=idx)
+                self.delete_recognizer(recognizer_to_remove=idx)
             edited = True
         
         # Update organism
