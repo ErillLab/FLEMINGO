@@ -96,7 +96,7 @@ class OrganismFactory:
 
         return
 
-    def check_shape_null_models(self, bins):
+    def check_shape_null_models(self, n_bins):
         """Determines if null models must be computed or not, and calls 
         computing function if necessary.
 
@@ -109,7 +109,7 @@ class OrganismFactory:
         computed already, it will do nothing and return None.
 
         Args:
-            bins: the number of intervals in the null models for each shape
+            n_bins: the number of intervals in the null models for each shape
 
         Returns:
             None
@@ -118,18 +118,18 @@ class OrganismFactory:
 
         if shape_object.null_models == {}:
             null.generate_range(5, self.conf_shape["MAX_LENGTH"] + 1,
-                                shape_object.null_models, bins)
+                                shape_object.null_models, n_bins)
             return
 
-        if bins not in shape_object.null_models.keys():
+        if n_bins not in shape_object.null_models.keys():
             null.generate_range(5, self.conf_shape["MAX_LENGTH"] + 1,
-                                shape_object.null_models, bins)
+                                shape_object.null_models, n_bins)
             return
 
-        if max(shape_object.null_models[bins]["mgw"].keys()) < self.conf_shape["MAX_LENGTH"]:
-            null.generate_range(max(shape_object.null_models[bins]["mgw"].keys()) + 1,
+        if max(shape_object.null_models[n_bins]["mgw"].keys()) < self.conf_shape["MAX_LENGTH"]:
+            null.generate_range(max(shape_object.null_models[n_bins]["mgw"].keys()) + 1,
                                 self.conf_shape["MAX_LENGTH"] + 1,
-                                shape_object.null_models, bins)
+                                shape_object.null_models, n_bins)
             return
 
         return

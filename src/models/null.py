@@ -253,34 +253,34 @@ def get_null_helt(sequences, n, num_bins):
     
     return (frequencies, edges)
 
-def generate_range(a, b, models, bins):
-    if models == {} or (bins not in models.keys()):
-        models[bins] = {}
-        models[bins]["mgw"] = {}
-        models[bins]["prot"] = {}
-        models[bins]["roll"] = {}
-        models[bins]["helt"] = {}
+def generate_range(a, b, models, n_bins):
+    if models == {} or (n_bins not in models.keys()):
+        models[n_bins] = {}
+        models[n_bins]["mgw"] = {}
+        models[n_bins]["prot"] = {}
+        models[n_bins]["roll"] = {}
+        models[n_bins]["helt"] = {}
     for i in range(a, b):
         print("Generating cartesian product for length {}...".format(i))
         sequences = (list(itertools.product(['A', 'G', 'C', 'T'], repeat=i)))
         print("Finished generating sequences for length {}".format(i))
         print("Calculating null distributions for length {}...".format(i))
-        model, edges = get_null_mgw(sequences, i, bins)
-        models[bins]["mgw"][i] = {}
-        models[bins]["mgw"][i]["frequencies"] = model
-        models[bins]["mgw"][i]["bins"] = edges
-        model, edges = get_null_prot(sequences, i, bins)
-        models[bins]["prot"][i] = {}
-        models[bins]["prot"][i]["frequencies"] = model
-        models[bins]["prot"][i]["bins"] = edges
-        model, edges = get_null_roll(sequences, i, bins)
-        models[bins]["roll"][i] = {}
-        models[bins]["roll"][i]["frequencies"] = model
-        models[bins]["roll"][i]["bins"] = edges
-        model, edges = get_null_helt(sequences, i, bins)
-        models[bins]["helt"][i] = {}
-        models[bins]["helt"][i]["frequencies"] = model
-        models[bins]["helt"][i]["bins"] = edges
+        model, edges = get_null_mgw(sequences, i, n_bins)
+        models[n_bins]["mgw"][i] = {}
+        models[n_bins]["mgw"][i]["frequencies"] = model
+        models[n_bins]["mgw"][i]["bins"] = edges
+        model, edges = get_null_prot(sequences, i, n_bins)
+        models[n_bins]["prot"][i] = {}
+        models[n_bins]["prot"][i]["frequencies"] = model
+        models[n_bins]["prot"][i]["bins"] = edges
+        model, edges = get_null_roll(sequences, i, n_bins)
+        models[n_bins]["roll"][i] = {}
+        models[n_bins]["roll"][i]["frequencies"] = model
+        models[n_bins]["roll"][i]["bins"] = edges
+        model, edges = get_null_helt(sequences, i, n_bins)
+        models[n_bins]["helt"][i] = {}
+        models[n_bins]["helt"][i]["frequencies"] = model
+        models[n_bins]["helt"][i]["bins"] = edges
         print("Finsihed calculating null for shapes of length {}".format(i))
         with open("models/models", "wb") as outfile:
             pickle.dump(models, outfile)
