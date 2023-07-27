@@ -1162,8 +1162,6 @@ class OrganismObject:
         Returns:
             DNA sequence and binding sites of the organisms recognizer
         """
-
-        s_dna = s_dna.lower()
         placement = self.get_placement(s_dna)
         placement.print_placement(stdout = True)
 
