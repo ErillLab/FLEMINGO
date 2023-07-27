@@ -222,12 +222,13 @@ class OrganismFactory:
         
         return ConnectorObject(self.conf_con, self.max_seq_length)
 
-    def create_recognizer(self, length = None):
+    def create_recognizer(self, length=None):
         """Randomly creates either a PSSM or shape recognizer
 
         Args:
-            length: length of the recognizer to be created
-                    passed to either create_pssm or create_shape
+            length:
+                length of the recognizer to be created. Default is None.
+                Passed to either create_pssm or create_shape.
 
         Returns:
             a recognizer with the specified length (if its valid)
@@ -237,14 +238,15 @@ class OrganismFactory:
         else:
             return self.create_shape(length)
 
-    def create_pssm(self, length = None) -> PssmObject:
+    def create_pssm(self, length=None) -> PssmObject:
         """It return a PSSM object with a specific length
 
         Args:
-            length: length (columns) of the PSSM
-            if None ...
-            !!!
-
+            length:
+                length (number of columns) of the PSSM. Default is None.
+                If None, the length is randomly drawn from a modified Poisson
+                distribution that respects the required average and bounds.
+        
         Returns:
             A pssm object with an initializated PWM
         """
@@ -261,14 +263,18 @@ class OrganismFactory:
 
         return PssmObject(np.array(pwm), self.conf_pssm)
     
-    def create_shape(self, length = None) -> ShapeObject:
+    def create_shape(self, length=None, rec_type=None) -> ShapeObject:
         """It return a shape object with a specific length (>= 5)
            and random feature (one of {mgw, prot, roll, or helt})
 
         Args:
-            length: length of the shape recognizer
-            if None or less than 5, then 5 is used
-
+            length:
+                length of the shape recognizer. Default is None.
+                If None or less than 5, then 5 is used.
+            rec_type:
+                type of shape recognizer. Default is None.
+                If None, a random type is chosen.
+        
         Returns:
             shape object with a specified length
         """
@@ -277,7 +283,8 @@ class OrganismFactory:
         if length > self.conf_shape["MAX_LENGTH"]:
             length = self.conf_shape["MAX_LENGTH"]
         
-        rec_type = random.choice(['mgw', 'prot', 'roll', 'helt'])
+        if rec_type == None:
+            rec_type = random.choice(['mgw', 'prot', 'roll', 'helt'])
         return ShapeObject(rec_type, length, self.conf_shape)
 
 
