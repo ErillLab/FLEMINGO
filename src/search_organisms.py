@@ -863,7 +863,7 @@ def read_fasta_file(filename: str) -> list:
     fasta_sequences = SeqIO.parse(open(filename), "fasta")
 
     for fasta in fasta_sequences:
-        dataset.append(str(fasta.seq).lower())
+        dataset.append(str(fasta.seq))
 
     return dataset
 
