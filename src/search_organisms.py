@@ -525,9 +525,11 @@ def generate_negative_set(positive_set: list) -> list:
     negative_set = []
     for i in range(q):
         for seq in positive_set:
-            negative_set.append(get_k_sampled_sequence(seq, GENERATED_NEG_SET_KMER_LEN))
+            negseq = get_k_sampled_sequence(seq, GENERATED_NEG_SET_KMER_LEN)
+            negative_set.append(negseq.lower())
     for seq in random.sample(positive_set, r):
-        negative_set.append(get_k_sampled_sequence(seq, GENERATED_NEG_SET_KMER_LEN))
+        negseq = get_k_sampled_sequence(seq, GENERATED_NEG_SET_KMER_LEN)
+        negative_set.append(negseq.lower())
     return negative_set
 
 
