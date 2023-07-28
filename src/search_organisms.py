@@ -271,10 +271,10 @@ def main():
                 changed_best_score = True
             
             # Print info about the current generation
-            print("")
             _m, _s = divmod((time.time() - initial), 60)
             _h, _m = divmod(_m, 60)
             s_time = "{}h:{}m:{:.2f}s".format(int(_h), int(_m), _s)
+            print("\n" + "_" * max_seq_length)
             print_ln(
                 (
                     "Generation {}" +
@@ -861,12 +861,9 @@ def read_fasta_file(filename: str) -> list:
 
     """
     dataset = []
-
     fasta_sequences = SeqIO.parse(open(filename), "fasta")
-
     for fasta in fasta_sequences:
         dataset.append(str(fasta.seq))
-
     return dataset
 
 
