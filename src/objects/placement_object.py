@@ -52,7 +52,7 @@ class PlacementObject:
     
     # Print placement (to standard output or to file)
     
-    def print_placement(self, stdout=False, outfile=None):
+    def print_placement_old(self, stdout=False, outfile=None):
         '''
         It prints out the placement as text.
 
@@ -127,7 +127,90 @@ class PlacementObject:
             print("".join(recog_positions_line), file=outfile)
             print("".join(recog_scores_line), file=outfile)
             print("".join(conn_scores_line), file=outfile)
+    
+    def print_placement(self, stdout=False, outfile=None):
+        '''
+        It prints out the placement as text.
 
+        Parameters
+        ----------
+        stdout : bool, optional
+            Whether to print to standard output the placement.
+            The default is False.
+        outfile : None or string, optional
+            Whether to write to file the placement. If it's None, the placement
+            is not written to file. Otherwise, it specifies the name of the
+            outfile. The default is None.
+        '''
+        n = len(self.dna_sequence)
+        recog_positions_line = [" "] * n
+        recog_scores_line = [" "] * n
+        conn_scores_line = ["_"] * n
+        
+        # Recognizers positions
+        for i in range(len(self.recognizers_positions)):
+            # start and stop DNA positions of recognizer i
+            start, stop = self.recognizers_positions[i]
+            
+            # get the recognizer score and format it
+            recog_score = self.recognizers_scores[i]
+            recog_score_str = "{:.2f}".format(recog_score)
+            if i == 0:
+                conn_scores_line[:stop] = [" "] * stop
+            if i == len(self.recognizers_positions) - 1:
+                conn_scores_line[start:] = [" "] * (n - start)
+            
+            # write recognizer placement
+            for pos in range(start, stop):
+                recog_positions_line[pos] = str(self.recognizer_types[i])
+                conn_scores_line[pos] = " "
+            
+            # write recognizer score
+            for c in range(len(recog_score_str)):
+                if start + c < len(recog_scores_line):  # avoid going out of the seq
+                    recog_scores_line[start + c] = recog_score_str[c]
+        
+        # Connectors positions
+        for i in range(len(self.connectors_positions)):
+            # start and stop DNA positions of connector i
+            start, stop = self.connectors_positions[i]
+            
+            # get the connector score and format it
+            connector_score = self.connectors_scores[i]
+            connector_score_str = "{:.2f}".format(connector_score)
+            
+            gap_size = stop - start
+            
+            # if the gap is large, the connector score is written in the middle
+            # if gap_size > len(connector_score_str) + 1:
+            right_shift = int(np.ceil((gap_size - len(connector_score_str))/2))
+            start += right_shift
+            
+            # # More centered printing for small gaps
+            # else:
+            #     start -= 2
+            
+            # write connector score
+            for c in range(len(connector_score_str)):
+                if start + c < len(conn_scores_line):  # avoid goin out of the seq
+                    conn_scores_line[start + c] = connector_score_str[c]
+        
+        # print to stdout if required
+        if stdout:
+            print("")
+            print("".join(conn_scores_line))
+            print("".join(recog_scores_line))
+            print("".join(recog_positions_line))
+            print(self.dna_sequence)
+        
+        # print to file if required
+        if outfile != None:
+            print("", file=outfile)
+            print("".join(conn_scores_line), file=outfile)
+            print("".join(recog_scores_line), file=outfile)
+            print("".join(recog_positions_line), file=outfile)
+            print(self.dna_sequence, file=outfile)
+    
     def set_recognizer_types(self, rec_types):
         #print(rec_types)
         self.recognizer_types = rec_types
