@@ -15,6 +15,125 @@ def print_histogram(histogram):
         counter += 1 
         print('[' + str(round(j, 2)) + ', ' + str(round(histogram[1][counter], 2)) + ') ' + '{0: >10}'.format(i))
 
+
+def get_sequence_mgw_score(sequence):
+    '''
+    !!! Docstring here ...
+    '''
+    # The number of pentamers is len(sequence) - 5 + 1 = len(sequence) - 4
+    num_pentamers = len(sequence) - 4
+    pentamer_scores = []
+    for i in range(num_pentamers):
+        
+        # Map the pentamer that starts at position i to a base-4 index
+        index = 0 
+        for j in range(i, i + 5):
+            nuc = sequence[j]
+            if nuc == 'A':
+                index += pow(4, 4 - (j - i)) * 0
+            if nuc == 'G':
+                index += pow(4, 4 - (j - i)) * 1
+            if nuc == 'C':
+                index += pow(4, 4 - (j - i)) * 2
+            if nuc == 'T':
+                index += pow(4, 4 - (j - i)) * 3
+
+        pentamer_scores.append(constants.MGW_SCORES[index])
+    
+    # Final MGW score for the l-mer `sequence`
+    return sum(pentamer_scores)/num_pentamers
+
+
+def get_sequence_prot_score(sequence):
+    '''
+    !!! Docstring here ...
+    '''
+    # The number of pentamers is len(sequence) - 5 + 1 = len(sequence) - 4
+    num_pentamers = len(sequence) - 4
+    pentamer_scores = []
+    for i in range(num_pentamers):
+        
+        # Map the pentamer that starts at position i to a base-4 index
+        index = 0 
+        for j in range(i, i + 5):
+            nuc = sequence[j]
+            if nuc == 'A':
+                index += pow(4, 4 - (j - i)) * 0
+            if nuc == 'G':
+                index += pow(4, 4 - (j - i)) * 1
+            if nuc == 'C':
+                index += pow(4, 4 - (j - i)) * 2
+            if nuc == 'T':
+                index += pow(4, 4 - (j - i)) * 3
+
+        pentamer_scores.append(constants.PROT_SCORES[index])
+    
+    # Final ProT score for the l-mer `sequence`
+    return sum(pentamer_scores)/num_pentamers
+
+
+def get_sequence_roll_score(sequence):
+    '''
+    !!! Docstring here ...
+    '''
+    # The number of pentamers is len(sequence) - 5 + 1 = len(sequence) - 4
+    num_pentamers = len(sequence) - 4
+    pentamer_scores = []
+    for i in range(num_pentamers):
+        
+        # Map the pentamer that starts at position i to a base-4 index
+        index = 0 
+        for j in range(i, i + 5):
+            nuc = sequence[j]
+            if nuc == 'A':
+                index += pow(4, 4 - (j - i)) * 0
+            if nuc == 'G':
+                index += pow(4, 4 - (j - i)) * 1
+            if nuc == 'C':
+                index += pow(4, 4 - (j - i)) * 2
+            if nuc == 'T':
+                index += pow(4, 4 - (j - i)) * 3
+
+        pentamer_scores.append(constants.ROLL_SCORES[index])
+        pentamer_scores.append(constants.ROLL_SCORES[1024 + index])
+    
+    # Final Roll score for the l-mer `sequence`. It's a weighted average
+    # where first and last element have double weight (counted twice)
+    # Note that the number of elements in pentamer_scores is 2*num_pentamers
+    return (pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / ((2*num_pentamers) + 2)
+
+
+def get_sequence_helt_score(sequence):
+    '''
+    !!! Docstring here ...
+    '''
+    # The number of pentamers is len(sequence) - 5 + 1 = len(sequence) - 4
+    num_pentamers = len(sequence) - 4
+    pentamer_scores = []
+    for i in range(num_pentamers):
+        
+        # Map the pentamer that starts at position i to a base-4 index
+        index = 0 
+        for j in range(i, i + 5):
+            nuc = sequence[j]
+            if nuc == 'A':
+                index += pow(4, 4 - (j - i)) * 0
+            if nuc == 'G':
+                index += pow(4, 4 - (j - i)) * 1
+            if nuc == 'C':
+                index += pow(4, 4 - (j - i)) * 2
+            if nuc == 'T':
+                index += pow(4, 4 - (j - i)) * 3
+
+        pentamer_scores.append(constants.HELT_SCORES[index])
+        pentamer_scores.append(constants.HELT_SCORES[1024 + index])
+    
+    # Final HelT score for the l-mer `sequence`. It's a weighted average
+    # where first and last element have double weight (counted twice)
+    # Note that the number of elements in pentamer_scores is 2*num_pentamers
+    return (pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / ((2*num_pentamers) + 2)
+
+
 def get_null_mgw(sequences, n, num_bins):
     '''
     Returns the binned frequency distribution for the null model of MGW shape
@@ -40,7 +159,7 @@ def get_null_mgw(sequences, n, num_bins):
     scores = []
 
     for sequence in sequences:
-        
+        '''
         pentamer_scores = []
         for i in range(num_pentamers):
             
@@ -61,6 +180,10 @@ def get_null_mgw(sequences, n, num_bins):
         
         # Final MGW score for the l-mer `sequence`
         scores.append(sum(pentamer_scores)/num_pentamers)
+        '''
+        
+        # Final MGW score for the l-mer `sequence`
+        scores.append(get_sequence_mgw_score(sequence))
     
     # Compute frequency for each bin
     counts, edges = np.histogram(scores, bins=num_bins)
@@ -98,7 +221,7 @@ def get_null_prot(sequences, n, num_bins):
     scores = []
 
     for sequence in sequences:
-        
+        '''
         pentamer_scores = []
         for i in range(num_pentamers):
             
@@ -119,6 +242,10 @@ def get_null_prot(sequences, n, num_bins):
         
         # Final ProT score for the l-mer `sequence`
         scores.append(sum(pentamer_scores)/num_pentamers)
+        '''
+        
+        # Final ProT score for the l-mer `sequence`
+        scores.append(get_sequence_prot_score(sequence))
     
     # Compute frequency for each bin
     counts, edges = np.histogram(scores, bins=num_bins)
@@ -156,7 +283,7 @@ def get_null_roll(sequences, n, num_bins):
     scores = []
 
     for sequence in sequences:
-        
+        '''
         pentamer_scores = []
         for i in range(num_pentamers):
             
@@ -180,6 +307,10 @@ def get_null_roll(sequences, n, num_bins):
         # where first and last element have double weight (counted twice)
         # Note that the number of elements in pentamer_scores is 2*num_pentamers
         scores.append( (pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / ((2*num_pentamers) + 2) )
+        '''
+        
+        # Final Roll score for the l-mer `sequence`
+        scores.append(get_sequence_roll_score(sequence))
     
     # Compute frequency for each bin
     counts, edges = np.histogram(scores, bins=num_bins)
@@ -217,7 +348,7 @@ def get_null_helt(sequences, n, num_bins):
     scores = []
 
     for sequence in sequences:
-        
+        '''
         pentamer_scores = []
         for i in range(num_pentamers):
             
@@ -241,7 +372,11 @@ def get_null_helt(sequences, n, num_bins):
         # where first and last element have double weight (counted twice)
         # Note that the number of elements in pentamer_scores is 2*num_pentamers
         scores.append( (pentamer_scores[0] + sum(pentamer_scores) + pentamer_scores[-1]) / ((2*num_pentamers) + 2) )
-    
+        '''
+        
+        # Final HelT score for the l-mer `sequence`
+        scores.append(get_sequence_helt_score(sequence))
+        
     # Compute frequency for each bin
     counts, edges = np.histogram(scores, bins=num_bins)
     frequencies = counts / sum(counts)
