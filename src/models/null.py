@@ -307,5 +307,5 @@ def generate_range(a, b, models, n_bins):
         models[n_bins]["helt"][i]["frequencies"] = model
         models[n_bins]["helt"][i]["bins"] = edges
         print("Finsihed calculating null for shapes of length {}".format(i))
-        with open("models/models", "wb") as outfile:
-            pickle.dump(models, outfile)
+    with open("models/models", "wb") as outfile:
+        pickle.dump(models, outfile)
