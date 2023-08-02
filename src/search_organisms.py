@@ -930,6 +930,14 @@ def check_config_settings(config):
         raise ValueError("Unknown fitness function. Please choose one of the " +
                          "following: 'Welch', 'Yuen', 'Trim-left-M', 'Trim-left-M-SD'.")
     
+    # Check value of the Gamma parameter for the Yuen fitness function
+    if config["main"]["FITNESS_FUNCTION"] == "Yuen" and config["main"]["GAMMA"] > 0.5:
+        raise ValueError("When the fitness function is 'Yuen', the trimmed mean " +
+                         "is computed by trimming from both tails. Therefore, " +
+                         "the maximum value of GAMMA is 0.5 (case in which the " +
+                         "trimmed mean is equivalent to the median). Please, " +
+                         "edit the settings chosing a valid value for GAMMA.")
+    
     # Check that PERIODIC_DATASETS_SHUFFLE is a positive integer
     if (not isinstance(config["main"]["PERIODIC_DATASETS_SHUFFLE"], int) or
         config["main"]["PERIODIC_DATASETS_SHUFFLE"] < 1):

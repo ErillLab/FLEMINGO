@@ -860,11 +860,6 @@ class OrganismObject:
         '''
         energy_scores = self.get_binding_energies(dna_set)
         n_to_trim = round(gamma * len(energy_scores))  # defalut gamma: 0.2
-        # Make sure that `n_to_trim` doesn't exceed the maximum. We should always
-        # trim less than half of the elements from one side, to avoid being left
-        # with an empty list
-        max_n_to_trim = int((len(energy_scores)-1)/2)
-        n_to_trim = min(n_to_trim, max_n_to_trim)
         
         if n_to_trim == 0 or method == "Welch":
             # Mean
@@ -875,6 +870,11 @@ class OrganismObject:
             sterr = stdev / np.sqrt(len(energy_scores))
         elif method == "Yuen":
             # Trimmed mean
+            # Make sure that `n_to_trim` doesn't exceed the maximum. We should always
+            # trim less than half of the elements from one side, to avoid being left
+            # with an empty list
+            max_n_to_trim = int((len(energy_scores)-1)/2)
+            n_to_trim = min(n_to_trim, max_n_to_trim)
             energy_scores.sort()
             energy_scores_trimmed = energy_scores[n_to_trim:-n_to_trim]
             mean = np.mean(energy_scores_trimmed)

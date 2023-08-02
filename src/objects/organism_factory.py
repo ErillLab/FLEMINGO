@@ -1202,7 +1202,7 @@ class OrganismFactory:
         
         # gap stats
         mu = np.mean(gaps)
-        sigma = np.std(gaps, ddof=1)  # !!! ddof ?
+        sigma = np.std(gaps, ddof=1)  # !!! ddof: 1 or 0? (sample VS population)
         
         # Create energy-optimized connector
         conn = self.create_connector()
@@ -1455,7 +1455,7 @@ class OrganismFactory:
         
         # shape value stats
         mu = np.mean(scores)
-        sigma = np.std(scores, ddof=1)  # !!! ddof ?
+        sigma = np.std(scores, ddof=1)  # !!! ddof: 1 or 0? (sample VS population)
         
         # Create energy-optimized shape-recognizer
         shape = self.create_shape(shape_length, shape_type)
