@@ -18,8 +18,16 @@ def g(x, mu, sigma):
 
 def norm_cdf(x, mu, sigma):
     ''' Cumulative distribution function for the normal distribution. '''
-    z = (x-mu)/abs(sigma)  # z-score
-    return (1.0 + math.erf(z / math.sqrt(2.0))) / 2.0
+    if sigma == 0:
+        if x < mu:
+            return 0
+        elif x > mu:
+            return 1
+        elif x == mu:
+            return 0.5
+    else:
+        z = (x-mu)/abs(sigma)  # z-score
+        return (1.0 + math.erf(z / math.sqrt(2.0))) / 2.0
 
 def norm_pf(x, mu, sigma):
     """
