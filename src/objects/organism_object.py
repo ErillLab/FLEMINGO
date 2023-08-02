@@ -827,7 +827,7 @@ class OrganismObject:
         of DNA sequences doesn't further improve fitness. This means that if the
         difference between averages (P - N) is small, the organism can not
         improve fitness indefinitely by only reducing the variances. [this would
-        also make sense under the assumptino that discrimination happens in a
+        also make sense under the assumption that discrimination happens in a
         noise-prone system where a very small P-N would be unreliable and
         ultimately wouldn't work].
         
@@ -842,12 +842,12 @@ class OrganismObject:
             the distribution (both left and right)
         Trim-left-M:
             TRIMMED MEAN.
-            gamma*100 is the percentage of discarded elements from the left tail of
-            the distribution
+            gamma*100 is the percentage of discarded elements from the left tail
+            of the distribution
         Trim-left-M-SD:
             TRIMMED MEAN AND TRIMMED STANDARD ERROR.
-            gamma*100 is the percentage of discarded elements from the left tail of
-            the distribution
+            gamma*100 is the percentage of discarded elements from the left tail
+            of the distribution
         
         Parameters
         ----------
@@ -866,34 +866,37 @@ class OrganismObject:
         max_n_to_trim = int((len(energy_scores)-1)/2)
         n_to_trim = min(n_to_trim, max_n_to_trim)
         
-        if n_to_trim == 0:
+        if n_to_trim == 0 or method == "Welch":
+            # Mean
             mean = np.mean(energy_scores)
-            stdev = np.std(energy_scores, ddof=1)
-            stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
-            sterr = stdev / np.sqrt(len(energy_scores))
-        elif method == "Welch":
-            mean = np.mean(energy_scores)
+            # Standard deviation
             stdev = np.std(energy_scores, ddof=1)
             stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
             sterr = stdev / np.sqrt(len(energy_scores))
         elif method == "Yuen":
+            # Trimmed mean
             energy_scores.sort()
             energy_scores_trimmed = energy_scores[n_to_trim:-n_to_trim]
             mean = np.mean(energy_scores_trimmed)
+            # Standard deviation
             stdev = np.std(energy_scores, ddof=1)
             stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
             sterr = stdev / np.sqrt(len(energy_scores))
         elif method == "Trim-left-M":
+            # Left-trimmed mean
             energy_scores.sort()
             energy_scores_trimmed = energy_scores[n_to_trim:]
             mean = np.mean(energy_scores_trimmed)
+            # Standard deviation
             stdev = np.std(energy_scores, ddof=1)
             stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
             sterr = stdev / np.sqrt(len(energy_scores))
         elif method == "Trim-left-M-SD":
+            # Left-trimmed mean
             energy_scores.sort()
             energy_scores_trimmed = energy_scores[n_to_trim:]
             mean = np.mean(energy_scores_trimmed)
+            # Left-trimmed standard deviation
             stdev = np.std(energy_scores_trimmed, ddof=1)
             stdev = max(1, stdev)  # Lower bound to sigma (see docstring)
             sterr = stdev / np.sqrt(len(energy_scores_trimmed))
