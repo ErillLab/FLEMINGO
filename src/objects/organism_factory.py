@@ -205,7 +205,11 @@ class OrganismFactory:
     
     def from_shifted_poisson(self, average, minimum, maximum):
         '''
-        !!! Docstring here ...
+        Randomly draws an integer from a Poisson distribution that is shifted
+        so that the smallest number returned is the number specified by the
+        parameter `minimum`. It also ensures that the expected value is the
+        number specified by the parameter `average`. If the randomly drawn
+        number is larger than `maximum` it is set to `maximum`.
         '''
         # Draw from shifted Poisson
         n = np.random.poisson(average - minimum)
@@ -790,7 +794,7 @@ class OrganismFactory:
         Index 1 is liked to index 3 by the second connector of p1: the
         connector that connects recognizer p1_1 with recognizer p1_2.
         
-        Index 2 is liked to index 3 by the only connector of p2: the
+        Index 1 is liked to index 2 by the only connector of p2: the
         connector that connects recognizer p2_0 with recognizer p2_1.
         
         Parameters
