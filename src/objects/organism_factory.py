@@ -91,7 +91,11 @@ class OrganismFactory:
             return
         
         with open("models/models", "rb") as infile:
-            shape_object.null_models = pickle.load(infile)
+            try:
+                shape_object.null_models = pickle.load(infile)
+            except:
+                shape_object.null_models = {}
+
             return
 
         return

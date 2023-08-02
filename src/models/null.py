@@ -279,6 +279,21 @@ def get_null_helt(sequences, n, num_bins):
     return (frequencies, edges)
 
 def generate_range(a, b, models, n_bins):
+    """
+    Args:
+        a: lower end of the range to compute
+           [one greater than the max size already computed for]
+
+        b: upper end of the range to compute
+           [one greater than the max size specified in the config]
+
+        models: dictionary passed by reference to update with newly
+                computed values
+                [in the form {n_bins: {rec_type: {length: {freqs: [], bins: []}}}}]
+          note: since its passed by reference, all runtime modifications are made in
+                this code and not read during the current run, reading is only done
+                at the very start of a run.
+    """
     if models == {} or (n_bins not in models.keys()):
         models[n_bins] = {}
         models[n_bins]["mgw"] = {}
@@ -287,25 +302,39 @@ def generate_range(a, b, models, n_bins):
         models[n_bins]["helt"] = {}
     for i in range(a, b):
         print("Generating cartesian product for length {}...".format(i))
+
+        # this generates all possible sequences of length i
         sequences = (list(itertools.product(['A', 'G', 'C', 'T'], repeat=i)))
         print("Finished generating sequences for length {}".format(i))
         print("Calculating null distributions for length {}...".format(i))
+
+        # model: frequencies in histogram
+        # edges: edges in the histogram
         model, edges = get_null_mgw(sequences, i, n_bins)
+
+        # addition of sub dictionary for the model for the shape of length i
+        # and assignment of key value pairs frequencies and edges
         models[n_bins]["mgw"][i] = {}
         models[n_bins]["mgw"][i]["frequencies"] = model
         models[n_bins]["mgw"][i]["bins"] = edges
+
         model, edges = get_null_prot(sequences, i, n_bins)
         models[n_bins]["prot"][i] = {}
         models[n_bins]["prot"][i]["frequencies"] = model
         models[n_bins]["prot"][i]["bins"] = edges
+
         model, edges = get_null_roll(sequences, i, n_bins)
         models[n_bins]["roll"][i] = {}
         models[n_bins]["roll"][i]["frequencies"] = model
         models[n_bins]["roll"][i]["bins"] = edges
+
         model, edges = get_null_helt(sequences, i, n_bins)
         models[n_bins]["helt"][i] = {}
         models[n_bins]["helt"][i]["frequencies"] = model
         models[n_bins]["helt"][i]["bins"] = edges
         print("Finsihed calculating null for shapes of length {}".format(i))
+
+    # THIS MUST STAY AS wb, changing to append will cause duplicate key errors
+    # this writes the entire updated model to the pickle file
     with open("models/models", "wb") as outfile:
         pickle.dump(models, outfile)
