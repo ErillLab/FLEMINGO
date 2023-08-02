@@ -78,7 +78,9 @@ def main():
         if i_am_main_process():
             # This is executed by process 0 (or by the only process if RUN_MODE is serial)
             print("Generateing negative set...")
-            negative_dataset = generate_negative_set(positive_dataset)
+            negative_dataset = generate_negative_set(
+                positive_dataset, GENERATED_NEG_SET_SIZE, GENERATED_NEG_SET_KMER_LEN)
+            
         else:
             negative_dataset = None  # this will only happen in parallel runs
         if RUN_MODE == 'parallel':
@@ -507,28 +509,30 @@ def get_k_sampled_sequence(seq: str, kmer_len: int) -> str:
     return "".join(sampled_seq_list)
 
 
-def generate_negative_set(positive_set: list) -> list:
+def generate_negative_set(positive_set, negative_set_size, k):
     ''' Generates a negative set made of pseudosequences that resemble the
-    positive set in terms of k-mer frequencies. If the size of the negative set
-    is not specified, it will be the size of the positive set. If the size is
-    specified and it's k*len(positive_set) where k is an integer, every sequence
-    in the positive set contributes to exactly k sequences in the negative set.
-    If the required size is not a multiple of len(positive_set), the remaining
-    number of sequences (as many as the remainder of the division) are selected
-    randomly from the positive set. '''
+    positive set in terms of k-mer frequencies. The size of the negative set is
+    specified by `negative_set_size`. If `negative_set_size` is None, the
+    negative set will be the same size as the positive set. If the size is
+    specified and it's n*len(positive_set) where n is an integer, every sequence
+    in the positive set contributes exactly to n sequences in the negative set.
+    If instead the required size is not a multiple of len(positive_set), the
+    remaining number of sequences (as many as the remainder of the division)
+    are selected randomly from the positive set. '''
     
-    if GENERATED_NEG_SET_SIZE is None:
-        neg_set_size = len(positive_set)
-    else:
-        neg_set_size = GENERATED_NEG_SET_SIZE
-    q, r = divmod(neg_set_size, len(positive_set))
+    # If size of neg set isn't specified, make it the same length as the pos set
+    if negative_set_size == None:
+        negative_set_size = len(positive_set)
+    # Size of neg set may not be a multiple of the size of pos set
+    q, r = divmod(negative_set_size, len(positive_set))
+    # Generate neg set
     negative_set = []
     for i in range(q):
         for seq in positive_set:
-            negseq = get_k_sampled_sequence(seq, GENERATED_NEG_SET_KMER_LEN)
+            negseq = get_k_sampled_sequence(seq, k)
             negative_set.append(negseq.lower())
     for seq in random.sample(positive_set, r):
-        negseq = get_k_sampled_sequence(seq, GENERATED_NEG_SET_KMER_LEN)
+        negseq = get_k_sampled_sequence(seq, k)
         negative_set.append(negseq.lower())
     return negative_set
 
