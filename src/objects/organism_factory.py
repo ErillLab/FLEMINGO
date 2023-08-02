@@ -1147,7 +1147,371 @@ class OrganismFactory:
         child2.assembly_instructions['recognizers'] = recogs_tags
         child2.assembly_instructions['connectors'] = connectors_tags
         return child1, child2
-
-
-
+    
+    
+    # =========================================================================
+    # XXX  New code for MLE
+    # =========================================================================
+    
+    def clone_organism(self, organism):
+        '''
+        Returns an organism with the same parameters as the input organism (but
+        different ID). The node tags in the 'assembly_instructions' attribute
+        report that every node comes from parent 1 ('p1_') because there is
+        only one parent (which is being cloned).
+        '''
+        clone = copy.deepcopy(organism)
+        # Assign ID
+        clone.set_id(self.get_id())
+        # Clone assembly instructions
+        recogs_tags = ['p1_' + str(i) for i in range(clone.count_recognizers())]
+        connectors_tags = recogs_tags[1:]
+        clone.assembly_instructions['recognizers'] = recogs_tags
+        clone.assembly_instructions['connectors'] = connectors_tags
+        return clone
+    
+    def mle_connector(self, conn_idx, placements):
+        '''
+        Given an organism that shows the placements specified by the parameter
+        `placements`, it analyses the placements of the connector specified by
+        the index `conn_idx`.
+        It returns a new connector whose parameters are obtained through maximum
+        likelihood estimation (MLE), to optimize binding energy on the positive
+        set, given the observed placements on the positive set of the original
+        connector.
+    
+        Parameters
+        ----------
+        conn_idx : int
+            Index of the connector to be optimized according to MLE.
+        placements : PlacementObject
+            List of placements of the organism being optimized according to MLE.
+    
+        Returns
+        -------
+        conn : ConnectorObject
+            A new connector object. Its parameters optimize binding energy on the
+            positive set and were found based on MLE.
+        '''
+        
+        # Observed gaps in the positive set
+        gaps = []
+        for plc in placements:
+            start, stop = plc.connectors_positions[conn_idx]
+            gaps.append(stop - start)
+        
+        # gap stats
+        mu = np.mean(gaps)
+        sigma = np.std(gaps, ddof=1)  # !!! ddof ?
+        
+        # Create energy-optimized connector
+        conn = self.create_connector()
+        conn.set_mu(mu)
+        conn.set_sigma(sigma)
+        conn.set_precomputed_pdfs_cdfs()
+        return conn
+    
+    def mle_recognizer(self, recog_idx, placements, organism):
+        '''
+        Given an organism that shows the placements specified by the parameter
+        `placements`, it analyses the placements of the recognizer specified by
+        the index `recog_idx`.
+        It returns a new recognizer whose parameters are obtained through maximum
+        likelihood estimation (MLE), to optimize binding energy on the positive
+        set, given the observed placements on the positive set of the original
+        recognizer.
+    
+        Parameters
+        ----------
+        recog_idx : int
+            Index of the recognizer to be optimized according to MLE.
+        placements : PlacementObject
+            List of placements of the organism being optimized according to MLE.
+        organism : OrganismObject
+            Organism the recognizer belongs to.
+    
+        Returns
+        -------
+        recog : either a PssmObject or a ShapeObject
+            A new recognizer. Its parameters optimize binding energy on the
+            positive set and were found based on MLE.
+        '''
+        if organism.recognizers[recog_idx].is_pssm():
+            recog = self.mle_pssm(recog_idx, placements)
+        elif organism.recognizers[recog_idx].is_shape():
+            recog = self.mle_shape(recog_idx, placements, organism)
+        return recog
+    
+    def mle_pssm(self, recog_idx, placements):
+        '''
+        Given an organism that shows the placements specified by the parameter
+        `placements`, it analyses the placements of the PSSM-recognizer
+        specified by the index `recog_idx`.
+        It returns a new PSSM whose parameters are obtained through maximum
+        likelihood estimation (MLE), to optimize binding energy on the positive
+        set, given the observed placements on the positive set of the original
+        PSSM.
+    
+        Parameters
+        ----------
+        recog_idx : int
+            Index of the PSSM to be optimized according to MLE.
+        placements : PlacementObject
+            List of placements of the organism being optimized according to MLE.
+        organism : OrganismObject
+            Organism the recognizer belongs to.
+    
+        Returns
+        -------
+        PssmObject :
+            A new PSSM. Its parameters optimize binding energy on the
+            positive set and were found based on MLE.
+        '''
+        
+        # Recognized k-mers from the positive set
+        instances = []
+        for plc in placements:
+            start, stop = plc.recognizers_positions[recog_idx]
+            instances.append(plc.dna_sequence[start:stop].lower())
+        
+        # Instances matrix
+        list_2D = []
+        for inst in instances:
+            list_2D.append([nucl for nucl in inst])
+        inst_mat = np.array(list_2D)
+        
+        # PWM
+        pwm = []
+        pssm_len = len(instances[0])
+        for i in range(pssm_len):
+            column = inst_mat[:,i]
+            # Nucleotides in `unique` and corresponding counts in `counts`
+            unique, counts = np.unique(column, return_counts=True)
+            # Report absent nucleotides as elements with 0 counts
+            for nucl in ['a','c','g','t']:
+                if nucl not in unique:
+                    unique = np.append(unique, nucl)
+                    counts = np.append(counts,0)
+            # Observed frequencies
+            frequencies = counts / sum(counts)
+            # Convert observed frequencies into frequencies that are compatible
+            # with the assumed number of binding sites (specified in the config)
+            compatible_freqs = self.get_compatible_freqs(frequencies)
+            # Compile PSSM column with compatible frequencies
+            column_dict = dict(zip(unique, compatible_freqs))
+            pwm.append(column_dict)
+        
+        # return PSSM object
+        return PssmObject(np.array(pwm), self.conf_pssm)
+    
+    def get_compatible_freqs(self, column_freqs):
+        '''
+        This function turns the four given frequencies (in `column_freqs`) into
+        frequencies that can be used in PWMs models of objects of the PssmObject
+        class. Indeed, the frequencies of a PssmObject are constrained to be
+        compatible with an assumed number of binding sites (the total number of
+        counts), N.
+        
+        For example, if N=100, 0.01 or 0.53 are acceptable frequencies, while
+        0.000013 or 0.4278 are not.
+        
+        First it assigns compatible counts with the 'get_compatible_counts'
+        function. Then it turns those counts back to frequencies. When doing so,
+        it makes sure that no approximation or numerical error turns those
+        frequencies into numbers with extra decimal values (this is achieved
+        using the 'decimal' library). The method ensures that frequencies are
+        stored accurately (with the correct number of decimal places) and that
+        their sum is exactly 1.
+        '''
+        # Compatible counts
+        compatible_counts = self.get_compatible_counts(column_freqs)
+        # Number of instances
+        num_inst = sum(compatible_counts)
+        if num_inst != self.pssm_number_of_binding_sites:
+            raise ValueError(
+                "Something went wrong. Number of instances is {}, but should have been {}.".format(
+                    num_inst, self.pssm_number_of_binding_sites))
+        # Back to frequencies
+        compatible_freqs = compatible_counts / num_inst
+        
+        # To avoid extra decimals due to floating point errors:
+        # Define the number of decimal digits actually required.
+        # All frequencies are multiples of 1/N, where N is the required number of
+        # binding sites (from the config file)
+        smallest_freq = dec.Decimal('1') / dec.Decimal(str(num_inst))
+        # Number of decimals in the smallest frequency
+        num_decimals = len(str(smallest_freq).split(".")[1])
+        # No frequency value needs more decimal digits than  smallest_freq.
+        # Therefore we can round according to  num_decimals
+        compatible_freqs = np.round(compatible_freqs, num_decimals)
+        
+        if float(sum([dec.Decimal(str(f)) for f in compatible_freqs])) != 1.0:
+            raise ValueError(("Sum of freqs is not 1. Freqs are {}".format(compatible_freqs)))
+        
+        return compatible_freqs
+    
+    def get_compatible_counts(self, column_freqs):
+        '''
+        It assigns a count (an integer number) to each of the four input
+        frequencies (the `column_freqs` argument) as faithfully as possible,
+        while ensuring that the sum of the counts is N, where N is defined by
+        the PSSM_NUM_OF_BINDING_SITES parameter in the config file.
+        
+        The four counts are assigned according to the "Largest Remainder Method"
+        (LRM). This algorithm rounds down the scaled frequencies to the closest
+        smaller integer. The remainder is distributed prioritizing the values
+        that were rounded down the most. This is a commonly applied method to
+        turn frequencies into counts while minimizing errors (minimizing the
+        distance between the frequencies based on the output counts and the
+        original frequencies).
+        
+        However, only N-4 counts are assigned proportionally to the input
+        frequencies (according to the LRM). One count per nucleotide is
+        assigned by defalut, serving as a pseudocount.
+        
+        RATIONALE:
+            This function is useful to turn given frequencies into frequencies
+            that can be used in the PWMs models by objects of the PssmObject
+            class. Indeed, the frequencies of a PssmObject are constrained to
+            be compatible with an assumed number of binding sites (the total
+            number of counts), N. For example, if N=100, 0.01 or 0.53 are
+            acceptable frequencies, while 0.000013 or 0.4278 are not.
+        '''
+        
+        # Apply Largest Remainder Method to get a number of counts for each base
+        
+        # Four counts are not assigned yet because one count per base will be
+        # added as a pseudocount
+        n_counts_to_assign = self.pssm_number_of_binding_sites - 4
+        non_int_counts = column_freqs * n_counts_to_assign
+        int_counts = np.floor(non_int_counts).astype(int)
+        order = np.flip(np.argsort(non_int_counts - int_counts))
+        remainder = n_counts_to_assign - sum(int_counts)
+        for i in range(remainder):
+            int_counts[order[i]] += 1
+        
+        # Now we can add one count per base (the pseudocounts) so that the total
+        # number of assigned counts will be equal to `self.pssm_number_of_binding_sites`
+        int_counts = int_counts + 1
+        return int_counts
+    
+    def get_shape_score(self, sequence, shape_type):
+        '''
+        Returns the shape value of the k-mer specified by the parameter `sequence`.
+        The returned shape value is the one for the type of shape specified by
+        the parameter `shape_type`.
+        '''
+        if shape_type == 'mgw':
+            return null.get_sequence_mgw_score(sequence)
+        elif shape_type == 'prot':
+            return null.get_sequence_prot_score(sequence)
+        elif shape_type == 'roll':
+            return null.get_sequence_roll_score(sequence)
+        elif shape_type == 'helt':
+            return null.get_sequence_helt_score(sequence)
+        else:
+            raise ValueError('Unknown shape_type. shape_type should be "mgw" / ' +
+                             '"prot" / "roll" / "helt".')
+    
+    def mle_shape(self, recog_idx, placements, organism):
+        '''
+        Given an organism that shows the placements specified by the parameter
+        `placements`, it analyses the placements of the PSSM-recognizer
+        specified by the index `recog_idx`.
+        It returns a new shape-recognizer whose parameters are obtained through
+        maximum likelihood estimation (MLE), to optimize binding energy on the
+        positive set, given the observed placements on the positive set of the
+        original shape-recognizer.
+    
+        Parameters
+        ----------
+        recog_idx : int
+            Index of the shape-recognizer to be optimized according to MLE.
+        placements : PlacementObject
+            List of placements of the organism being optimized according to MLE.
+        organism : OrganismObject
+            Organism the recognizer belongs to.
+    
+        Returns
+        -------
+        ShapeObject :
+            A new shape-recognizer. Its parameters optimize binding energy on
+            the positive set and were found based on MLE.
+        '''
+        # Recognized k-mers from the positive set
+        instances = []
+        for plc in placements:
+            start, stop = plc.recognizers_positions[recog_idx]
+            instances.append(plc.dna_sequence[start, stop])
+        
+        # Read shape type and length
+        shape_type = organism.recognizers[recog_idx].type
+        shape_length = organism.recognizers[recog_idx].length
+        
+        # observed shape values
+        scores = []
+        for sequence in instances:
+            scores.append(self.get_shape_score(sequence, shape_type))
+        
+        # shape value stats
+        mu = np.mean(scores)
+        sigma = np.std(scores, ddof=1)  # !!! ddof ?
+        
+        # Create energy-optimized shape-recognizer
+        shape = self.create_shape(shape_length, shape_type)
+        shape._mu = mu
+        shape._sigma = sigma
+        shape.set_alt_model()
+        return shape
+    
+    def mle_org(self, organism, placements):
+        '''
+        Given an organism (`organism` argument) and its placements (`placements`
+        argument), it returns a new organism, where the parameters of every node
+        are obtained through maximum likelihood estimation (MLE). This procedure
+        optimizes binding energy on the positive set, given the observed
+        placements on the positive set of the original organism.
+        
+        
+        that shows the placements specified by the parameter
+        `placements`, it analyses the placements of the PSSM-recognizer
+        specified by the index `recog_idx`.
+        It returns a new PSSM whose parameters are obtained through maximum
+        likelihood estimation (MLE), to optimize binding energy on the positive
+        set, given the observed placements on the positive set of the original
+        PSSM.
+    
+        Parameters
+        ----------
+        organism : OrganismObject
+            Organism whose parameters need to be optimized according to MLE.
+        placements : PlacementObject
+            List of placements (on the positive set) of the organism to be
+            optimized according to MLE.
+        
+        Returns
+        -------
+        OrganismObject :
+            A new organism. Its parameters optimize binding energy on the
+            positive set and were found based on MLE.
+        '''
+        # Optimize connectors
+        mle_connectors = []
+        for i in range(organism.count_connectors()):
+            mle_connectors.append(self.mle_connector(i, placements))
+        
+        # Optimize recognizers
+        mle_recognizers = []
+        for i in range(organism.count_recognizers()):
+            if organism.recognizers[i].is_pssm():
+                mle_recognizers.append(self.mle_pssm(i, placements))
+            elif organism.recognizers[i].is_shape():
+                mle_recognizers.append(self.mle_shape(i, placements))
+        
+        # Return a new organism with nodes that bind optimally to the positive set
+        org = self.clone_organism(organism)  # !!! Replace clone_parents with two calls to this new function
+        org.recognizers = mle_recognizers
+        org.connectors = mle_connectors
+        org.flatten()
+        return org
 
