@@ -47,10 +47,15 @@ class OrganismFactory:
         self.probability_recombination = conf_org_fac["PROBABILITY_RECOMBINATION"]
         
         # MLE-based memetic drive
-        self.periodic_mle = conf_org_fac["PERIODIC_MLE"]
+        if conf_org_fac["PERIODIC_MLE"] == None:
+            self.periodic_mle = np.inf
+        else:
+            self.periodic_mle = conf_org_fac["PERIODIC_MLE"]
         self.probability_mle_pssm = conf_org_fac["PROBABILITY_MLE_PSSM"]
         self.probability_mle_shape = conf_org_fac["PROBABILITY_MLE_SHAPE"]
         self.probability_mle_connector = conf_org_fac["PROBABILITY_MLE_CONNECTOR"]
+        self.probability_mle_pssm_to_shape = conf_org_fac["PROBABILITY_MLE_PSSM_TO_SHAPE"]
+        self.probability_mle_shape_to_pssm = conf_org_fac["PROBABILITY_MLE_SHAPE_TO_PSSM"]
         
         # minimum and maximum values allowed for connector mu's
         self.connector_min_mu = conf_org_fac["CONNECTOR_MIN_MU"]
@@ -1408,7 +1413,7 @@ class OrganismFactory:
         placements : PlacementObject
             List of placements of the organism being optimized according to MLE.
         shape_type : str
-            Type of DNA shape recognizer ('MGW'/'HelT'/'Roll'/'ProT').
+            Type of DNA shape recognizer ("mgw"/"helt"/"roll"/"prot").
     
         Returns
         -------
@@ -1449,15 +1454,10 @@ class OrganismFactory:
         optimizes binding energy on the positive set, given the observed
         placements on the positive set of the original organism.
         
+        ...
+        !!! Write here about the probabilistic framework ...
+        ...
         
-        that shows the placements specified by the parameter
-        `placements`, it analyses the placements of the PSSM-recognizer
-        specified by the index `recog_idx`.
-        It returns a new PSSM whose parameters are obtained through maximum
-        likelihood estimation (MLE), to optimize binding energy on the positive
-        set, given the observed placements on the positive set of the original
-        PSSM.
-    
         Parameters
         ----------
         organism : OrganismObject
@@ -1483,20 +1483,32 @@ class OrganismFactory:
             
             # PSSM
             if organism.recognizers[i].is_pssm():
+                # MLE-optimized PSSM
                 if random.random() < self.probability_mle_pssm:
                     mle_recognizers.append(self.mle_pssm(i, placements))
+                # Turn the PSSM into a Shape (MLE-optimized)
+                elif random.random() < self.probability_mle_pssm_to_shape:
+                    # The type of shape is chosen randomly
+                    shape_type = random.choice(['mgw','prot','helt','roll'])
+                    mle_recognizers.append(self.mle_shape(i, placements, shape_type))
+                # Leave the PSSM unchanged
                 else:
                     mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
             
             # SHAPE
             elif organism.recognizers[i].is_shape():
+                # MLE-optimized Shape
                 if random.random() < self.probability_mle_shape:
                     mle_recognizers.append(self.mle_shape(i, placements, organism.recognizers[i].type))
+                # Turn the Shape into a PSSM (MLE-optimized)
+                elif random.random() < self.probability_mle_shape_to_pssm:
+                    mle_recognizers.append(self.mle_pssm(i, placements))
+                # Leave the Shape unchanged
                 else:
                     mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
         
         # Return the new organism
-        org = self.clone_organism(organism)  # !!! Replace clone_parents with two calls to this new function
+        org = self.clone_organism(organism)  # !!! Replace clone_parents with two calls to this new function ?
         org.recognizers = mle_recognizers
         org.connectors = mle_connectors
         org.flatten()
