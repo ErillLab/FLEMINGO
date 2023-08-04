@@ -7,8 +7,16 @@ null_models = {}
 
 def norm_cdf(x, mu, sigma):
     ''' Cumulative distribution function for the normal distribution. '''
-    z = (x-mu)/abs(sigma)
-    return (1.0 + math.erf(z / math.sqrt(2.0))) / 2.0
+    if sigma == 0:
+        if x < mu:
+            return 0
+        elif x > mu:
+            return 1
+        elif x == mu:
+            return 0.5
+    else:
+        z = (x-mu)/abs(sigma)  # z-score
+        return (1.0 + math.erf(z / math.sqrt(2.0))) / 2.0
 
 def norm_pf(x, y, mu, sigma):
     """
@@ -239,12 +247,17 @@ class ShapeObject:
                                              self.magnitude_sigma_mutation)
             )
         elif self.sigma_mutator=="log":
-            base = self.magnitude_sigma_mutation
-            logb_sigma = np.log(self._sigma) / np.log(base)
-            shift = random.uniform(-1, 1)
-            # Apply a shift in the range (-1, 1) to the log-sigma
-            logb_sigma += shift
-            self._sigma = base**logb_sigma
+            
+            # !!! Special case with hard-coded pseudosigma
+            if self._sigma == 0:
+                self._sigma = 0.00001
+            else:
+                base = self.magnitude_sigma_mutation
+                logb_sigma = np.log(self._sigma) / np.log(base)
+                shift = random.uniform(-1, 1)
+                # Apply a shift in the range (-1, 1) to the log-sigma
+                logb_sigma += shift
+                self._sigma = base**logb_sigma
     
     def _mutate_mu(self):
         '''

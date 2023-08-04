@@ -43,8 +43,15 @@ class OrganismFactory:
         # lambda parameter for Poisson distribution used to instantiate organisms.
         # lambda is the expected number of recognizers per organism
         self.avg_num_of_recognizers = conf_org_fac["AVG_NUM_OF_RECOGNIZERS"]
-
+        
         self.probability_recombination = conf_org_fac["PROBABILITY_RECOMBINATION"]
+        
+        # MLE-based memetic drive
+        self.periodic_mle = conf_org_fac["PERIODIC_MLE"]
+        self.probability_mle_pssm = conf_org_fac["PROBABILITY_MLE_PSSM"]
+        self.probability_mle_shape = conf_org_fac["PROBABILITY_MLE_SHAPE"]
+        self.probability_mle_connector = conf_org_fac["PROBABILITY_MLE_CONNECTOR"]
+        
         # minimum and maximum values allowed for connector mu's
         self.connector_min_mu = conf_org_fac["CONNECTOR_MIN_MU"]
         self.connector_max_mu = conf_org_fac["CONNECTOR_MAX_MU"]
@@ -59,6 +66,8 @@ class OrganismFactory:
         # Number of binding sites used to generate the PWM
         self.pssm_number_of_binding_sites = conf_org_fac["PSSM_NUM_OF_BINDING_SITES"]
         self.pssm_vs_shape_probability = conf_org_fac["PSSM_VS_SHAPE_PROBABILITY"]
+        
+        
         
         # assign organism, connector and pssm configurations
         self.conf_org = conf_org
@@ -1211,37 +1220,6 @@ class OrganismFactory:
         conn.set_precomputed_pdfs_cdfs()
         return conn
     
-    def mle_recognizer(self, recog_idx, placements, organism):
-        '''
-        Given an organism that shows the placements specified by the parameter
-        `placements`, it analyses the placements of the recognizer specified by
-        the index `recog_idx`.
-        It returns a new recognizer whose parameters are obtained through maximum
-        likelihood estimation (MLE), to optimize binding energy on the positive
-        set, given the observed placements on the positive set of the original
-        recognizer.
-    
-        Parameters
-        ----------
-        recog_idx : int
-            Index of the recognizer to be optimized according to MLE.
-        placements : PlacementObject
-            List of placements of the organism being optimized according to MLE.
-        organism : OrganismObject
-            Organism the recognizer belongs to.
-    
-        Returns
-        -------
-        recog : either a PssmObject or a ShapeObject
-            A new recognizer. Its parameters optimize binding energy on the
-            positive set and were found based on MLE.
-        '''
-        if organism.recognizers[recog_idx].is_pssm():
-            recog = self.mle_pssm(recog_idx, placements)
-        elif organism.recognizers[recog_idx].is_shape():
-            recog = self.mle_shape(recog_idx, placements, organism)
-        return recog
-    
     def mle_pssm(self, recog_idx, placements):
         '''
         Given an organism that shows the placements specified by the parameter
@@ -1413,7 +1391,7 @@ class OrganismFactory:
             raise ValueError('Unknown shape_type. shape_type should be "mgw" / ' +
                              '"prot" / "roll" / "helt".')
     
-    def mle_shape(self, recog_idx, placements, organism):
+    def mle_shape(self, recog_idx, placements, shape_type):
         '''
         Given an organism that shows the placements specified by the parameter
         `placements`, it analyses the placements of the PSSM-recognizer
@@ -1429,8 +1407,8 @@ class OrganismFactory:
             Index of the shape-recognizer to be optimized according to MLE.
         placements : PlacementObject
             List of placements of the organism being optimized according to MLE.
-        organism : OrganismObject
-            Organism the recognizer belongs to.
+        shape_type : str
+            Type of DNA shape recognizer ('MGW'/'HelT'/'Roll'/'ProT').
     
         Returns
         -------
@@ -1442,11 +1420,10 @@ class OrganismFactory:
         instances = []
         for plc in placements:
             start, stop = plc.recognizers_positions[recog_idx]
-            instances.append(plc.dna_sequence[start, stop])
+            instances.append(plc.dna_sequence[start:stop].lower())
         
-        # Read shape type and length
-        shape_type = organism.recognizers[recog_idx].type
-        shape_length = organism.recognizers[recog_idx].length
+        # Shape length
+        shape_length = len(instances[0])
         
         # observed shape values
         scores = []
@@ -1503,15 +1480,39 @@ class OrganismFactory:
         # Optimize recognizers
         mle_recognizers = []
         for i in range(organism.count_recognizers()):
+            
+            # PSSM
             if organism.recognizers[i].is_pssm():
-                mle_recognizers.append(self.mle_pssm(i, placements))
+                if random.random() < self.probability_mle_pssm:
+                    mle_recognizers.append(self.mle_pssm(i, placements))
+                else:
+                    mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
+            
+            # SHAPE
             elif organism.recognizers[i].is_shape():
-                mle_recognizers.append(self.mle_shape(i, placements))
+                if random.random() < self.probability_mle_shape:
+                    mle_recognizers.append(self.mle_shape(i, placements, organism.recognizers[i].type))
+                else:
+                    mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
         
-        # Return a new organism with nodes that bind optimally to the positive set
+        # Return the new organism
         org = self.clone_organism(organism)  # !!! Replace clone_parents with two calls to this new function
         org.recognizers = mle_recognizers
         org.connectors = mle_connectors
         org.flatten()
         return org
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -175,23 +175,41 @@ def main():
             pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
             ref_seq = pos_set_sample[0]
             
-            # Decide if the parents will do sexual or clonal reproduction (recombination VS mutation)
-            if random.random() < organism_factory.probability_recombination:
-                # Recombination case; no mutation
-                child1, child2 = organism_factory.get_children(
-                    parent1, parent2, ref_seq, pos_set_sample)
+            # XXX MLE
+            # -------
+            if (generation + 1) % organism_factory.periodic_mle == 0:
+                
+                # Child 1
+                placements = [parent1.get_placement(seq) for seq in positive_dataset]
+                child1 = organism_factory.mle_org(parent1, placements)
+                # Child 2
+                placements = [parent2.get_placement(seq) for seq in positive_dataset]
+                child2 = organism_factory.mle_org(parent2, placements)
             
+            # MUTATION/RECOMBINATION
+            # ----------------------
             else:
-                # Non-recomination case; the children are mutated
-                child1, child2 = organism_factory.clone_parents(parent1, parent2)
-                # The children in this non-recombination scenario are just
-                # mutated versions of the parents
-                child1.mutate(organism_factory)
-                child2.mutate(organism_factory)
-            
-            # Check that new organisms comply with size contraints (modify them if necessary)
-            child1.check_size(organism_factory)
-            child2.check_size(organism_factory)
+                
+                # RECOMBINATION
+                
+                # Decide if the parents will do sexual or clonal reproduction (recombination VS mutation)
+                if random.random() < organism_factory.probability_recombination:
+                    # Recombination case; no mutation
+                    child1, child2 = organism_factory.get_children(
+                        parent1, parent2, ref_seq, pos_set_sample)
+                
+                # MUTATION
+                else:
+                    # Non-recomination case; the children are mutated
+                    child1, child2 = organism_factory.clone_parents(parent1, parent2)
+                    # The children in this non-recombination scenario are just
+                    # mutated versions of the parents
+                    child1.mutate(organism_factory)
+                    child2.mutate(organism_factory)
+                
+                # Check that new organisms comply with size contraints (modify them if necessary)
+                child1.check_size(organism_factory)
+                child2.check_size(organism_factory)
             
             # Pair parents and offspring
             two_parent_child_pairs = pair_parents_and_children(parent1, parent2, child1, child2)
