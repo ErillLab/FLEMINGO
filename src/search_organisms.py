@@ -115,7 +115,6 @@ def main():
     """
     generation = 0
     max_score = float("-inf")
-    last_max_score = 0.0
     timeformat = "%Y-%m-%d--%H-%M-%S"
     
     best_org = None
@@ -126,7 +125,7 @@ def main():
     # Main loop, it iterates until organisms do not get a significant change
     # or MIN_ITERATIONS or MIN_FITNESS is reached.
     
-    while not is_finished(END_WHILE_METHOD, generation, max_score, last_max_score):
+    while not is_finished(END_WHILE_METHOD, generation, max_score):
         
         if i_am_main_process():
             # Shuffle population
@@ -150,7 +149,6 @@ def main():
                 negative_dataset = shuffle_dataset(negative_dataset)
         
         # Reset max_score
-        last_max_score = max_score  # !!! Obsolete code. To be deleted/updated
         max_score = float("-inf")
         changed_best_score = False
         initial = time.time()
@@ -175,8 +173,9 @@ def main():
             pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
             ref_seq = pos_set_sample[0]
             
+            # =======
             # XXX MLE
-            # -------
+            # =======
             if (generation + 1) % organism_factory.periodic_mle == 0:
                 
                 # Child 1
@@ -186,8 +185,9 @@ def main():
                 placements = [parent2.get_placement(seq) for seq in positive_dataset]
                 child2 = organism_factory.mle_org(parent2, placements)
             
+            # ======================
             # MUTATION/RECOMBINATION
-            # ----------------------
+            # ======================
             else:
                 
                 # RECOMBINATION
@@ -904,6 +904,8 @@ def check_config_settings(config):
     Checks that the input parameters set in the config file are valid.
     '''
     
+    confOrgFact = config["organismFactory"]
+    
     # Check that the population size is an even number
     if config["main"]["POPULATION_SIZE"] % 2 != 0:
         raise Exception(("POPULATION_SIZE must be an even number. " +
@@ -964,6 +966,33 @@ def check_config_settings(config):
                          "and set to false RANDOM_SHUFFLE_SAMPLING_POS and " +
                          "RANDOM_SHUFFLE_SAMPLING_NEG.")
     
+    # Check that PERIODIC_DATASETS_SHUFFLE is None or a positive integer
+    if confOrgFact["PERIODIC_MLE"] != None:
+        if (not isinstance(confOrgFact["PERIODIC_MLE"], int) or
+            confOrgFact["PERIODIC_MLE"] < 1):
+            raise ValueError("PERIODIC_MLE should be a positive integer, " +
+                             "specifying every how many generations to apply " +
+                             "the MLE-based memetic drive. If you don't want " +
+                             "to use the memetic drive, just set this " +
+                             "parameter to null.")
+    
+    # XXX Check that MLE probabilities are valid
+    for key in ["PROBABILITY_MLE_PSSM",
+                "PROBABILITY_MLE_SHAPE",
+                "PROBABILITY_MLE_CONNECTOR",
+                "PROBABILITY_MLE_PSSM_TO_SHAPE",
+                "PROBABILITY_MLE_SHAPE_TO_PSSM"]:
+        if confOrgFact[key] > 1 or confOrgFact[key] < 0:
+            raise ValueError(
+                ("Parameter {} should be a probability, but was " +
+                 "set to {}. Please choose a value from 0 to 1.").format(
+                     key, confOrgFact[key]))
+    if confOrgFact["PROBABILITY_MLE_PSSM"] + confOrgFact["PROBABILITY_MLE_PSSM_TO_SHAPE"] > 1:
+        raise ValueError("PROBABILITY_MLE_PSSM + PROBABILITY_MLE_PSSM_TO_SHAPE " +
+                         "exceeds 1. Please choose valid settings.")
+    if confOrgFact["PROBABILITY_MLE_SHAPE"] + confOrgFact["PROBABILITY_MLE_SHAPE_TO_PSSM"] > 1:
+        raise ValueError("PROBABILITY_MLE_SHAPE + PROBABILITY_MLE_SHAPE_TO_PSSM " +
+                         "exceeds 1. Please choose valid settings.")
 
 
 def print_config_json(config: dict, name: str, path: str) -> None:
