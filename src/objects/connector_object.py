@@ -204,12 +204,12 @@ class ConnectorObject():
             prev_cdf = cdf
     
     def mutate(self, org_factory) -> None:
-        """mutation for a connector
-
+        '''
+        Mutation for a connector. The two parameters (mu and sigma) can be
+        mutated (depending on the respective mutation rates).
         Args:
-            org_factory(organism_factory): Organism Facory
-        """
-        
+            org_factory: Organism Facory
+        '''
         mutated = False
         
         # Mutate sigma

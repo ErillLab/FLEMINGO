@@ -150,7 +150,6 @@ def main():
         
         # Reset max_score
         max_score = float("-inf")
-        changed_best_score = False
         initial = time.time()
         
         pop_id_list = []
@@ -173,9 +172,9 @@ def main():
             pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
             ref_seq = pos_set_sample[0]
             
-            # =======
-            # XXX MLE
-            # =======
+            # =======================
+            # MLE-based memetic drive
+            # =======================
             if (generation + 1) % organism_factory.periodic_mle == 0:
                 
                 # Child 1
@@ -290,7 +289,6 @@ def main():
             if max_org_fitness >= best_org_fitness:
                 best_org = max_org
                 best_org_fitness = max_org_fitness
-                changed_best_score = True
             
             # Print info about the current generation
             _m, _s = divmod((time.time() - initial), 60)
@@ -337,10 +335,6 @@ def main():
             else:
                 pos_set_for_export = positive_dataset
             
-            # Always export organism if new best organism
-            if changed_best_score:
-                filename = "{}_{}".format(time.strftime(timeformat), best_org._id)
-                export_organism(best_org, pos_set_for_export, filename, organism_factory)
             # Periodic organism export
             if generation % PERIODIC_ORG_EXPORT == 0:
                 filename = "{}_{}".format(time.strftime(timeformat), max_org._id)

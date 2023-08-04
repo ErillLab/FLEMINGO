@@ -180,15 +180,16 @@ class ShapeObject:
             self.alt_model.append(np.log(score + self.pseudo_count) - log_auc)
 
     def mutate(self, org_factory):
-        """randomly mutates various attributes of the shape recognizer object.
-        The recognizer may or may not be mutated
+        '''
+        Mutation for a Shape recognizer. The two parameters (mu and sigma) can be
+        mutated (depending on the respective mutation rates).
 
         Args:
-            org_factory (has config information for determining mutations)
+            org_factory: Organism Facory
             ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
             !!! Unused argument (just for consistency with the pssm mutate function)
             ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
-        """
+        '''
         # keeps track of if a mutation happend. If it did, alternative model is updated
         mutated = False
         
