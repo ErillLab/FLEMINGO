@@ -1506,17 +1506,25 @@ class OrganismFactory:
             # PSSM
             if organism.recognizers[i].is_pssm():
                 x = random.random()
-                # MLE-optimized PSSM
+                
+                # (I) MLE-optimized PSSM
                 # [with probability `probability_mle_pssm`]
                 if x < self.probability_mle_pssm:
                     mle_recognizers.append(self.mle_pssm(i, placements))
-                # Turn the PSSM into a Shape (MLE-optimized)
+                
+                # (II) Turn the PSSM into a Shape (MLE-optimized)
                 # [with probability `probability_mle_pssm_to_shape`]
                 elif (x - self.probability_mle_pssm) < self.probability_mle_pssm_to_shape:
-                    # The type of shape is chosen randomly
-                    shape_type = random.choice(['mgw','prot','helt','roll'])
-                    mle_recognizers.append(self.mle_shape(i, placements, shape_type))
-                # Leave the PSSM unchanged
+                    # Check that the PSSM is long enough to become a shape
+                    if organism.recognizers[i].length >= 5:
+                        # The type of shape is chosen randomly
+                        shape_type = random.choice(['mgw','prot','helt','roll'])
+                        mle_recognizers.append(self.mle_shape(i, placements, shape_type))
+                    # if it's too short, leave the PSSM unchanged
+                    else:
+                        mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
+                
+                # (III) Leave the PSSM unchanged
                 # [with probability 1 - (probability_mle_pssm + probability_mle_pssm_to_shape)]
                 else:
                     mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
@@ -1524,15 +1532,18 @@ class OrganismFactory:
             # SHAPE
             elif organism.recognizers[i].is_shape():
                 x = random.random()
-                # MLE-optimized Shape
+                
+                # (I) MLE-optimized Shape
                 # [with probability `probability_mle_shape`]
                 if x < self.probability_mle_shape:
                     mle_recognizers.append(self.mle_shape(i, placements, organism.recognizers[i].type))
-                # Turn the Shape into a PSSM (MLE-optimized)
+                
+                # (II) Turn the Shape into a PSSM (MLE-optimized)
                 # [with probability `probability_mle_shape_to_pssm`]
                 elif (x - self.probability_mle_shape) < self.probability_mle_shape_to_pssm:
                     mle_recognizers.append(self.mle_pssm(i, placements))
-                # Leave the Shape unchanged
+                
+                # (III) Leave the Shape unchanged
                 # [with probability 1 - (probability_mle_shape + probability_mle_shape_to_pssm)]
                 else:
                     mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
