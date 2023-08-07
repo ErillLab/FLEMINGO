@@ -1449,33 +1449,55 @@ class OrganismFactory:
     def mle_org(self, organism, placements):
         '''
         Given an organism (`organism` argument) and its placements (`placements`
-        argument), it returns a new organism, where the parameters of every node
-        are obtained through maximum likelihood estimation (MLE). This procedure
-        optimizes binding energy on the positive set, given the observed
-        placements on the positive set of the original organism.
+        argument), it returns a new organism, where the parameters of the nodes
+        are obtained through maximum likelihood estimation (MLE). Each type of
+        node has a certain probability of being optimized through MLE, which
+        means that its binding instances are collected and the parameters are
+        firectly inferred from that collection.
+        For recognizers, there's also the possibility of using the observed
+        instances of a PSSM to obtain an MLE-optimized Shape recognizer (of any
+        type), or using the observed instances of a Shape recognizer to obtain
+        an MLE-optimized PSSM.
         
-        ...
-        !!! Write here about the probabilistic framework ...
-        ...
+        The probabilities of such events are the following:
+            
+            probability_mle_connector :
+                probability that a connector undergoes MLE.
+            probability_mle_pssm :
+                probability that a PSSM undergoes MLE.
+            probability_mle_shape :
+                probability that a Shape recognizer undergoes MLE.
+            probability_mle_pssm_to_shape :
+                probability that a PSSM is turned into a MLE-optimized Shape
+                recognizer. The shape type is chosen randomly.
+            probability_mle_shape_to_pssm :
+                probability that a Shape recognizer is turned into a
+                MLE-optimized PSSM.
         
         Parameters
         ----------
         organism : OrganismObject
             Organism whose parameters need to be optimized according to MLE.
-        placements : PlacementObject
+        placements : list
             List of placements (on the positive set) of the organism to be
-            optimized according to MLE.
+            optimized according to MLE. Each placement is a PlacementObject
         
         Returns
         -------
         OrganismObject :
-            A new organism. Its parameters optimize binding energy on the
-            positive set and were found based on MLE.
+            A new organism that has some nodes optimized through MLE.
         '''
         # Optimize connectors
         mle_connectors = []
         for i in range(organism.count_connectors()):
-            mle_connectors.append(self.mle_connector(i, placements))
+            # MLE-optimized connector
+            # [with probability `probability_mle_connector`]
+            if random.random() < self.probability_mle_connector:
+                mle_connectors.append(self.mle_connector(i, placements))
+            # Leave the connector unchanged
+            # [with probability 1 - probability_mle_connector]
+            else:
+                mle_connectors.append(copy.deepcopy(organism.connectors[i]))
         
         # Optimize recognizers
         mle_recognizers = []
@@ -1483,27 +1505,35 @@ class OrganismFactory:
             
             # PSSM
             if organism.recognizers[i].is_pssm():
+                x = random.random()
                 # MLE-optimized PSSM
-                if random.random() < self.probability_mle_pssm:
+                # [with probability `probability_mle_pssm`]
+                if x < self.probability_mle_pssm:
                     mle_recognizers.append(self.mle_pssm(i, placements))
                 # Turn the PSSM into a Shape (MLE-optimized)
-                elif random.random() < self.probability_mle_pssm_to_shape:
+                # [with probability `probability_mle_pssm_to_shape`]
+                elif (x - self.probability_mle_pssm) < self.probability_mle_pssm_to_shape:
                     # The type of shape is chosen randomly
                     shape_type = random.choice(['mgw','prot','helt','roll'])
                     mle_recognizers.append(self.mle_shape(i, placements, shape_type))
                 # Leave the PSSM unchanged
+                # [with probability 1 - (probability_mle_pssm + probability_mle_pssm_to_shape)]
                 else:
                     mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
             
             # SHAPE
             elif organism.recognizers[i].is_shape():
+                x = random.random()
                 # MLE-optimized Shape
-                if random.random() < self.probability_mle_shape:
+                # [with probability `probability_mle_shape`]
+                if x < self.probability_mle_shape:
                     mle_recognizers.append(self.mle_shape(i, placements, organism.recognizers[i].type))
                 # Turn the Shape into a PSSM (MLE-optimized)
-                elif random.random() < self.probability_mle_shape_to_pssm:
+                # [with probability `probability_mle_shape_to_pssm`]
+                elif (x - self.probability_mle_shape) < self.probability_mle_shape_to_pssm:
                     mle_recognizers.append(self.mle_pssm(i, placements))
                 # Leave the Shape unchanged
+                # [with probability 1 - (probability_mle_shape + probability_mle_shape_to_pssm)]
                 else:
                     mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
         

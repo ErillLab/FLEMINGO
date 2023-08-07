@@ -970,7 +970,7 @@ def check_config_settings(config):
                              "to use the memetic drive, just set this " +
                              "parameter to null.")
     
-    # XXX Check that MLE probabilities are valid
+    # Check that MLE probabilities are valid
     for key in ["PROBABILITY_MLE_PSSM",
                 "PROBABILITY_MLE_SHAPE",
                 "PROBABILITY_MLE_CONNECTOR",
@@ -1118,13 +1118,14 @@ def flatten_population(population):
     '''
     
     # Avoid errors if the function is called on all processes during a parallel
-    # run. With the following code we don't have to worry about calling the
-    # flatten_population only on the "main" process.
+    # run. With the following if condition we don't have to worry about calling
+    # the flatten_population only on the "main" process.
     if population is None:
         return None
     
     # Flatten population: 2D list -> 1D list
-    return [org for sublist in population for org in sublist]
+    else:
+        return [org for sublist in population for org in sublist]
 
 
 if __name__ == "__main__":
@@ -1154,11 +1155,10 @@ if __name__ == "__main__":
     if i_am_main_process():
         _M, _S = divmod((time.time() - INITIAL), 60)
         _H, _M = divmod(_M, 60)
-        print_ln(
-            "Time: {}h:{}m:{:.2f}s".format(int(_H), int(_M), _S),
-            RESULT_BASE_PATH_DIR + "parameters.txt")
+        print_ln("Time: {}h:{}m:{:.2f}s".format(int(_H), int(_M), _S),
+                 RESULT_BASE_PATH_DIR + "parameters.txt")
     
-    
+
 
 
 
