@@ -204,12 +204,12 @@ class ConnectorObject():
             prev_cdf = cdf
     
     def mutate(self, org_factory) -> None:
-        """mutation for a connector
-
+        '''
+        Mutation for a connector. The two parameters (mu and sigma) can be
+        mutated (depending on the respective mutation rates).
         Args:
-            org_factory(organism_factory): Organism Facory
-        """
-        
+            org_factory: Organism Facory
+        '''
         mutated = False
         
         # Mutate sigma
@@ -248,12 +248,16 @@ class ConnectorObject():
                                              self.magnitude_sigma_mutation)
             )
         elif self.sigma_mutator=="log":
-            base = self.magnitude_sigma_mutation
-            logb_sigma = np.log(self._sigma) / np.log(base)
-            shift = random.uniform(-1, 1)
-            # Apply a shift in the range (-1, 1) to the log-sigma
-            logb_sigma += shift
-            self._sigma = base**logb_sigma
+            # !!! Special case with hard-coded pseudosigma
+            if self._sigma == 0:
+                self._sigma = 0.00001
+            else:
+                base = self.magnitude_sigma_mutation
+                logb_sigma = np.log(self._sigma) / np.log(base)
+                shift = random.uniform(-1, 1)
+                # Apply a shift in the range (-1, 1) to the log-sigma
+                logb_sigma += shift
+                self._sigma = base**logb_sigma
     
     def _mutate_mu(self):
         '''

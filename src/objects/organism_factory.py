@@ -43,8 +43,20 @@ class OrganismFactory:
         # lambda parameter for Poisson distribution used to instantiate organisms.
         # lambda is the expected number of recognizers per organism
         self.avg_num_of_recognizers = conf_org_fac["AVG_NUM_OF_RECOGNIZERS"]
-
+        
         self.probability_recombination = conf_org_fac["PROBABILITY_RECOMBINATION"]
+        
+        # MLE-based memetic drive
+        if conf_org_fac["PERIODIC_MLE"] == None:
+            self.periodic_mle = np.inf
+        else:
+            self.periodic_mle = conf_org_fac["PERIODIC_MLE"]
+        self.probability_mle_pssm = conf_org_fac["PROBABILITY_MLE_PSSM"]
+        self.probability_mle_shape = conf_org_fac["PROBABILITY_MLE_SHAPE"]
+        self.probability_mle_connector = conf_org_fac["PROBABILITY_MLE_CONNECTOR"]
+        self.probability_mle_pssm_to_shape = conf_org_fac["PROBABILITY_MLE_PSSM_TO_SHAPE"]
+        self.probability_mle_shape_to_pssm = conf_org_fac["PROBABILITY_MLE_SHAPE_TO_PSSM"]
+        
         # minimum and maximum values allowed for connector mu's
         self.connector_min_mu = conf_org_fac["CONNECTOR_MIN_MU"]
         self.connector_max_mu = conf_org_fac["CONNECTOR_MAX_MU"]
@@ -59,6 +71,8 @@ class OrganismFactory:
         # Number of binding sites used to generate the PWM
         self.pssm_number_of_binding_sites = conf_org_fac["PSSM_NUM_OF_BINDING_SITES"]
         self.pssm_vs_shape_probability = conf_org_fac["PSSM_VS_SHAPE_PROBABILITY"]
+        
+        
         
         # assign organism, connector and pssm configurations
         self.conf_org = conf_org
@@ -1211,37 +1225,6 @@ class OrganismFactory:
         conn.set_precomputed_pdfs_cdfs()
         return conn
     
-    def mle_recognizer(self, recog_idx, placements, organism):
-        '''
-        Given an organism that shows the placements specified by the parameter
-        `placements`, it analyses the placements of the recognizer specified by
-        the index `recog_idx`.
-        It returns a new recognizer whose parameters are obtained through maximum
-        likelihood estimation (MLE), to optimize binding energy on the positive
-        set, given the observed placements on the positive set of the original
-        recognizer.
-    
-        Parameters
-        ----------
-        recog_idx : int
-            Index of the recognizer to be optimized according to MLE.
-        placements : PlacementObject
-            List of placements of the organism being optimized according to MLE.
-        organism : OrganismObject
-            Organism the recognizer belongs to.
-    
-        Returns
-        -------
-        recog : either a PssmObject or a ShapeObject
-            A new recognizer. Its parameters optimize binding energy on the
-            positive set and were found based on MLE.
-        '''
-        if organism.recognizers[recog_idx].is_pssm():
-            recog = self.mle_pssm(recog_idx, placements)
-        elif organism.recognizers[recog_idx].is_shape():
-            recog = self.mle_shape(recog_idx, placements, organism)
-        return recog
-    
     def mle_pssm(self, recog_idx, placements):
         '''
         Given an organism that shows the placements specified by the parameter
@@ -1413,7 +1396,7 @@ class OrganismFactory:
             raise ValueError('Unknown shape_type. shape_type should be "mgw" / ' +
                              '"prot" / "roll" / "helt".')
     
-    def mle_shape(self, recog_idx, placements, organism):
+    def mle_shape(self, recog_idx, placements, shape_type):
         '''
         Given an organism that shows the placements specified by the parameter
         `placements`, it analyses the placements of the PSSM-recognizer
@@ -1429,8 +1412,8 @@ class OrganismFactory:
             Index of the shape-recognizer to be optimized according to MLE.
         placements : PlacementObject
             List of placements of the organism being optimized according to MLE.
-        organism : OrganismObject
-            Organism the recognizer belongs to.
+        shape_type : str
+            Type of DNA shape recognizer ("mgw"/"helt"/"roll"/"prot").
     
         Returns
         -------
@@ -1442,11 +1425,10 @@ class OrganismFactory:
         instances = []
         for plc in placements:
             start, stop = plc.recognizers_positions[recog_idx]
-            instances.append(plc.dna_sequence[start, stop])
+            instances.append(plc.dna_sequence[start:stop].lower())
         
-        # Read shape type and length
-        shape_type = organism.recognizers[recog_idx].type
-        shape_length = organism.recognizers[recog_idx].length
+        # Shape length
+        shape_length = len(instances[0])
         
         # observed shape values
         scores = []
@@ -1467,51 +1449,123 @@ class OrganismFactory:
     def mle_org(self, organism, placements):
         '''
         Given an organism (`organism` argument) and its placements (`placements`
-        argument), it returns a new organism, where the parameters of every node
-        are obtained through maximum likelihood estimation (MLE). This procedure
-        optimizes binding energy on the positive set, given the observed
-        placements on the positive set of the original organism.
+        argument), it returns a new organism, where the parameters of the nodes
+        are obtained through maximum likelihood estimation (MLE). Each type of
+        node has a certain probability of being optimized through MLE, which
+        means that its binding instances are collected and the parameters are
+        firectly inferred from that collection.
+        For recognizers, there's also the possibility of using the observed
+        instances of a PSSM to obtain an MLE-optimized Shape recognizer (of any
+        type), or using the observed instances of a Shape recognizer to obtain
+        an MLE-optimized PSSM.
         
+        The probabilities of such events are the following:
+            
+            probability_mle_connector :
+                probability that a connector undergoes MLE.
+            probability_mle_pssm :
+                probability that a PSSM undergoes MLE.
+            probability_mle_shape :
+                probability that a Shape recognizer undergoes MLE.
+            probability_mle_pssm_to_shape :
+                probability that a PSSM is turned into a MLE-optimized Shape
+                recognizer. The shape type is chosen randomly.
+            probability_mle_shape_to_pssm :
+                probability that a Shape recognizer is turned into a
+                MLE-optimized PSSM.
         
-        that shows the placements specified by the parameter
-        `placements`, it analyses the placements of the PSSM-recognizer
-        specified by the index `recog_idx`.
-        It returns a new PSSM whose parameters are obtained through maximum
-        likelihood estimation (MLE), to optimize binding energy on the positive
-        set, given the observed placements on the positive set of the original
-        PSSM.
-    
         Parameters
         ----------
         organism : OrganismObject
             Organism whose parameters need to be optimized according to MLE.
-        placements : PlacementObject
+        placements : list
             List of placements (on the positive set) of the organism to be
-            optimized according to MLE.
+            optimized according to MLE. Each placement is a PlacementObject
         
         Returns
         -------
         OrganismObject :
-            A new organism. Its parameters optimize binding energy on the
-            positive set and were found based on MLE.
+            A new organism that has some nodes optimized through MLE.
         '''
         # Optimize connectors
         mle_connectors = []
         for i in range(organism.count_connectors()):
-            mle_connectors.append(self.mle_connector(i, placements))
+            # MLE-optimized connector
+            # [with probability `probability_mle_connector`]
+            if random.random() < self.probability_mle_connector:
+                mle_connectors.append(self.mle_connector(i, placements))
+            # Leave the connector unchanged
+            # [with probability 1 - probability_mle_connector]
+            else:
+                mle_connectors.append(copy.deepcopy(organism.connectors[i]))
         
         # Optimize recognizers
         mle_recognizers = []
         for i in range(organism.count_recognizers()):
+            
+            # PSSM
             if organism.recognizers[i].is_pssm():
-                mle_recognizers.append(self.mle_pssm(i, placements))
+                x = random.random()
+                
+                # (I) MLE-optimized PSSM
+                # [with probability `probability_mle_pssm`]
+                if x < self.probability_mle_pssm:
+                    mle_recognizers.append(self.mle_pssm(i, placements))
+                
+                # (II) Turn the PSSM into a Shape (MLE-optimized)
+                # [with probability `probability_mle_pssm_to_shape`]
+                elif (x - self.probability_mle_pssm) < self.probability_mle_pssm_to_shape:
+                    # Check that the PSSM is long enough to become a shape
+                    if organism.recognizers[i].length >= 5:
+                        # The type of shape is chosen randomly
+                        shape_type = random.choice(['mgw','prot','helt','roll'])
+                        mle_recognizers.append(self.mle_shape(i, placements, shape_type))
+                    # if it's too short, leave the PSSM unchanged
+                    else:
+                        mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
+                
+                # (III) Leave the PSSM unchanged
+                # [with probability 1 - (probability_mle_pssm + probability_mle_pssm_to_shape)]
+                else:
+                    mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
+            
+            # SHAPE
             elif organism.recognizers[i].is_shape():
-                mle_recognizers.append(self.mle_shape(i, placements))
+                x = random.random()
+                
+                # (I) MLE-optimized Shape
+                # [with probability `probability_mle_shape`]
+                if x < self.probability_mle_shape:
+                    mle_recognizers.append(self.mle_shape(i, placements, organism.recognizers[i].type))
+                
+                # (II) Turn the Shape into a PSSM (MLE-optimized)
+                # [with probability `probability_mle_shape_to_pssm`]
+                elif (x - self.probability_mle_shape) < self.probability_mle_shape_to_pssm:
+                    mle_recognizers.append(self.mle_pssm(i, placements))
+                
+                # (III) Leave the Shape unchanged
+                # [with probability 1 - (probability_mle_shape + probability_mle_shape_to_pssm)]
+                else:
+                    mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
         
-        # Return a new organism with nodes that bind optimally to the positive set
-        org = self.clone_organism(organism)  # !!! Replace clone_parents with two calls to this new function
+        # Return the new organism
+        org = self.clone_organism(organism)  # !!! Replace clone_parents with two calls to this new function ?
         org.recognizers = mle_recognizers
         org.connectors = mle_connectors
         org.flatten()
         return org
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

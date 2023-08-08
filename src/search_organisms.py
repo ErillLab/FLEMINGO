@@ -4,6 +4,8 @@
 
 This program searches for models that fit a specific motif.
 
+MEMETIC BRANCH
+
 """
 
 import time
@@ -113,7 +115,6 @@ def main():
     """
     generation = 0
     max_score = float("-inf")
-    last_max_score = 0.0
     timeformat = "%Y-%m-%d--%H-%M-%S"
     
     best_org = None
@@ -124,7 +125,7 @@ def main():
     # Main loop, it iterates until organisms do not get a significant change
     # or MIN_ITERATIONS or MIN_FITNESS is reached.
     
-    while not is_finished(END_WHILE_METHOD, generation, max_score, last_max_score):
+    while not is_finished(END_WHILE_METHOD, generation, max_score):
         
         if i_am_main_process():
             # Shuffle population
@@ -148,9 +149,7 @@ def main():
                 negative_dataset = shuffle_dataset(negative_dataset)
         
         # Reset max_score
-        last_max_score = max_score  # !!! Obsolete code. To be deleted/updated
         max_score = float("-inf")
-        changed_best_score = False
         initial = time.time()
         
         pop_id_list = []
@@ -173,23 +172,43 @@ def main():
             pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
             ref_seq = pos_set_sample[0]
             
-            # Decide if the parents will do sexual or clonal reproduction (recombination VS mutation)
-            if random.random() < organism_factory.probability_recombination:
-                # Recombination case; no mutation
-                child1, child2 = organism_factory.get_children(
-                    parent1, parent2, ref_seq, pos_set_sample)
+            # =======================
+            # MLE-based memetic drive
+            # =======================
+            if (generation + 1) % organism_factory.periodic_mle == 0:
+                
+                # Child 1
+                placements = [parent1.get_placement(seq) for seq in positive_dataset]
+                child1 = organism_factory.mle_org(parent1, placements)
+                # Child 2
+                placements = [parent2.get_placement(seq) for seq in positive_dataset]
+                child2 = organism_factory.mle_org(parent2, placements)
             
+            # ======================
+            # MUTATION/RECOMBINATION
+            # ======================
             else:
-                # Non-recomination case; the children are mutated
-                child1, child2 = organism_factory.clone_parents(parent1, parent2)
-                # The children in this non-recombination scenario are just
-                # mutated versions of the parents
-                child1.mutate(organism_factory)
-                child2.mutate(organism_factory)
-            
-            # Check that new organisms comply with size contraints (modify them if necessary)
-            child1.check_size(organism_factory)
-            child2.check_size(organism_factory)
+                
+                # RECOMBINATION
+                
+                # Decide if the parents will do sexual or clonal reproduction (recombination VS mutation)
+                if random.random() < organism_factory.probability_recombination:
+                    # Recombination case; no mutation
+                    child1, child2 = organism_factory.get_children(
+                        parent1, parent2, ref_seq, pos_set_sample)
+                
+                # MUTATION
+                else:
+                    # Non-recomination case; the children are mutated
+                    child1, child2 = organism_factory.clone_parents(parent1, parent2)
+                    # The children in this non-recombination scenario are just
+                    # mutated versions of the parents
+                    child1.mutate(organism_factory)
+                    child2.mutate(organism_factory)
+                
+                # Check that new organisms comply with size contraints (modify them if necessary)
+                child1.check_size(organism_factory)
+                child2.check_size(organism_factory)
             
             # Pair parents and offspring
             two_parent_child_pairs = pair_parents_and_children(parent1, parent2, child1, child2)
@@ -270,7 +289,6 @@ def main():
             if max_org_fitness >= best_org_fitness:
                 best_org = max_org
                 best_org_fitness = max_org_fitness
-                changed_best_score = True
             
             # Print info about the current generation
             _m, _s = divmod((time.time() - initial), 60)
@@ -317,10 +335,6 @@ def main():
             else:
                 pos_set_for_export = positive_dataset
             
-            # Export organism if new best organism
-            if changed_best_score:
-                filename = "{}_{}".format(time.strftime(timeformat), best_org._id)
-                export_organism(best_org, pos_set_for_export, filename, organism_factory)
             # Periodic organism export
             if generation % PERIODIC_ORG_EXPORT == 0:
                 filename = "{}_{}".format(time.strftime(timeformat), max_org._id)
@@ -331,7 +345,7 @@ def main():
                 # Select a random positive DNA sequence to use for the population export
                 seq_idx = random.randint(0, len(pos_set_for_export)-1)
                 export_population(organism_population, pos_set_for_export,
-                                  organism_factory,generation, seq_idx)
+                                  organism_factory, generation, seq_idx)
                 # Export plot, too
                 export_plots()
         
@@ -356,9 +370,8 @@ def single_print(*argv):
 
 def initialize_population(organism_factory):
     '''
-    Returns the initial population of organisms as a list.
-    If running in parallel, in processes that have rank different from 0 the
-    funtion returns None.
+    Returns the initial population of organisms as a list. If running in parallel,
+    in processes that have rank different from 0 the funtion returns None.
     '''
     # Initialize the population of organisms
     if i_am_main_process():
@@ -510,16 +523,17 @@ def get_k_sampled_sequence(seq: str, kmer_len: int) -> str:
 
 
 def generate_negative_set(positive_set, negative_set_size, k):
-    ''' Generates a negative set made of pseudosequences that resemble the
-    positive set in terms of k-mer frequencies. The size of the negative set is
-    specified by `negative_set_size`. If `negative_set_size` is None, the
-    negative set will be the same size as the positive set. If the size is
-    specified and it's n*len(positive_set) where n is an integer, every sequence
-    in the positive set contributes exactly to n sequences in the negative set.
-    If instead the required size is not a multiple of len(positive_set), the
-    remaining number of sequences (as many as the remainder of the division)
-    are selected randomly from the positive set. '''
-    
+    '''
+    Generates a negative set made of pseudosequences that resemble the positive
+    set in terms of k-mer frequencies. The size of the negative set is specified
+    by `negative_set_size`. If `negative_set_size` is None, the negative set
+    will be the same size as the positive set. If the size is specified and it's
+    n*len(positive_set) where n is an integer, every sequence in the positive
+    set contributes exactly to n sequences in the negative set. If instead the
+    required size is not a multiple of len(positive_set), the remaining number
+    of sequences (as many as the remainder of the division) are selected
+    randomly from the positive set.
+    '''
     # If size of neg set isn't specified, make it the same length as the pos set
     if negative_set_size == None:
         negative_set_size = len(positive_set)
@@ -537,72 +551,68 @@ def generate_negative_set(positive_set, negative_set_size, k):
     return negative_set
 
 
-def is_finished(
-        method: str, generation: int, max_score: float, last_max_score: float
-) -> bool:
-    """Checks if main while loop is finished
-    methods: 'Iterations', 'minScore', 'Threshold'
-
+def is_finished(method: str, generation: int, max_score: float) -> bool:
+    '''
+    Checks if main while loop is finished.
+    
     Args:
-        method: Name of the finishing method
-        max_score: max score recorded on the current iteration
-        last_max_score: max score recorded on the laset iteration
-        generation: Number of the current iteration
-
+        method:
+            Name of the finishing method. It can be "iterations"/"fitness".
+        generation:
+            Number of the current iteration
+        max_score:
+            max score recorded on the current iteration
+    
     Returns:
-        True if program should finnish.
-        False otherwise
-    """
-
+        True if program should finish, False otherwise.
+    '''
     if method.lower() == "iterations":
         return generation >= MIN_ITERATIONS
-
-    if method.lower() == "fitness":
+    
+    elif method.lower() == "fitness":
         return max_score >= MIN_FITNESS
+    
+    else:
+        raise ValueError("Unknown finishing method")
 
-    if method.lower() == "threshold":
-        return abs(last_max_score - max_score) <= THRESHOLD
-
-    return True
-
-
-def export_organism(
-        organism, dataset: list, filename: str, factory: OrganismFactory
-) -> None:
-    """Exports a single organism in json format, visual format and its
-    recognizers binding
+def export_organism(organism, dataset, filename, factory) -> None:
+    '''
+    Exports a single organism to three files:
+        - json format (*_organism.json)
+        - visual format (*_organism.txt)
+        - its placements (*_results.txt)
 
     Args:
-        organism (OrganismObject): organism to export
-        dataset: Sequences to check the organism binding
-        filename: Previous info to export filenames. Common in all filenames
+        organism: organism to export
+        dataset: List of sequences on which the organism will be placed
+        filename: Previous info to export filenames. Common to all filenames
         factory: Used to export in json format
-    """
-
+    '''
     organism_file = "{}{}_organism.txt".format(RESULT_BASE_PATH_DIR, filename)
-    organism_file_json = "{}{}_organism.json".format(
-        RESULT_BASE_PATH_DIR, filename
-    )
     results_file = "{}{}_results.txt".format(RESULT_BASE_PATH_DIR, filename)
-
+    organism_file_json = "{}{}_organism.json".format(RESULT_BASE_PATH_DIR, filename)
     organism.export(organism_file)
     organism.export_results(dataset, results_file)
     factory.export_organisms([organism], organism_file_json)
 
 
 def export_population(
-        population, dataset: list, factory: OrganismFactory,
+        population: list, dataset: list, factory: OrganismFactory,
         generation: int, dna_seq_idx: int
 ) -> None:
-    """Exports a single organism in json format, visual format and its
-    recognizers binding
+    '''
+    Exports the entire population to three files:
+        - json format (*.json)
+        - visual format (*.txt)
+        - placements (*_placements.txt)
 
     Args:
-        organism (OrganismObject): organism to export
+        population: list of organism to export
         dataset: Sequences to check the organism binding
-        filename: Previous info to export filenames. Common in all filenames
         factory: Used to export in json format
-    """
+        generation: generation number
+        dna_seq_idx: index of the DNA seq (from dataset) to be used for export
+    '''
     
     population_dir = RESULT_BASE_PATH_DIR + "population"
     
@@ -888,6 +898,8 @@ def check_config_settings(config):
     Checks that the input parameters set in the config file are valid.
     '''
     
+    confOrgFact = config["organismFactory"]
+    
     # Check that the population size is an even number
     if config["main"]["POPULATION_SIZE"] % 2 != 0:
         raise Exception(("POPULATION_SIZE must be an even number. " +
@@ -948,6 +960,33 @@ def check_config_settings(config):
                          "and set to false RANDOM_SHUFFLE_SAMPLING_POS and " +
                          "RANDOM_SHUFFLE_SAMPLING_NEG.")
     
+    # Check that PERIODIC_DATASETS_SHUFFLE is None or a positive integer
+    if confOrgFact["PERIODIC_MLE"] != None:
+        if (not isinstance(confOrgFact["PERIODIC_MLE"], int) or
+            confOrgFact["PERIODIC_MLE"] < 1):
+            raise ValueError("PERIODIC_MLE should be a positive integer, " +
+                             "specifying every how many generations to apply " +
+                             "the MLE-based memetic drive. If you don't want " +
+                             "to use the memetic drive, just set this " +
+                             "parameter to null.")
+    
+    # Check that MLE probabilities are valid
+    for key in ["PROBABILITY_MLE_PSSM",
+                "PROBABILITY_MLE_SHAPE",
+                "PROBABILITY_MLE_CONNECTOR",
+                "PROBABILITY_MLE_PSSM_TO_SHAPE",
+                "PROBABILITY_MLE_SHAPE_TO_PSSM"]:
+        if confOrgFact[key] > 1 or confOrgFact[key] < 0:
+            raise ValueError(
+                ("Parameter {} should be a probability, but was " +
+                 "set to {}. Please choose a value from 0 to 1.").format(
+                     key, confOrgFact[key]))
+    if confOrgFact["PROBABILITY_MLE_PSSM"] + confOrgFact["PROBABILITY_MLE_PSSM_TO_SHAPE"] > 1:
+        raise ValueError("PROBABILITY_MLE_PSSM + PROBABILITY_MLE_PSSM_TO_SHAPE " +
+                         "exceeds 1. Please choose valid settings.")
+    if confOrgFact["PROBABILITY_MLE_SHAPE"] + confOrgFact["PROBABILITY_MLE_SHAPE_TO_PSSM"] > 1:
+        raise ValueError("PROBABILITY_MLE_SHAPE + PROBABILITY_MLE_SHAPE_TO_PSSM " +
+                         "exceeds 1. Please choose valid settings.")
 
 
 def print_config_json(config: dict, name: str, path: str) -> None:
@@ -1079,13 +1118,14 @@ def flatten_population(population):
     '''
     
     # Avoid errors if the function is called on all processes during a parallel
-    # run. With the following code we don't have to worry about calling the
-    # flatten_population only on the "main" process.
+    # run. With the following if condition we don't have to worry about calling
+    # the flatten_population only on the "main" process.
     if population is None:
         return None
     
     # Flatten population: 2D list -> 1D list
-    return [org for sublist in population for org in sublist]
+    else:
+        return [org for sublist in population for org in sublist]
 
 
 if __name__ == "__main__":
@@ -1115,11 +1155,10 @@ if __name__ == "__main__":
     if i_am_main_process():
         _M, _S = divmod((time.time() - INITIAL), 60)
         _H, _M = divmod(_M, 60)
-        print_ln(
-            "Time: {}h:{}m:{:.2f}s".format(int(_H), int(_M), _S),
-            RESULT_BASE_PATH_DIR + "parameters.txt")
+        print_ln("Time: {}h:{}m:{:.2f}s".format(int(_H), int(_M), _S),
+                 RESULT_BASE_PATH_DIR + "parameters.txt")
     
-    
+
 
 
 
