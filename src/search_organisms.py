@@ -4,7 +4,8 @@
 
 This program searches for models that fit a specific motif.
 
-MEMETIC BRANCH
++ MEMETIC
++ NEW RECOMBINATION
 
 """
 
