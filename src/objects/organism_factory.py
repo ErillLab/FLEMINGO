@@ -57,11 +57,11 @@ class OrganismFactory:
         self.probability_mle_pssm_to_shape = conf_org_fac["PROBABILITY_MLE_PSSM_TO_SHAPE"]
         self.probability_mle_shape_to_pssm = conf_org_fac["PROBABILITY_MLE_SHAPE_TO_PSSM"]
         
-        # minimum and maximum values allowed for connector mu's
+        # Minimum and maximum values allowed for connector's mu
         self.connector_min_mu = conf_org_fac["CONNECTOR_MIN_MU"]
         self.connector_max_mu = conf_org_fac["CONNECTOR_MAX_MU"]
 
-        # minimum and maximum values allowed for connector sigma's
+        # Minimum and maximum values allowed for connector's sigma
         self.connector_min_sigma = conf_org_fac["CONNECTOR_MIN_SIGMA"]
         self.connector_max_sigma = conf_org_fac["CONNECTOR_MAX_SIGMA"]
         
@@ -72,9 +72,7 @@ class OrganismFactory:
         self.pssm_number_of_binding_sites = conf_org_fac["PSSM_NUM_OF_BINDING_SITES"]
         self.pssm_vs_shape_probability = conf_org_fac["PSSM_VS_SHAPE_PROBABILITY"]
         
-        
-        
-        # assign organism, connector and pssm configurations
+        # Assign organism, connector and pssm configurations
         self.conf_org = conf_org
         self.conf_con = conf_con
         self.conf_pssm = conf_pssm
@@ -94,7 +92,6 @@ class OrganismFactory:
 
         Returns:
             None
-            
         """
         if not os.path.isfile("models/models"):
             shape_object.null_models = {}
@@ -131,7 +128,6 @@ class OrganismFactory:
 
         Returns:
             None
-        
         """
 
         if shape_object.null_models == {}:
@@ -168,7 +164,7 @@ class OrganismFactory:
             return str(self._process_rank) + "_" + str(self._organism_counter)
 
     def get_organism(self) -> OrganismObject:
-        """
+        '''
         It creates and returns a full organism datastructure.
         An organism contains essentially two lists:
             - a recognizer list
@@ -177,8 +173,8 @@ class OrganismFactory:
         connections between them.
 
         Returns:
-            A new organism based on JSON config file
-        """
+            A new random organism based on JSON config file
+        '''
         
         # instantiates organism with organism configuration and pssm columns
         new_organism = OrganismObject(self.get_id(), self.conf_org)
@@ -238,14 +234,15 @@ class OrganismFactory:
         return n
     
     def create_connector(self) -> ConnectorObject:
-        """It returns a connector object with its internal parameters (mu, sigma)
-        assigned
-        """
-        
+        '''
+        It returns a connector object with its internal parameters (mu, sigma)
+        assigned.
+        '''
         return ConnectorObject(self.conf_con, self.max_seq_length)
 
     def create_recognizer(self, length=None):
-        """Randomly creates either a PSSM or shape recognizer
+        '''
+        Randomly creates either a PSSM or shape recognizer.
 
         Args:
             length:
@@ -253,15 +250,17 @@ class OrganismFactory:
                 Passed to either create_pssm or create_shape.
 
         Returns:
-            a recognizer with the specified length (if its valid)
-        """
+            A recognizer with the specified length (if its valid), or a
+            randommly chosen length if not specified.
+        '''
         if random.random() < self.pssm_vs_shape_probability:
             return self.create_pssm(length)
         else:
             return self.create_shape(length)
 
     def create_pssm(self, length=None) -> PssmObject:
-        """It return a PSSM object with a specific length
+        '''
+        It return a PSSM object. The length can be specified.
 
         Args:
             length:
@@ -271,7 +270,7 @@ class OrganismFactory:
         
         Returns:
             A pssm object with an initializated PWM
-        """
+        '''
         if length == None:
             # length = self.recognizer_avg_length
             length = self.from_shifted_poisson(self.recognizer_avg_length,
@@ -286,8 +285,9 @@ class OrganismFactory:
         return PssmObject(np.array(pwm), self.conf_pssm)
     
     def create_shape(self, length=None, rec_type=None) -> ShapeObject:
-        """It return a shape object with a specific length (>= 5)
-           and random feature (one of {mgw, prot, roll, or helt})
+        '''
+        It return a shape object. The length can be specified (>= 5). The shape
+        type can be specified (one of {"mgw", "prot", "roll", "helt"}).
 
         Args:
             length:
@@ -298,8 +298,8 @@ class OrganismFactory:
                 If None, a random type is chosen.
         
         Returns:
-            shape object with a specified length
-        """
+            A shape object
+        '''
         if length == None or length < self.conf_shape["MIN_LENGTH"]:
             length = self.conf_shape["MIN_LENGTH"]
         if length > self.conf_shape["MAX_LENGTH"]:
@@ -308,8 +308,7 @@ class OrganismFactory:
         if rec_type == None:
             rec_type = random.choice(['mgw', 'prot', 'roll', 'helt'])
         return ShapeObject(rec_type, length, self.conf_shape)
-
-
+    
     def get_pwm_column(self) -> dict:
         """Generates a single column for a PWM
 
@@ -398,7 +397,6 @@ class OrganismFactory:
             organism.flatten()
         return organism_list
     
-    
     def check_pwm_frequencies_of_imported_organisms(self, imported_organisms: list):
         '''
         Raises an error if the PWMs of the imported organisms are not compatible
@@ -433,7 +431,6 @@ class OrganismFactory:
                                  "imported, accordingly to the desired number of "
                                  "binding sites. ")
                             )
-    
     
     def import_connector(self, connector: dict) -> ConnectorObject:
         """Import Connector from JSON object
@@ -659,10 +656,14 @@ class OrganismFactory:
             )
         
         '''
+        
+        placement1 = parent1.get_placement(dna_seq)
+        placement2 = parent2.get_placement(dna_seq)
+        
         # These dictionaries say which recognizer of an organism is occupying a
         # certain DNA position
-        pos_to_recog_dict1 = self.get_pos_to_recog_idx_dict(parent1, dna_seq, 'p1')
-        pos_to_recog_dict2 = self.get_pos_to_recog_idx_dict(parent2, dna_seq, 'p2')
+        pos_to_recog_dict1 = self.get_pos_to_recog_idx_dict(placement1, dna_seq, 'p1')
+        pos_to_recog_dict2 = self.get_pos_to_recog_idx_dict(placement2, dna_seq, 'p2')
         
         # Initialize the representation object of the aligned parents
         parents_repres = AlignedOrganismsRepresentation(parent1._id, parent2._id)
@@ -752,33 +753,30 @@ class OrganismFactory:
         #return (p1_repres, p2_repres)
         return parents_repres
     
-    def get_pos_to_recog_idx_dict(self, org, dna_seq, org_tag):
+    def get_pos_to_recog_idx_dict(self, placement, org_tag):
         '''
-        The given organism is placed on the given DNA sequence.
-        Each DNA position covered by some recognizer is mapped to a string,
-        saying what recognizer is placed there. The string will contain a tag
-        for the organism (org_tag argument), joint with the recog index by an
-        underscore.
+        For the given `placement`, each DNA position covered by some recognizer
+        is mapped to a string that says what recognizer is placed there. The
+        string will contain a tag for the organism (`org_tag` argument), joint
+        with the recog index by an underscore.
         
         EXAMPLE:
         This dictionary
             {112: 'p1_0', 113: 'p1_0', 114: 'p1_0', 115: 'p1_0'}
-        will be used to know that position 114 is covered by recognizer 0.
-        In this case, 'p1' was the org_tag value specified as input, used to
-        identify an organism.
+        will be used to know that (for example) position 114 is covered by
+        recognizer 0. In this case, 'p1' was the org_tag value specified as
+        input, used to identify an organism.
         
         Parameters
         ----------
-        org : OrganismObject
-        dna_seq : string
+        placement : PlacementObject
         org_tag : string
 
         Returns
         -------
         pos_to_recog_dict : dictionary
         '''
-        org_placement = org.get_placement(dna_seq)        
-        recog_positions = org_placement.recognizers_positions
+        recog_positions = placement.recognizers_positions
         
         pos_to_recog_dict = {}
         
