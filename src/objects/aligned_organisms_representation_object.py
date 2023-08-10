@@ -17,7 +17,7 @@ class AlignedOrganismsRepresentation:
         AlignedOrganismsRepresentation object constructor.
 
         Args:
-            
+            XXX
         """
         
         # Initialize organisms representations
@@ -60,10 +60,12 @@ class AlignedOrganismsRepresentation:
     
     def annotate_available_connectors(self):
         '''
-        The representations of the aligned parents are lists of symbols.
+        Sets the `connectors_table` attribute.
+        The representations of the aligned parents are lists of symbols, stored
+        in the `organism1` and `organism2` attributes.
         For each possible couple of positions in the representations, this
         function annotates whether the parents have a connector that connects
-        them.
+        them. This info is stored in the attribute `connectors_table`.
         
         EXAMPLE:
         In this representations
@@ -79,21 +81,11 @@ class AlignedOrganismsRepresentation:
         
         Index 1 is liked to index 2 by the only connector of p2: the
         connector that connects recognizer p2_0 with recognizer p2_1.
-        
-        Parameters
-        ----------
-        parent1_repres : list
-            Representation of parent1 (aligned against parent2).
-        parent2_repres : list
-            Representation of parent2 (aligned against parent1).
 
-        Returns
-        -------
-        connectors_table : 2D list
-            This table stores at row i, column j the connector(s) available to
-            link index i to index j.
+        Sets `connectors_table`: a table in the form of a 2D list.
+        This table stores at row i, column j the connector(s) available to link
+        index i to index j.
         '''
-        
         
         # XXX Code here to catch case when organisms were not set yet
         n = len(self.organism1)
