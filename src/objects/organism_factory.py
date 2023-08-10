@@ -599,6 +599,8 @@ class OrganismFactory:
         # Representation of the two recombined children aligned
         children_repres = self.get_aligned_children_repr(parents_repres, child1._id, child2._id)
         
+        # XXX ...
+        
         # Assemble child 1
         # Write the assembly instructions
         child1.set_assembly_instructions(children_repres.organism1, connectors_table, par1._id, par2._id)
@@ -655,6 +657,10 @@ class OrganismFactory:
                 ['-', 'p2_0', 'p2_1']
             )
         
+        Returns
+        -------
+        parents_repres :
+            Object of the class AlignedOrganismsRepresentation
         '''
         
         placement1 = parent1.get_placement(dna_seq)
@@ -662,8 +668,8 @@ class OrganismFactory:
         
         # These dictionaries say which recognizer of an organism is occupying a
         # certain DNA position
-        pos_to_recog_dict1 = self.get_pos_to_recog_idx_dict(placement1, dna_seq, 'p1')
-        pos_to_recog_dict2 = self.get_pos_to_recog_idx_dict(placement2, dna_seq, 'p2')
+        pos_to_recog_dict1 = self.get_pos_to_recog_idx_dict(placement1, 'p1')
+        pos_to_recog_dict2 = self.get_pos_to_recog_idx_dict(placement2, 'p2')
         
         # Initialize the representation object of the aligned parents
         parents_repres = AlignedOrganismsRepresentation(parent1._id, parent2._id)
@@ -834,7 +840,7 @@ class OrganismFactory:
         
         # Each parent representation is coupled with a tag ('p1' or 'p2')
         parents = [(parents_repres.organism1, 'p1'),
-                   (parents_repres.organism2, 'p2')]
+                    (parents_repres.organism2, 'p2')]
         
         for (org_repr, org_tag) in parents:
             
