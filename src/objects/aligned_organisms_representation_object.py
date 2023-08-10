@@ -25,6 +25,9 @@ class AlignedOrganismsRepresentation:
         self.organism2 = []
         
         # XXX
+        self.units = None
+        
+        # XXX
         self.connectors_table = None
         
         # Organisms IDs
@@ -81,7 +84,7 @@ class AlignedOrganismsRepresentation:
         
         Index 1 is liked to index 2 by the only connector of p2: the
         connector that connects recognizer p2_0 with recognizer p2_1.
-
+        
         Sets `connectors_table`: a table in the form of a 2D list.
         This table stores at row i, column j the connector(s) available to link
         index i to index j.
@@ -121,6 +124,61 @@ class AlignedOrganismsRepresentation:
         
         # Set the table storing info about available connectors
         self.connectors_table = connectors_table
+    
+    def define_independent_units(self):
+        '''
+        This function is used to define what chunks of the organisms'
+        representation are going to work as independent units in the
+        recombination process. Within each unit, the part from parent1 can be
+        swapped with the part from parent2 (by get_aligned_children_repr function)
+        with 50% probability.
+        This function generates a list of units' spans, where each element is a
+        (start, stop) tuple.
+        
+        EXAMPLE
+        In this representations
+        
+            p1_0    p1_1    -       p1_2
+            p2_0    p2_0    p2_1    -   
+        
+        p2_0 is partially overlapping with p1_0, and partially with p1_1. In
+        this scenario, the first two positions of the representations work as a
+        single unit. Therefore, the obtained list of independent units will be
+        
+            [ (0, 2), (2, 3), (3, 4) ]
+        
+        '''
+        
+        # XXX Code here to catch case when organisms were not set yet
+        org1_repr = self.organism1
+        org2_repr = self.organism2
+        
+        # Initialize list about where each unit starts
+        unit_starts = [0]
+        
+        for i in range(1, len(org1_repr)):
+            
+            # If in org1_repr at position i there is the same recognizer as the one
+            # at position i-1
+            if org1_repr[i] != '-' and org1_repr[i] == org1_repr[i-1]:
+                # Then this is not yet the start of the next unit
+                continue
+        
+            # If in org2_repr at position i there is the same recognizer as the one
+            # at position i-1
+            if org2_repr[i] != '-' and org2_repr[i] == org2_repr[i-1]:
+                # Then this is not yet the start of the next unit
+                continue
+            
+            unit_starts.append(i)  # i is the start position of a new unit
+        
+        # Each unit stops where the next unit starts (or when the list ends in the
+        # case of the last unit)
+        unit_stops = unit_starts[1:] + [len(org1_repr)]
+        
+        # Make a list of units. Each unit is a tuple: (start, stop)
+        units = list(zip(unit_starts, unit_stops))
+        self.units = units
 
 
 

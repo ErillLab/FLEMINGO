@@ -758,7 +758,16 @@ class OrganismFactory:
         parents_repres.set_organsism1(p1_repres)
         parents_repres.set_organsism2(p2_repres)
         
-        #return (p1_repres, p2_repres)
+        # Define units
+        parents_repres.define_independent_units()
+        
+        
+        # XXX Code here to annotate connector adjustments ...
+        
+        
+        # A new attribute will be set
+        ###parents_repres.connectors_adjustments = conn_adj_dict
+        
         return parents_repres
     
     def get_pos_to_recog_idx_dict(self, placement, org_tag):
@@ -875,18 +884,14 @@ class OrganismFactory:
         '''
         # Define the chunks of the aligned representations that will work as
         # independent units of the recombination process
-        units = self.define_independent_units(parents_repres)
-        
-        # Initialize representation of the children as identical copies of the parents
-        #c1_repr = copy.deepcopy(parent1_repres)  # child1
-        #c2_repr = copy.deepcopy(parent2_repres)  # child2
+        #units = self.define_independent_units(parents_repres)
         
         # Initialize representation of the children as identical copies of the parents
         children_repres = copy.deepcopy(parents_repres)
         children_repres.set_children_IDs(child1_id, child2_id)
         
         # Within each unit, perform a swap with 50% probability
-        for (start, stop) in units:
+        for (start, stop) in parents_repres.units:
             if random.random() < 0.5:
                 # Perform the swapping, which means that the part from parent1 will
                 # end up into child2, and the part from parent2 will end up into child1
@@ -894,59 +899,59 @@ class OrganismFactory:
         
         return children_repres
     
-    def define_independent_units(self, parents_repres):
-        '''
-        This function is used to define what chunks of the organisms'
-        representation are going to work as independent units in the
-        recombination process. Within each unit, the part from parent1 can be
-        swapped with the part from parent2 (by get_aligned_children_repr function)
-        with 50% probability.
-        This function returns a list of units' spans, where each element is a
-        (start, stop) tuple.
+    # def define_independent_units(self, parents_repres):
+    #     '''
+    #     This function is used to define what chunks of the organisms'
+    #     representation are going to work as independent units in the
+    #     recombination process. Within each unit, the part from parent1 can be
+    #     swapped with the part from parent2 (by get_aligned_children_repr function)
+    #     with 50% probability.
+    #     This function returns a list of units' spans, where each element is a
+    #     (start, stop) tuple.
         
-        EXAMPLE
-        In this representations
+    #     EXAMPLE
+    #     In this representations
         
-            p1_0    p1_1    -       p1_2
-            p2_0    p2_0    p2_1    -   
+    #         p1_0    p1_1    -       p1_2
+    #         p2_0    p2_0    p2_1    -   
         
-        p2_0 is partially overlapping with p1_0, and partially with p1_1. In
-        this scenario, the first two positions of the representations work as a
-        single unit. Therefore, the returned list of independent units will be
+    #     p2_0 is partially overlapping with p1_0, and partially with p1_1. In
+    #     this scenario, the first two positions of the representations work as a
+    #     single unit. Therefore, the returned list of independent units will be
         
-            [ (0, 2), (2, 3), (3, 4) ]
+    #         [ (0, 2), (2, 3), (3, 4) ]
         
-        '''
+    #     '''
         
-        org1_repr = parents_repres.organism1
-        org2_repr = parents_repres.organism2
+    #     org1_repr = parents_repres.organism1
+    #     org2_repr = parents_repres.organism2
         
-        # Initialize list about where each unit starts
-        unit_starts = [0]
+    #     # Initialize list about where each unit starts
+    #     unit_starts = [0]
         
-        for i in range(1, len(org1_repr)):
+    #     for i in range(1, len(org1_repr)):
             
-            # If in org1_repr at position i there is the same recognizer as the one
-            # at position i-1
-            if org1_repr[i] != '-' and org1_repr[i] == org1_repr[i-1]:
-                # Then this is not yet the start of the next unit
-                continue
+    #         # If in org1_repr at position i there is the same recognizer as the one
+    #         # at position i-1
+    #         if org1_repr[i] != '-' and org1_repr[i] == org1_repr[i-1]:
+    #             # Then this is not yet the start of the next unit
+    #             continue
         
-            # If in org2_repr at position i there is the same recognizer as the one
-            # at position i-1
-            if org2_repr[i] != '-' and org2_repr[i] == org2_repr[i-1]:
-                # Then this is not yet the start of the next unit
-                continue
+    #         # If in org2_repr at position i there is the same recognizer as the one
+    #         # at position i-1
+    #         if org2_repr[i] != '-' and org2_repr[i] == org2_repr[i-1]:
+    #             # Then this is not yet the start of the next unit
+    #             continue
             
-            unit_starts.append(i)  # i is the start position of a new unit
+    #         unit_starts.append(i)  # i is the start position of a new unit
         
-        # Each unit stops where the next unit starts (or when the list ends in the
-        # case of the last unit)
-        unit_stops = unit_starts[1:] + [len(org1_repr)]
+    #     # Each unit stops where the next unit starts (or when the list ends in the
+    #     # case of the last unit)
+    #     unit_stops = unit_starts[1:] + [len(org1_repr)]
         
-        # Make a list of units. Each unit is a tuple: (start, stop)
-        units = list(zip(unit_starts, unit_stops))
-        return units
+    #     # Make a list of units. Each unit is a tuple: (start, stop)
+    #     units = list(zip(unit_starts, unit_stops))
+    #     return units
     
     def compile_recognizers(self, child_obj, parent1, parent2):
         '''
