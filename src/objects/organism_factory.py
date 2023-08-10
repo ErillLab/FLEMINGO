@@ -599,12 +599,11 @@ class OrganismFactory:
         # Representation of the two recombined children aligned
         children_repres = self.get_aligned_children_repr(parents_repres, child1._id, child2._id)
         
-        # XXX ... Change this so that the table is stored in children_repres ?
-        connectors_table = parents_repres.connectors_table
-        
         # Assemble child 1
         # Write the assembly instructions
-        child1.set_assembly_instructions(children_repres.organism1, connectors_table, par1._id, par2._id)
+        child1.set_assembly_instructions(children_repres.organism1,
+                                         children_repres.connectors_table,
+                                         par1._id, par2._id)
         # Now compile child 1
         self.compile_recognizers(child1, par1, par2)
         self.compile_connectors(child1, par1, par2, parents_repres,
@@ -612,7 +611,9 @@ class OrganismFactory:
         
         # Assemble child 2
         # Write the assembly instructions
-        child2.set_assembly_instructions(children_repres.organism2, connectors_table, par1._id, par2._id)
+        child2.set_assembly_instructions(children_repres.organism2,
+                                         children_repres.connectors_table,
+                                         par1._id, par2._id)
         # Now compile child 2
         self.compile_recognizers(child2, par1, par2)
         self.compile_connectors(child2, par1, par2, parents_repres,
