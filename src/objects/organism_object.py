@@ -1299,8 +1299,10 @@ class OrganismObject:
                         # then 2 more indices for the current mu and sigma
                         offset = sum([(self.connectors[i].max_seq_length * 2 + 2) for i in range(0, i)]) + 2
                         self.connectors[i].adjust_scores(c_scores[offset:], len(sequence), self.sum_recognizer_lengths)
-                        print("rescaling...")
-                        print(len(c_scores))
+                        # XXX printing (for debugging purposes)
+                        # print("rescaling...")
+                        # print(len(c_scores))
+                        
                         #self.adjust_connector_scores(i, c_scores, len(sequence))
 
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), \
