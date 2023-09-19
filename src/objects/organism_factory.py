@@ -384,10 +384,6 @@ class OrganismFactory:
             new_organism.set_recognizers(new_org_recognizers)
             new_organism.set_connectors(new_org_connectors)
             new_organism.set_row_to_pssm()
-
-            #if "isTracked" in organism.keys():  # !!! organism tracking needs to be reimplemented with chain-organisms
-            #    new_organism.set_is_tracked(organism["isTracked"])
-
             organism_list.append(new_organism)
         
         # Check if the frequency values in the PWMs of the imported organisms
@@ -705,7 +701,155 @@ class OrganismFactory:
                     p2_repres.append(p2)
         
         # Remove protrusions
+        # '''
+        # A 1-bp overlap between recognizers is enough for them to get 'paired'.
+        # This means that the overlap can be imperfect, with flanking parts of
+        # the recognizers being unpaired. Those will be ignored.
+        
+        # EXAMPLE:
+        # If two recognizers are placed on DNA in this way
+        #     -----AAAA-------
+        #     -------BBBB-----
+        # the desired representation is
+        #     A
+        #     B
+        # and not
+        #     AA-
+        #     -BB
+        # Therefore, the two positions to the left and to the right of the
+        # A-B match will be called 'protrusions', and they will be removed
+        # '''
+        # matches_p1 = set([])  # recogs of parent1 that overlap with a recog
+        # matches_p2 = set([])  # recogs of parent2 that overlap with a recog
+        
+        # for i in range(len(p1_repres)):
+        #     p1_node, p2_node = p1_repres[i], p2_repres[i]
+        #     if p1_node != '-' and p2_node != '-':
+        #         matches_p1.add(p1_node)
+        #         matches_p2.add(p2_node)
+        
+        
+        # # If recognizer X is in matches_p1 or matches_p2 (menaing that it
+        # # overlaps at least once with another recognizer) all the other
+        # # eventual pairings of X with "-" are protrusions.
+        
+        # # Here we store the indexes of the positions where there's a 'protrusion'
+        # protrusions = []        
+        
+        # for i in range(len(p1_repres)):
+        #     if p1_repres[i] in matches_p1:
+        #         if p2_repres[i] == '-':
+        #             protrusions.append(i)
+        
+        # for i in range(len(p2_repres)):
+        #     if p2_repres[i] in matches_p2:
+        #         if p1_repres[i] == '-':
+        #             protrusions.append(i)
+        
+        # # Skip the protrusions and return the desired representations
+        # p1_repres = [p1_repres[i] for i in range(len(p1_repres)) if i not in protrusions]
+        # p2_repres = [p2_repres[i] for i in range(len(p2_repres)) if i not in protrusions]
+        
+        p1_repres, p2_repres = self.remove_protrusions(p1_repres, p2_repres)
+        
+        
+        parents_repres.set_organsism1(p1_repres)
+        parents_repres.set_organsism2(p2_repres)
+        
+        # Define units
+        parents_repres.define_independent_units()
+        
+        
+        # =====================================================================
+        # XXX Code here to annotate connector adjustments ...
+        # IT WILL BECOME A METHOD OF THE AlignedOrganismsRepresentation CLASS
+        # =====================================================================
+        
+        # XXX
+        # print("- - - - - - - - -")
+        
+        # Initialize connector adjustments dictionaries
+        org1_n_connectors = parent1.count_connectors()
+        org2_n_connectors = parent2.count_connectors()
+        org1_conn_adj_dict = {i : [0,0] for i in range(org1_n_connectors)}
+        org2_conn_adj_dict = {i : [0,0] for i in range(org2_n_connectors)}
+        
+        # Compile connector adjustments dictionaries
+        for unit_start, unit_stop in parents_repres.units:
+            # Ignore if it's not an overlap between recognizers
+            if (parents_repres.organism1[unit_start:unit_stop] == ["-"] or
+                parents_repres.organism2[unit_start:unit_stop] == ["-"]):
+                continue
+            
+            else:
+                # LEFT connectors
+                # ---------------
+                p1recog_name = parents_repres.organism1[unit_start]
+                p2recog_name = parents_repres.organism2[unit_start]
+                # XXX
+                # print(p1recog_name, 'with', p2recog_name)
+                # print(parents_repres.organism1)
+                # print(parents_repres.organism2)
+                placement1.print_placement(stdout=True)
+                placement2.print_placement(stdout=True)
+                
+                p1recog_idx = int(p1recog_name.split('_')[1])
+                p2recog_idx = int(p2recog_name.split('_')[1])
+                # The indexes shouldn't be both 0 (there wouldn't be LEFT connectors)
+                if p1recog_idx == 0 and p2recog_idx == 0:
+                    pass
+                else:
+                    p1recog_start = placement1.recognizers_positions[p1recog_idx][0]
+                    p2recog_start = placement2.recognizers_positions[p2recog_idx][0]
+                    
+                    # Store the right-bound adjustment for the connectors to the LEFT
+                    displacement = p1recog_start - p2recog_start
+                    
+                    p1conn_idx = p1recog_idx - 1
+                    if p1conn_idx >= 0:
+                        org1_conn_adj_dict[p1conn_idx][1] -= displacement
+                    
+                    p2conn_idx = p2recog_idx - 1
+                    if p2conn_idx >= 0:
+                        org2_conn_adj_dict[p2conn_idx][1] += displacement
+                
+                # RIGHT connectors
+                # ----------------
+                p1recog_name = parents_repres.organism1[unit_stop - 1]
+                p2recog_name = parents_repres.organism2[unit_stop - 1]
+                p1recog_idx = int(p1recog_name.split('_')[1])
+                p2recog_idx = int(p2recog_name.split('_')[1])
+                # The indexes shouldn't be both the last (there wouldn't be RIGHT connectors)
+                if p1recog_idx == org1_n_connectors and p2recog_idx == org2_n_connectors:
+                    pass
+                else:
+                    p1recog_stop = placement1.recognizers_positions[p1recog_idx][1]
+                    p2recog_stop = placement2.recognizers_positions[p2recog_idx][1]
+                    
+                    # Store the left-bound adjustment for the connectors to the RIGHT
+                    displacement = p1recog_stop - p2recog_stop
+                    
+                    p1conn_idx = p1recog_idx
+                    if p1conn_idx < org1_n_connectors:
+                        org1_conn_adj_dict[p1conn_idx][0] -= displacement
+                    
+                    p2conn_idx = p2recog_idx
+                    if p2conn_idx < org2_n_connectors:
+                        org2_conn_adj_dict[p2conn_idx][0] += displacement
+        
+        # XXX
+        # print(org1_conn_adj_dict, "\n", org2_conn_adj_dict, "\n- - - - - - - - -\n")
+        
+        # Set attributes
+        parents_repres.org1_connectors_adjustments = org1_conn_adj_dict
+        parents_repres.org2_connectors_adjustments = org2_conn_adj_dict
+        
+        return parents_repres
+    
+    def remove_protrusions(self, p1_repres, p2_repres):
         '''
+        XXX ...
+        
         A 1-bp overlap between recognizers is enough for them to get 'paired'.
         This means that the overlap can be imperfect, with flanking parts of
         the recognizers being unpaired. Those will be ignored.
@@ -724,14 +868,13 @@ class OrganismFactory:
         A-B match will be called 'protrusions', and they will be removed
         '''
         matches_p1 = set([])  # recogs of parent1 that overlap with a recog
-        matches_p2 = set([])  # recogs of parent1 that overlap with a recog
+        matches_p2 = set([])  # recogs of parent2 that overlap with a recog
         
         for i in range(len(p1_repres)):
             p1_node, p2_node = p1_repres[i], p2_repres[i]
             if p1_node != '-' and p2_node != '-':
                 matches_p1.add(p1_node)
                 matches_p2.add(p2_node)
-        
         
         # If recognizer X is in matches_p1 or matches_p2 (menaing that it
         # overlaps at least once with another recognizer) all the other
@@ -750,25 +893,11 @@ class OrganismFactory:
                 if p1_repres[i] == '-':
                     protrusions.append(i)
         
-        
         # Skip the protrusions and return the desired representations
         p1_repres = [p1_repres[i] for i in range(len(p1_repres)) if i not in protrusions]
         p2_repres = [p2_repres[i] for i in range(len(p2_repres)) if i not in protrusions]
         
-        parents_repres.set_organsism1(p1_repres)
-        parents_repres.set_organsism2(p2_repres)
-        
-        # Define units
-        parents_repres.define_independent_units()
-        
-        
-        # XXX Code here to annotate connector adjustments ...
-        
-        
-        # A new attribute will be set
-        ###parents_repres.connectors_adjustments = conn_adj_dict
-        
-        return parents_repres
+        return p1_repres, p2_repres
     
     def get_pos_to_recog_idx_dict(self, placement, org_tag):
         '''
@@ -808,90 +937,18 @@ class OrganismFactory:
         
         return pos_to_recog_dict
     
-    # def annotate_available_connectors(self, parents_repres):
-    #     '''
-    #     The representations of the aligned parents are lists of symbols.
-    #     For each possible couple of positions in the representations, this
-    #     function annotates whether the parents have a connector that connects
-    #     them.
-        
-    #     EXAMPLE:
-    #     In this representations
-        
-    #         p1_0    p1_1    -       p1_2
-    #         -       p2_0    p2_1    -   
-        
-    #     index 0 is liked to index 1 by the first connector of p1 (parent1): the
-    #     connector that connects recognizer p1_0 with recognizer p1_1.
-        
-    #     Index 1 is liked to index 3 by the second connector of p1: the
-    #     connector that connects recognizer p1_1 with recognizer p1_2.
-        
-    #     Index 1 is liked to index 2 by the only connector of p2: the
-    #     connector that connects recognizer p2_0 with recognizer p2_1.
-        
-    #     Parameters
-    #     ----------
-    #     parent1_repres : list
-    #         Representation of parent1 (aligned against parent2).
-    #     parent2_repres : list
-    #         Representation of parent2 (aligned against parent1).
-
-    #     Returns
-    #     -------
-    #     connectors_table : 2D list
-    #         This table stores at row i, column j the connector(s) available to
-    #         link index i to index j.
-    #     '''
-        
-    #     n = len(parents_repres.organism1)
-        
-    #     # 2D list where each item is an emtpy list
-    #     connectors_table = [[ [] for i in range(n)] for j in range(n)]
-        
-    #     # Each parent representation is coupled with a tag ('p1' or 'p2')
-    #     parents = [(parents_repres.organism1, 'p1'),
-    #                 (parents_repres.organism2, 'p2')]
-        
-    #     for (org_repr, org_tag) in parents:
-            
-    #         # Indexes where a recognizer of this parent is present        
-    #         recogs_indexes = []
-    #         for idx in range(len(org_repr)):
-    #             if org_repr[idx] != '-':
-    #                 recogs_indexes.append(idx)
-            
-    #         connector_idx = 0
-    #         for i in range(len(recogs_indexes)-1):
-                
-    #             left_recog_idx = recogs_indexes[i]
-    #             right_recog_idx = recogs_indexes[i+1]
-                
-    #             left_recog_name = org_repr[left_recog_idx]
-    #             right_recog_name = org_repr[right_recog_idx]
-                
-    #             if left_recog_name != right_recog_name:                
-    #                 connector_name = org_tag + '_' + str(connector_idx)
-    #                 connector_idx += 1
-    #                 connectors_table[left_recog_idx][right_recog_idx].append(connector_name)
-    #     # Return the table storing info about available connectors
-    #     return connectors_table
-    
     def get_aligned_children_repr(self, parents_repres, child1_id, child2_id):
         '''
         This function swaps parts of the representations of the two parents, in
         order to get the representations of the two children.
         '''
-        # Define the chunks of the aligned representations that will work as
-        # independent units of the recombination process
-        #units = self.define_independent_units(parents_repres)
         
         # Initialize representation of the children as identical copies of the parents
         children_repres = copy.deepcopy(parents_repres)
         children_repres.set_children_IDs(child1_id, child2_id)
         
         # Within each unit, perform a swap with 50% probability
-        for (start, stop) in parents_repres.units:
+        for (start, stop) in children_repres.units:
             if random.random() < 0.5:
                 # Perform the swapping, which means that the part from parent1 will
                 # end up into child2, and the part from parent2 will end up into child1

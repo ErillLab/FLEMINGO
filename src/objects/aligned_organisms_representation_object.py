@@ -23,6 +23,9 @@ class AlignedOrganismsRepresentation:
         # Initialize organisms representations
         self.organism1 = []
         self.organism2 = []
+        # XXX
+        self.org1_connectors_adjustments = None
+        self.org2_connectors_adjustments = None
         
         # XXX
         self.units = None
@@ -51,6 +54,7 @@ class AlignedOrganismsRepresentation:
         print('\t'.join(self.organism2))
     
     def swap_unit(self, unit_start, unit_stop):
+        # XXX
         # Perform the swapping, which means that the part from organism1 will
         # end up into organism2, and the part from organism2 will end up into
         # organism1.
@@ -97,8 +101,7 @@ class AlignedOrganismsRepresentation:
         connectors_table = [[ [] for i in range(n)] for j in range(n)]
         
         # Each parent representation is coupled with a tag ('p1' or 'p2')
-        parents = [(self.organism1, 'p1'),
-                   (self.organism2, 'p2')]
+        parents = [(self.organism1, 'p1'), (self.organism2, 'p2')]
         
         for (org_repr, org_tag) in parents:
             
