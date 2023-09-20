@@ -1110,31 +1110,31 @@ class OrganismFactory:
         
         return (first_bp, last_bp)
     
-    def clone_parents(self, par1, par2):
-        '''
-        This function generates two children that are identical (in terms of
-        nodes) to the provided parents.
-        '''
-        child1 = copy.deepcopy(par1)
-        child2 = copy.deepcopy(par2)
-        # Assign IDs to organisms and increase factory counter
-        child1.set_id(self.get_id())
-        child2.set_id(self.get_id())
-        # Set assembly_instructions
-        ''' The children are clones of the parents, therefore the
-        assembly_instructions will report that all the nodes for child1 are
-        from parent1 and all child2 is from parent2. '''
-        # child1 assembly_instructions
-        recogs_tags = ['p1_' + str(i) for i in range(child1.count_recognizers())]
-        connectors_tags = recogs_tags[1:]
-        child1.assembly_instructions['recognizers'] = recogs_tags
-        child1.assembly_instructions['connectors'] = connectors_tags
-        # child2 assembly_instructions
-        recogs_tags = ['p2_' + str(i) for i in range(child2.count_recognizers())]
-        connectors_tags = recogs_tags[1:]
-        child2.assembly_instructions['recognizers'] = recogs_tags
-        child2.assembly_instructions['connectors'] = connectors_tags
-        return child1, child2
+    # def clone_parents(self, par1, par2):
+    #     '''
+    #     This function generates two children that are identical (in terms of
+    #     nodes) to the provided parents.
+    #     '''
+    #     child1 = copy.deepcopy(par1)
+    #     child2 = copy.deepcopy(par2)
+    #     # Assign IDs to organisms and increase factory counter
+    #     child1.set_id(self.get_id())
+    #     child2.set_id(self.get_id())
+    #     # Set assembly_instructions
+    #     ''' The children are clones of the parents, therefore the
+    #     assembly_instructions will report that all the nodes for child1 are
+    #     from parent1 and all child2 is from parent2. '''
+    #     # child1 assembly_instructions
+    #     recogs_tags = ['p1_' + str(i) for i in range(child1.count_recognizers())]
+    #     connectors_tags = recogs_tags[1:]
+    #     child1.assembly_instructions['recognizers'] = recogs_tags
+    #     child1.assembly_instructions['connectors'] = connectors_tags
+    #     # child2 assembly_instructions
+    #     recogs_tags = ['p2_' + str(i) for i in range(child2.count_recognizers())]
+    #     connectors_tags = recogs_tags[1:]
+    #     child2.assembly_instructions['recognizers'] = recogs_tags
+    #     child2.assembly_instructions['connectors'] = connectors_tags
+    #     return child1, child2
     
     
     # =========================================================================
@@ -1152,10 +1152,16 @@ class OrganismFactory:
         # Assign ID
         clone.set_id(self.get_id())
         # Clone assembly instructions
-        recogs_tags = ['p1_' + str(i) for i in range(clone.count_recognizers())]
-        connectors_tags = recogs_tags[1:]
-        clone.assembly_instructions['recognizers'] = recogs_tags
-        clone.assembly_instructions['connectors'] = connectors_tags
+        clone.assembly_instructions['p1'] = organism._id
+        clone.assembly_instructions['p2'] = None
+        clone.assembly_instructions['recognizers'] = "cloned from " + organism._id
+        clone.assembly_instructions['connectors'] = "cloned from " + organism._id
+        
+        # recogs_tags = ['p1_' + str(i) for i in range(clone.count_recognizers())]
+        # connectors_tags = recogs_tags[1:]
+        # clone.assembly_instructions['recognizers'] = recogs_tags
+        # clone.assembly_instructions['connectors'] = connectors_tags
+        
         return clone
     
     def mle_connector(self, conn_idx, placements):
