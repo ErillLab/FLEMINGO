@@ -78,37 +78,59 @@ class OrganismObject:
         self.assembly_instructions = {'p1': None,  # ID number of the first parent
                                       'p2': None,  # ID number of the second parent
                                       'recognizers': None,
-                                      'connectors': None}
+                                      'connectors': None,
+                                      'connectors_adjustments': None}
         
         self.fitness = None
     
-    def set_assembly_instructions(self, aligned_repres, connectors_table, p1_id, p2_id):
-        '''
-        Sets the self.assembly_instructions attribute.
-        '''
-        self.assembly_instructions['p1'] = p1_id
-        self.assembly_instructions['p2'] = p2_id
-        self.set_recogs_assembly_instructions(aligned_repres)
-        self.set_connectors_assembly_instructions(aligned_repres, connectors_table)
+    # def set_assembly_instructions_old_version(self, aligned_repres, connectors_table, p1_id, p2_id):
+    #     '''
+    #     Sets the self.assembly_instructions attribute.
+    #     '''
+    #     self.assembly_instructions['p1'] = p1_id
+    #     self.assembly_instructions['p2'] = p2_id
+    #     self.set_recogs_assembly_instructions(aligned_repres)
+    #     self.set_connectors_assembly_instructions(aligned_repres, connectors_table)
+    #     self.set_connectors_adjustments(aligned_repres)
     
-    def set_recogs_assembly_instructions(self, aligned_repres):
+    def set_assembly_instructions(self, aligned_repres, organism_tag):
+        '''
+        !!! Docstring here ...
+        '''
+        # Parent IDs
+        self.assembly_instructions['p1'] = aligned_repres.parents_ids[0]
+        self.assembly_instructions['p2'] = aligned_repres.parents_ids[1]
+        
+        # Child representation
+        if organism_tag == 'org1':
+            child_repres = aligned_repres.organism1
+        elif organism_tag == 'org2':
+            child_repres = aligned_repres.organism2
+        else:
+            raise ValueError("Unknown organism_tag. It should be 'org1' or 'org2'.")
+        
+        self.set_recogs_assembly_instructions(child_repres)
+        self.set_connectors_assembly_instructions(child_repres, aligned_repres.connectors_table)
+        self.set_connectors_adjustments(aligned_repres)
+    
+    def set_recogs_assembly_instructions(self, child_repres):
         '''
         Compiles the list of recognizers in the self.assembly_instructions
         attribute.
         '''
-        child_recog_names = [item for item in aligned_repres if item != '-']
+        child_recog_names = [item for item in child_repres if item != '-']
         recogs_list = []
         for item in child_recog_names:
             if item not in recogs_list:
                 recogs_list.append(item)
         self.assembly_instructions['recognizers'] = recogs_list
     
-    def set_connectors_assembly_instructions(self, aligned_repres, connectors_table):
+    def set_connectors_assembly_instructions(self, child_repres, connectors_table):
         '''
         Compiles the list of connectors in the self.assembly_instructions
         attribute.
         '''
-        required_connectors = self.annotate_required_connectors(aligned_repres)
+        required_connectors = self.annotate_required_connectors(child_repres)
         connectors_list = []
         for (left, right) in required_connectors:
             # What suitable connectors are available to cover that span
@@ -128,6 +150,14 @@ class OrganismObject:
             
             connectors_list.append(connector_name)
         self.assembly_instructions['connectors'] = connectors_list
+    
+    def set_connectors_adjustments(self, aligned_repres):
+        '''
+        !!! Docstring here ...
+        '''
+        self.assembly_instructions['connectors_adjustments'] = {
+            'p1_connectors': aligned_repres.org1_connectors_adjustments,
+            'p2_connectors': aligned_repres.org2_connectors_adjustments}
     
     def get_parent1_parent2_ratio(self):
         '''
@@ -223,19 +253,20 @@ class OrganismObject:
         return required_connectors
     
     def set_row_to_pssm(self):
-        """row_to_pssm is an attribute that maps each row of the alignment
-           matrix to the index (within org) of the pssm recognizer, and the
-           column of the pssm that applies to that row.
-           In the alignment matrix, the rows correspond all consecutively to 
-           pssm positions (i.e. columns).
-           This attribute allows to go from row directly to a pair of indices
-           denoting the pssm number and the position within the pssm that maps
-           to it.
-           
-           Call by factory upon generation of organism, and also after any
-           mutations that might change the size of the pssm, or the column order,
-           or their number.
-        """
+        '''
+        The `row_to_pssm` attribute maps each row of the alignment
+        matrix to the index (within org) of the pssm recognizer, and the
+        column of the pssm that applies to that row.
+        In the alignment matrix, the rows correspond all consecutively to 
+        pssm positions (i.e. columns).
+        This attribute allows to go from row directly to a pair of indices
+        denoting the pssm number and the position within the pssm that maps
+        to it.
+        
+        Call by factory upon generation of organism, and also after any
+        mutations that might change the size of the pssm, or the column order,
+        or their number.
+        '''
         
         pssm_list = self.recognizers
         

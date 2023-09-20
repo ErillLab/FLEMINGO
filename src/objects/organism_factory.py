@@ -588,9 +588,9 @@ class OrganismFactory:
         
         # Representation of the two parents aligned
         #parents_repres = self.get_aligned_parents_repr(par1, par2, reference_dna_seq)
+        
         # XXX New approach
         parents_repres = AlignedOrganismsRepresentation(par1, par2, reference_dna_seq)
-        
         # Table storing info about what connectors are available to cover the possible spans
         parents_repres.annotate_available_connectors()
         
@@ -599,20 +599,28 @@ class OrganismFactory:
         
         # Assemble child 1
         # Write the assembly instructions
-        child1.set_assembly_instructions(children_repres.organism1,
-                                         children_repres.connectors_table,
-                                         par1._id, par2._id)
-        # Now compile child 1
+        
+        # XXX New approach
+        # child1.set_assembly_instructions(children_repres.organism1,
+        #                                  children_repres.connectors_table,
+        #                                  par1._id, par2._id)
+        child1.set_assembly_instructions(children_repres, 'org1')
+        
+        # Compile child 1
         self.compile_recognizers(child1, par1, par2)
         self.compile_connectors(child1, par1, par2, parents_repres,
                                 par1_placements, par2_placements)
         
         # Assemble child 2
         # Write the assembly instructions
-        child2.set_assembly_instructions(children_repres.organism2,
-                                         children_repres.connectors_table,
-                                         par1._id, par2._id)
-        # Now compile child 2
+        
+        # XXX New approach
+        # child2.set_assembly_instructions(children_repres.organism2,
+        #                                  children_repres.connectors_table,
+        #                                  par1._id, par2._id)
+        child2.set_assembly_instructions(children_repres, 'org2')
+        
+        # Compile child 2
         self.compile_recognizers(child2, par1, par2)
         self.compile_connectors(child2, par1, par2, parents_repres,
                                 par1_placements, par2_placements)
@@ -1138,7 +1146,7 @@ class OrganismFactory:
     
     
     # =========================================================================
-    # XXX  New code for MLE
+    # XXX  Code for MLE
     # =========================================================================
     
     def clone_organism(self, organism):
@@ -1529,7 +1537,7 @@ class OrganismFactory:
                     mle_recognizers.append(copy.deepcopy(organism.recognizers[i]))
         
         # Return the new organism
-        org = self.clone_organism(organism)  # !!! Replace clone_parents with two calls to this new function ?
+        org = self.clone_organism(organism)
         org.recognizers = mle_recognizers
         org.connectors = mle_connectors
         org.flatten()
