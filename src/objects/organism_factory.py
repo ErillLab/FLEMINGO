@@ -997,14 +997,14 @@ class OrganismFactory:
                 parent, conn_idx = connector_name.split('_')
                 conn_idx = int(conn_idx)
                 
+                # Copy connector
                 if parent == 'p1':
                     # Re-use connector from parent 1
                     conn = copy.deepcopy(par1.connectors[conn_idx])
                 elif parent == 'p2':
                     # Re-use connector from parent 2
                     conn = copy.deepcopy(par2.connectors[conn_idx])
-                
-                # !!! Work in progress ...
+                adjusted = False
                 
                 # Left and Right recognizers
                 l_rec_name = recogs_names[i]
@@ -1015,12 +1015,20 @@ class OrganismFactory:
                     left_adj, right_adj = conn_adj_vals[parent][conn_idx]
                     print("L adjustments:", left_adj, ",", right_adj)
                     conn._mu += left_adj
+                    conn.apply_mu_bounds()  # Avoide negative mu or too large mu
+                    if left_adj != 0:
+                        adjusted = True
                 # Apply RIGHT adjustment if necessary
                 if r_rec_name.split("_")[0] != parent:
                     left_adj, right_adj = conn_adj_vals[parent][conn_idx]
                     print("R adjustments:", left_adj, ",", right_adj)
                     conn._mu += right_adj
-                
+                    conn.apply_mu_bounds()  # Avoide negative mu or too large mu
+                    if right_adj != 0:
+                        adjusted = True
+                # If mu was adjusted, recompute the scores of PDF and CDF values
+                if adjusted:
+                    conn.set_precomputed_pdfs_cdfs()
             
             # Add connector to organism
             child_obj.append_connector(conn)
