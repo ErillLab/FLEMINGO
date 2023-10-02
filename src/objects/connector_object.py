@@ -410,7 +410,6 @@ class ConnectorObject():
         """Prints the connector mu and sigma values
         """
         print(" m: {} s: {}".format(self._mu, self._sigma))
-        # XXX Remove when done with debugging
         if debug:
             print(" adjust_score_threshold: {}".format(self.adjust_score_threshold))
 

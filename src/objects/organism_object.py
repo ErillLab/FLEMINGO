@@ -85,16 +85,6 @@ class OrganismObject:
         
         self.fitness = None
     
-    # def set_assembly_instructions_old_version(self, aligned_repres, connectors_table, p1_id, p2_id):
-    #     '''
-    #     Sets the self.assembly_instructions attribute.
-    #     '''
-    #     self.assembly_instructions['p1'] = p1_id
-    #     self.assembly_instructions['p2'] = p2_id
-    #     self.set_recogs_assembly_instructions(aligned_repres)
-    #     self.set_connectors_assembly_instructions(aligned_repres, connectors_table)
-    #     self.set_connectors_adjustments(aligned_repres)
-    
     def set_assembly_instructions(self, aligned_repres, organism_tag):
         '''
         Sets the self.assembly_instructions attribute. It is a dictionary with
@@ -998,100 +988,98 @@ class OrganismObject:
             sum_lengths += pssm.length
         return sum_lengths
     
-    def get_gap_score(self, connector_idx, d, s_dna_len):
-        """Calls the appropriate connector, with the given distance and length of the DNA sequence to
-		   obtain the energy of the connector.
-		"""
-        if d < s_dna_len:
-            # !!! New input param for connector.get_score: the list of the lengths of the recognizers
-            recog_lengths = [recog.length for recog in self.recognizers]
-            gap_score = self.connectors[connector_idx].get_score(d, s_dna_len, recog_lengths)
-            return gap_score
-        else:
-            return -1 * np.inf
+#     def get_gap_score(self, connector_idx, d, s_dna_len):
+#         """Calls the appropriate connector, with the given distance and length of the DNA sequence to
+# 		   obtain the energy of the connector.
+# 		"""
+#         if d < s_dna_len:
+#             recog_lengths = [recog.length for recog in self.recognizers]
+#             gap_score = self.connectors[connector_idx].get_score(d, s_dna_len, recog_lengths)
+#             return gap_score
+#         else:
+#             return -1 * np.inf
     
-    def get_score_from_pssm(self, row_idx_from_placement_matrix, nucleotide):
-        """Calls the appropriate PSSM (and column) to obtain the score, given a nucleotide
-		"""
-        pssm_index = self.row_to_pssm[row_idx_from_placement_matrix][0]
-        pssm_column = self.row_to_pssm[row_idx_from_placement_matrix][1]
-        pssm_object = self.recognizers[pssm_index]
-        score = pssm_object.pssm[pssm_column][nucleotide]
-        return score
+#     def get_score_from_pssm(self, row_idx_from_placement_matrix, nucleotide):
+#         """Calls the appropriate PSSM (and column) to obtain the score, given a nucleotide
+# 		"""
+#         pssm_index = self.row_to_pssm[row_idx_from_placement_matrix][0]
+#         pssm_column = self.row_to_pssm[row_idx_from_placement_matrix][1]
+#         pssm_object = self.recognizers[pssm_index]
+#         score = pssm_object.pssm[pssm_column][nucleotide]
+#         return score
     
-    def get_diag_score(self, pointers_mat, row_idx, col_idx, dna_sequence):
-        """Evaluates and returns a substitution score (diagonal move), using
-		   get_score_from_pssm and taking into account several special cases.
-		   row_idx and col_idx identify the "destination" cell [the cell being
-		   evaluated]
-		"""
+#     def get_diag_score(self, pointers_mat, row_idx, col_idx, dna_sequence):
+#         """Evaluates and returns a substitution score (diagonal move), using
+# 		   get_score_from_pssm and taking into account several special cases.
+# 		   row_idx and col_idx identify the "destination" cell [the cell being
+# 		   evaluated]
+# 		"""
     
-        diag_score = 0
+#         diag_score = 0
         
-        # Check if it is a gap of zero bp
-		# This means two PSSMs back to back, which then must incorporate a zero
-		# gap score
-        if self.is_a_0_bp_gap(pointers_mat, row_idx, col_idx):
-            # Call connector, for a zero bp gap evaluation, add it to the
-			# diagonal score [connector needs to the length of the DNA seq]
-            pssm_idx = self.row_to_pssm[row_idx][0]
-            connector = self.connectors[pssm_idx - 1]
+#         # Check if it is a gap of zero bp
+# 		# This means two PSSMs back to back, which then must incorporate a zero
+# 		# gap score
+#         if self.is_a_0_bp_gap(pointers_mat, row_idx, col_idx):
+#             # Call connector, for a zero bp gap evaluation, add it to the
+# 			# diagonal score [connector needs to the length of the DNA seq]
+#             pssm_idx = self.row_to_pssm[row_idx][0]
+#             connector = self.connectors[pssm_idx - 1]
             
-            # !!! New input param for connector.get_score: the list of the lengths of the recognizers
-            recog_lengths = [recog.length for recog in self.recognizers]
+#             recog_lengths = [recog.length for recog in self.recognizers]
             
-            zero_gap_score = connector.get_score(0, len(dna_sequence), recog_lengths)
-            diag_score += zero_gap_score
+#             zero_gap_score = connector.get_score(0, len(dna_sequence), recog_lengths)
+#             diag_score += zero_gap_score
         
-		# get nucleotide and compute PSSM score for it
-        nucleotide = dna_sequence[col_idx - 1] 
-        pssm_score = self.get_score_from_pssm(row_idx, nucleotide)
-        diag_score += pssm_score
+# 		# get nucleotide and compute PSSM score for it
+#         nucleotide = dna_sequence[col_idx - 1] 
+#         pssm_score = self.get_score_from_pssm(row_idx, nucleotide)
+#         diag_score += pssm_score
         
-        return diag_score
+#         return diag_score
     
-    def is_first(self, row_idx_from_placement_matrix):
-        """Returns True if we are on the first element of a PSSM recognizer
-		"""
-        pssm_col = self.row_to_pssm[row_idx_from_placement_matrix][1]
-        if pssm_col == 0:
-            return True
-        else:
-            return False
+#     def is_first(self, row_idx_from_placement_matrix):
+#         """Returns True if we are on the first element of a PSSM recognizer
+# 		"""
+#         pssm_col = self.row_to_pssm[row_idx_from_placement_matrix][1]
+#         if pssm_col == 0:
+#             return True
+#         else:
+#             return False
     
-    def is_last(self, row_idx_from_placement_matrix): 
-        """Returns true if we are on the last element of a PSSM recognizer
-		"""
-		# if next one is a first, then we are at a last ;-)
-        if self.is_first(row_idx_from_placement_matrix + 1):
-            return True
-        else:
-            return False
+#     def is_last(self, row_idx_from_placement_matrix): 
+#         """Returns true if we are on the last element of a PSSM recognizer
+# 		"""
+# 		# if next one is a first, then we are at a last ;-)
+#         if self.is_first(row_idx_from_placement_matrix + 1):
+#             return True
+#         else:
+#             return False
     
-    def is_a_0_bp_gap(self, pointers_mat, row_idx, col_idx):
-        """Tells whether the cell defines a contiguous diagonal
-		   run between two PSSMs
-		"""
+#     def is_a_0_bp_gap(self, pointers_mat, row_idx, col_idx):
+#         """Tells whether the cell defines a contiguous diagonal
+# 		   run between two PSSMs
+# 		"""
 
-		# if the row does not correspond to the first column of a PSSM
-        if self.is_first(row_idx)==False:
-            return False
+# 		# if the row does not correspond to the first column of a PSSM
+#         if self.is_first(row_idx)==False:
+#             return False
         
-		# if the row IS a first column of a PSSM
-		# get row index of diagonal-up-left cell
-		# this should be the row of the cell pointing to the
-		# end of the previous PSSM
-        pointer_row_idx = pointers_mat[0][row_idx-1, col_idx-1]
+# 		# if the row IS a first column of a PSSM
+# 		# get row index of diagonal-up-left cell
+# 		# this should be the row of the cell pointing to the
+# 		# end of the previous PSSM
+#         pointer_row_idx = pointers_mat[0][row_idx-1, col_idx-1]
         
-		# the equality below, will only be true, if there was
-		# a diagonal move. this, combined with the fact that we know
-		# that this was a PSSM last row, identifies that the diagonal
-		# up-left element comes from a PSSM diagonal score
-		# (so you really have a back-to-back PSSM situation)
-        if pointer_row_idx == row_idx-2:
-            return True
-        else:
-            return False
+# 		# the equality below, will only be true, if there was
+# 		# a diagonal move. this, combined with the fact that we know
+# 		# that this was a PSSM last row, identifies that the diagonal
+# 		# up-left element comes from a PSSM diagonal score
+# 		# (so you really have a back-to-back PSSM situation)
+#         if pointer_row_idx == row_idx-2:
+#             return True
+#         else:
+#             return False
     
     def get_random_connector(self) -> int:
         """Returns the index of a random connector of the organism
@@ -1335,11 +1323,6 @@ class OrganismObject:
                         # then 2 more indices for the current mu and sigma
                         offset = sum([(self.connectors[i].max_seq_length * 2 + 2) for i in range(0, i)]) + 2
                         self.connectors[i].adjust_scores(c_scores[offset:], len(sequence), self.sum_recognizer_lengths)
-                        # XXX printing (for debugging purposes)
-                        # print("rescaling...")
-                        # print(len(c_scores))
-                        
-                        #self.adjust_connector_scores(i, c_scores, len(sequence))
 
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), \
             self.recognizers_flat, self.recognizer_lengths,  c_scores, recognizer_scores, gap_scores, \

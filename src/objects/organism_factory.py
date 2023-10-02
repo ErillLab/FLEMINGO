@@ -587,9 +587,6 @@ class OrganismFactory:
         par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample)
         
         # Representation of the two parents aligned
-        
-        # XXX New approach
-        #parents_repres = self.get_aligned_parents_repr(par1, par2, reference_dna_seq)
         parents_repres = AlignedOrganismsRepresentation(par1, par2, reference_dna_seq)
         # Table storing info about what connectors are available to cover the possible spans
         parents_repres.annotate_available_connectors()
@@ -599,11 +596,6 @@ class OrganismFactory:
         
         # Assemble child 1
         # Write the assembly instructions
-        
-        # XXX New approach
-        # child1.set_assembly_instructions(children_repres.organism1,
-        #                                  children_repres.connectors_table,
-        #                                  par1._id, par2._id)
         child1.set_assembly_instructions(children_repres, 'org1')
         
         # Compile child 1
@@ -613,11 +605,6 @@ class OrganismFactory:
         
         # Assemble child 2
         # Write the assembly instructions
-        
-        # XXX New approach
-        # child2.set_assembly_instructions(children_repres.organism2,
-        #                                  children_repres.connectors_table,
-        #                                  par1._id, par2._id)
         child2.set_assembly_instructions(children_repres, 'org2')
         
         # Compile child 2
@@ -641,269 +628,6 @@ class OrganismFactory:
             p2_placements.append(parent2.get_placement(dna_seq))
         
         return p1_placements, p2_placements
-    
-    # def get_aligned_parents_repr(self, parent1, parent2, dna_seq):
-    #     '''
-    #     Places both the parents on the given DNA sequence, in order to 'align'
-    #     them, one against the other. An abstract representation of the two
-    #     aligned parents is returned as lists of symbols.
-        
-    #     EXAMPLE:
-    #     This scheme
-        
-    #         p1_0    p1_1    -
-    #         -       p2_0    p2_1
-        
-    #     says that recognizer 1 of parent1 ('p1') overlaps with recognizer 0 of
-    #     parent2 ('p2'). Instead, recognizer 0 of parent 1 is unpaired, placing
-    #     to the left of where parent2 is placed. Recognizer 1 of parent2 is also
-    #     unpaired, placing to the right of where parent1 is placed.
-    #     This scheme would be returned as a couple of lists:
-        
-    #         (
-    #             ['p1_0', 'p1_1', '-'],
-    #             ['-', 'p2_0', 'p2_1']
-    #         )
-        
-    #     Returns
-    #     -------
-    #     parents_repres :
-    #         Object of the class AlignedOrganismsRepresentation
-    #     '''
-        
-    #     placement1 = parent1.get_placement(dna_seq)
-    #     placement2 = parent2.get_placement(dna_seq)
-        
-    #     # These dictionaries say which recognizer of an organism is occupying a
-    #     # certain DNA position
-    #     pos_to_recog_dict1 = self.get_pos_to_recog_idx_dict(placement1, 'p1')
-    #     pos_to_recog_dict2 = self.get_pos_to_recog_idx_dict(placement2, 'p2')
-        
-    #     # Initialize the representation object of the aligned parents
-    #     parents_repres = AlignedOrganismsRepresentation(parent1, parent2)
-        
-    #     p1_repres = []
-    #     p2_repres = []
-        
-    #     # All the encountered pairs (each pair is made of one element from parent1,
-    #     # and the other from parent2) are stored in this set
-    #     pairs = set([])
-        
-    #     for i in range(len(dna_seq)):
-    #         p1, p2 = '-', '-'
-            
-    #         if i in pos_to_recog_dict1.keys():
-    #             p1 = pos_to_recog_dict1[i]
-            
-    #         if i in pos_to_recog_dict2.keys():
-    #             p2 = pos_to_recog_dict2[i]
-            
-    #         pair = (p1, p2)
-    #         # ignore DNA regions where there aren't recogs
-    #         if pair != ('-','-'):
-                
-    #             # avoid repeating the match for all the DNA positions where the
-    #             # match occurs
-    #             if pair not in pairs:
-    #                 pairs.add(pair)
-    #                 # Compile parents representations
-    #                 p1_repres.append(p1)
-    #                 p2_repres.append(p2)
-        
-    #     p1_repres, p2_repres = self.remove_protrusions(p1_repres, p2_repres)
-        
-        
-    #     parents_repres.set_organsism1(p1_repres)
-    #     parents_repres.set_organsism2(p2_repres)
-        
-    #     # Define units
-    #     parents_repres.define_independent_units()
-        
-        
-    #     # =====================================================================
-    #     # XXX Code here to annotate connector adjustments ...
-    #     # IT WILL BECOME A METHOD OF THE AlignedOrganismsRepresentation CLASS
-    #     # =====================================================================
-        
-    #     # XXX
-    #     # print("- - - - - - - - -")
-        
-    #     # Initialize connector adjustments dictionaries
-    #     org1_n_connectors = parent1.count_connectors()
-    #     org2_n_connectors = parent2.count_connectors()
-    #     org1_conn_adj_dict = {i : [0,0] for i in range(org1_n_connectors)}
-    #     org2_conn_adj_dict = {i : [0,0] for i in range(org2_n_connectors)}
-        
-    #     # Compile connector adjustments dictionaries
-    #     for unit_start, unit_stop in parents_repres.units:
-    #         # Ignore if it's not an overlap between recognizers
-    #         if (parents_repres.organism1[unit_start:unit_stop] == ["-"] or
-    #             parents_repres.organism2[unit_start:unit_stop] == ["-"]):
-    #             continue
-            
-    #         else:
-    #             # LEFT connectors
-    #             # ---------------
-    #             p1recog_name = parents_repres.organism1[unit_start]
-    #             p2recog_name = parents_repres.organism2[unit_start]
-    #             # XXX
-    #             # print(p1recog_name, 'with', p2recog_name)
-    #             # print(parents_repres.organism1)
-    #             # print(parents_repres.organism2)
-    #             # placement1.print_placement(stdout=True)
-    #             # placement2.print_placement(stdout=True)
-                
-    #             p1recog_idx = int(p1recog_name.split('_')[1])
-    #             p2recog_idx = int(p2recog_name.split('_')[1])
-    #             # The indexes shouldn't be both 0 (there wouldn't be LEFT connectors)
-    #             if p1recog_idx == 0 and p2recog_idx == 0:
-    #                 pass
-    #             else:
-    #                 p1recog_start = placement1.recognizers_positions[p1recog_idx][0]
-    #                 p2recog_start = placement2.recognizers_positions[p2recog_idx][0]
-                    
-    #                 # Store the right-bound adjustment for the connectors to the LEFT
-    #                 displacement = p1recog_start - p2recog_start
-                    
-    #                 p1conn_idx = p1recog_idx - 1
-    #                 if p1conn_idx >= 0:
-    #                     org1_conn_adj_dict[p1conn_idx][1] -= displacement
-                    
-    #                 p2conn_idx = p2recog_idx - 1
-    #                 if p2conn_idx >= 0:
-    #                     org2_conn_adj_dict[p2conn_idx][1] += displacement
-                
-    #             # RIGHT connectors
-    #             # ----------------
-    #             p1recog_name = parents_repres.organism1[unit_stop - 1]
-    #             p2recog_name = parents_repres.organism2[unit_stop - 1]
-    #             p1recog_idx = int(p1recog_name.split('_')[1])
-    #             p2recog_idx = int(p2recog_name.split('_')[1])
-    #             # The indexes shouldn't be both the last (there wouldn't be RIGHT connectors)
-    #             if p1recog_idx == org1_n_connectors and p2recog_idx == org2_n_connectors:
-    #                 pass
-    #             else:
-    #                 p1recog_stop = placement1.recognizers_positions[p1recog_idx][1]
-    #                 p2recog_stop = placement2.recognizers_positions[p2recog_idx][1]
-                    
-    #                 # Store the left-bound adjustment for the connectors to the RIGHT
-    #                 displacement = p1recog_stop - p2recog_stop
-                    
-    #                 p1conn_idx = p1recog_idx
-    #                 if p1conn_idx < org1_n_connectors:
-    #                     org1_conn_adj_dict[p1conn_idx][0] -= displacement
-                    
-    #                 p2conn_idx = p2recog_idx
-    #                 if p2conn_idx < org2_n_connectors:
-    #                     org2_conn_adj_dict[p2conn_idx][0] += displacement
-        
-    #     # XXX
-    #     # print(org1_conn_adj_dict, "\n", org2_conn_adj_dict, "\n- - - - - - - - -\n")
-        
-    #     # Set attributes
-    #     parents_repres.org1_connectors_adjustments = org1_conn_adj_dict
-    #     parents_repres.org2_connectors_adjustments = org2_conn_adj_dict
-        
-    #     return parents_repres
-    
-    
-    
-    
-    
-    # def remove_protrusions(self, p1_repres, p2_repres):
-    #     '''
-    #     XXX ...
-        
-    #     A 1-bp overlap between recognizers is enough for them to get 'paired'.
-    #     This means that the overlap can be imperfect, with flanking parts of
-    #     the recognizers being unpaired. Those will be ignored.
-        
-    #     EXAMPLE:
-    #     If two recognizers are placed on DNA in this way
-    #         -----AAAA-------
-    #         -------BBBB-----
-    #     the desired representation is
-    #         A
-    #         B
-    #     and not
-    #         AA-
-    #         -BB
-    #     Therefore, the two positions to the left and to the right of the
-    #     A-B match will be called 'protrusions', and they will be removed
-    #     '''
-    #     matches_p1 = set([])  # recogs of parent1 that overlap with a recog
-    #     matches_p2 = set([])  # recogs of parent2 that overlap with a recog
-        
-    #     for i in range(len(p1_repres)):
-    #         p1_node, p2_node = p1_repres[i], p2_repres[i]
-    #         if p1_node != '-' and p2_node != '-':
-    #             matches_p1.add(p1_node)
-    #             matches_p2.add(p2_node)
-        
-    #     # If recognizer X is in matches_p1 or matches_p2 (menaing that it
-    #     # overlaps at least once with another recognizer) all the other
-    #     # eventual pairings of X with "-" are protrusions.
-        
-    #     # Here we store the indexes of the positions where there's a 'protrusion'
-    #     protrusions = []        
-        
-    #     for i in range(len(p1_repres)):
-    #         if p1_repres[i] in matches_p1:
-    #             if p2_repres[i] == '-':
-    #                 protrusions.append(i)
-        
-    #     for i in range(len(p2_repres)):
-    #         if p2_repres[i] in matches_p2:
-    #             if p1_repres[i] == '-':
-    #                 protrusions.append(i)
-        
-    #     # Skip the protrusions and return the desired representations
-    #     p1_repres = [p1_repres[i] for i in range(len(p1_repres)) if i not in protrusions]
-    #     p2_repres = [p2_repres[i] for i in range(len(p2_repres)) if i not in protrusions]
-        
-    #     return p1_repres, p2_repres
-    
-    
-    
-    
-    
-    # def get_pos_to_recog_idx_dict(self, placement, org_tag):
-    #     '''
-    #     For the given `placement`, each DNA position covered by some recognizer
-    #     is mapped to a string that says what recognizer is placed there. The
-    #     string will contain a tag for the organism (`org_tag` argument), joint
-    #     with the recog index by an underscore.
-        
-    #     EXAMPLE:
-    #     This dictionary
-    #         {112: 'p1_0', 113: 'p1_0', 114: 'p1_0', 115: 'p1_0'}
-    #     will be used to know that (for example) position 114 is covered by
-    #     recognizer 0. In this case, 'p1' was the org_tag value specified as
-    #     input, used to identify an organism.
-        
-    #     Parameters
-    #     ----------
-    #     placement : PlacementObject
-    #     org_tag : string
-
-    #     Returns
-    #     -------
-    #     pos_to_recog_dict : dictionary
-    #     '''
-    #     recog_positions = placement.recognizers_positions
-        
-    #     pos_to_recog_dict = {}
-        
-    #     # for each recognizer
-    #     for i in range(len(recog_positions)):
-    #         # start and stop DNA positions of recognizer i
-    #         start, stop = recog_positions[i]
-            
-    #         # DNA positions occupied by this recognizer
-    #         for pos in range(start, stop):
-    #             pos_to_recog_dict[pos] = org_tag + '_' + str(i)  # i is the recog idx
-        
-    #     return pos_to_recog_dict
     
     def get_aligned_children_repr(self, parents_repres, child1_id, child2_id):
         '''
@@ -956,11 +680,7 @@ class OrganismFactory:
         # Read assembly instructions
         recogs_names = child_obj.assembly_instructions['recognizers']
         connectors_names = child_obj.assembly_instructions['connectors']
-        print("LENGTHS:", len(recogs_names), len(connectors_names))
         conn_adj_vals = child_obj.assembly_instructions['connectors_adjustments']
-        
-        print("recogs_names:", recogs_names)
-        print("connectors_names:", connectors_names)
         
         for i in range(len(connectors_names)):
             connector_name = connectors_names[i]
@@ -1013,7 +733,6 @@ class OrganismFactory:
                 # Apply LEFT adjustment if necessary
                 if l_rec_name.split("_")[0] != parent:
                     left_adj, right_adj = conn_adj_vals[parent][conn_idx]
-                    print("L adjustments:", left_adj, ",", right_adj)
                     conn._mu += left_adj
                     conn.apply_mu_bounds()  # Avoide negative mu or too large mu
                     if left_adj != 0:
@@ -1021,7 +740,6 @@ class OrganismFactory:
                 # Apply RIGHT adjustment if necessary
                 if r_rec_name.split("_")[0] != parent:
                     left_adj, right_adj = conn_adj_vals[parent][conn_idx]
-                    print("R adjustments:", left_adj, ",", right_adj)
                     conn._mu += right_adj
                     conn.apply_mu_bounds()  # Avoide negative mu or too large mu
                     if right_adj != 0:
@@ -1153,33 +871,6 @@ class OrganismFactory:
         
         return (first_bp, last_bp)
     
-    # def clone_parents(self, par1, par2):
-    #     '''
-    #     This function generates two children that are identical (in terms of
-    #     nodes) to the provided parents.
-    #     '''
-    #     child1 = copy.deepcopy(par1)
-    #     child2 = copy.deepcopy(par2)
-    #     # Assign IDs to organisms and increase factory counter
-    #     child1.set_id(self.get_id())
-    #     child2.set_id(self.get_id())
-    #     # Set assembly_instructions
-    #     ''' The children are clones of the parents, therefore the
-    #     assembly_instructions will report that all the nodes for child1 are
-    #     from parent1 and all child2 is from parent2. '''
-    #     # child1 assembly_instructions
-    #     recogs_tags = ['p1_' + str(i) for i in range(child1.count_recognizers())]
-    #     connectors_tags = recogs_tags[1:]
-    #     child1.assembly_instructions['recognizers'] = recogs_tags
-    #     child1.assembly_instructions['connectors'] = connectors_tags
-    #     # child2 assembly_instructions
-    #     recogs_tags = ['p2_' + str(i) for i in range(child2.count_recognizers())]
-    #     connectors_tags = recogs_tags[1:]
-    #     child2.assembly_instructions['recognizers'] = recogs_tags
-    #     child2.assembly_instructions['connectors'] = connectors_tags
-    #     return child1, child2
-    
-    
     # =========================================================================
     # XXX  Code for MLE
     # =========================================================================
@@ -1199,12 +890,6 @@ class OrganismFactory:
         clone.assembly_instructions['p2'] = None
         clone.assembly_instructions['recognizers'] = "cloned from " + organism._id
         clone.assembly_instructions['connectors'] = "cloned from " + organism._id
-        
-        # recogs_tags = ['p1_' + str(i) for i in range(clone.count_recognizers())]
-        # connectors_tags = recogs_tags[1:]
-        # clone.assembly_instructions['recognizers'] = recogs_tags
-        # clone.assembly_instructions['connectors'] = connectors_tags
-        
         return clone
     
     def mle_connector(self, conn_idx, placements):
@@ -1577,12 +1262,6 @@ class OrganismFactory:
         org.connectors = mle_connectors
         org.flatten()
         return org
-
-
-
-
-
-
 
 
 

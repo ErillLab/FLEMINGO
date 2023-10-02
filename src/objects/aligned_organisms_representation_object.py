@@ -169,10 +169,6 @@ class AlignedOrganismsRepresentation:
             XXX ...
         '''
         
-        
-        # XXX
-        # print("- - - - - - - - -")
-        
         # Initialize connector adjustments dictionaries
         org1_n_connectors = len(placement1.connectors_scores)
         org2_n_connectors = len(placement2.connectors_scores)
@@ -191,13 +187,6 @@ class AlignedOrganismsRepresentation:
                 # ---------------
                 p1recog_name = self.organism1[unit_start]
                 p2recog_name = self.organism2[unit_start]
-                # XXX
-                # print(p1recog_name, 'with', p2recog_name)
-                # print(self.organism1)
-                # print(self.organism2)
-                # placement1.print_placement(stdout=True)
-                # placement2.print_placement(stdout=True)
-                
                 p1recog_idx = int(p1recog_name.split('_')[1])
                 p2recog_idx = int(p2recog_name.split('_')[1])
                 # The indexes shouldn't be both 0 (there wouldn't be LEFT connectors)
@@ -241,9 +230,6 @@ class AlignedOrganismsRepresentation:
                     p2conn_idx = p2recog_idx
                     if p2conn_idx < org2_n_connectors:
                         org2_conn_adj_dict[p2conn_idx][0] -= displacement
-        
-        # XXX
-        # print(org1_conn_adj_dict, "\n", org2_conn_adj_dict, "\n- - - - - - - - -\n")
         
         # Set connector adjustments attributes
         self.org1_connectors_adjustments = org1_conn_adj_dict
@@ -371,7 +357,7 @@ class AlignedOrganismsRepresentation:
         index i to index j.
         '''
         
-        # XXX Code here to catch case when organisms were not set yet
+        # !!! Add code here to catch case when organisms were not set yet
         n = len(self.organism1)
         
         # 2D list where each item is an emtpy list
@@ -429,7 +415,7 @@ class AlignedOrganismsRepresentation:
         
         '''
         
-        # XXX Code here to catch case when organisms were not set yet
+        # !!! Add code here to catch case when organisms were not set yet
         org1_repr = self.organism1
         org2_repr = self.organism2
         
@@ -459,6 +445,7 @@ class AlignedOrganismsRepresentation:
         # Make a list of units. Each unit is a tuple: (start, stop)
         units = list(zip(unit_starts, unit_stops))
         self.units = units
+
 
 
 
