@@ -72,9 +72,11 @@ class OrganismObject:
         # Dictionary storing information about how the organism has to be
         # assembled by the recombination process. All the values are
         # initialized as None.
+        # The "p1" and "p2" keys map to the ID number of parent 1 and parent 2.
         # The "recognizers" key maps to the list of required recognizers, from
-        # left to right. Same thing for the "connectors" key. The "p1" and "p2"
-        # keys map to the ID number of parent 1 and parent 2, respectively.
+        # left to right. Same for the "connectors" key. The "connectors_adjustments"
+        # key stores the values that will be used to adjust connectors' mu values
+        # when swapping overlaying recognizers that overlap with some offset.
         self.assembly_instructions = {'p1': None,  # ID number of the first parent
                                       'p2': None,  # ID number of the second parent
                                       'recognizers': None,
@@ -95,7 +97,9 @@ class OrganismObject:
     
     def set_assembly_instructions(self, aligned_repres, organism_tag):
         '''
-        !!! Docstring here ...
+        Sets the self.assembly_instructions attribute. It is a dictionary with
+        5 keys:
+            "p1", "p2", "recognizers", "connectors", "connectors_adjustments"
         '''
         # Parent IDs
         self.assembly_instructions['p1'] = aligned_repres.parents_ids[0]
@@ -116,7 +120,7 @@ class OrganismObject:
     def set_recogs_assembly_instructions(self, child_repres):
         '''
         Compiles the list of recognizers in the self.assembly_instructions
-        attribute.
+        attribute (it sets the "recognizers" key of the dictionary).
         '''
         child_recog_names = [item for item in child_repres if item != '-']
         recogs_list = []
@@ -128,7 +132,7 @@ class OrganismObject:
     def set_connectors_assembly_instructions(self, child_repres, connectors_table):
         '''
         Compiles the list of connectors in the self.assembly_instructions
-        attribute.
+        attribute (it sets the "connectors" key of the dictionary).
         '''
         required_connectors = self.annotate_required_connectors(child_repres)
         connectors_list = []
@@ -153,11 +157,12 @@ class OrganismObject:
     
     def set_connectors_adjustments(self, aligned_repres):
         '''
-        !!! Docstring here ...
+        Compiles the list of connector-adjustments in the self.assembly_instructions
+        attribute (it sets the "connectors_adjustments" key of the dictionary)
         '''
         self.assembly_instructions['connectors_adjustments'] = {
-            'p1_connectors': aligned_repres.org1_connectors_adjustments,
-            'p2_connectors': aligned_repres.org2_connectors_adjustments}
+            'p1': aligned_repres.org1_connectors_adjustments,
+            'p2': aligned_repres.org2_connectors_adjustments}
     
     def get_parent1_parent2_ratio(self):
         '''

@@ -587,9 +587,9 @@ class OrganismFactory:
         par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample)
         
         # Representation of the two parents aligned
-        #parents_repres = self.get_aligned_parents_repr(par1, par2, reference_dna_seq)
         
         # XXX New approach
+        #parents_repres = self.get_aligned_parents_repr(par1, par2, reference_dna_seq)
         parents_repres = AlignedOrganismsRepresentation(par1, par2, reference_dna_seq)
         # Table storing info about what connectors are available to cover the possible spans
         parents_repres.annotate_available_connectors()
@@ -935,9 +935,9 @@ class OrganismFactory:
             parent, recog_idx = recog_name.split('_')
             
             if parent == 'p1':
-                recog = parent1.recognizers[int(recog_idx)]
+                recog = copy.deepcopy(parent1.recognizers[int(recog_idx)])
             elif parent == 'p2':
-                recog = parent2.recognizers[int(recog_idx)]
+                recog = copy.deepcopy(parent2.recognizers[int(recog_idx)])
             
             # Add recognizer to organism
             child_obj.append_recognizer(recog)
@@ -953,13 +953,21 @@ class OrganismFactory:
         assembly_instructions requires to synthesize a new connector. This is
         done by calling the make_synthetic_connector method.
         '''
-        for connector_name in child_obj.assembly_instructions['connectors']:
+        # Read assembly instructions
+        recogs_names = child_obj.assembly_instructions['recognizers']
+        connectors_names = child_obj.assembly_instructions['connectors']
+        print("LENGTHS:", len(recogs_names), len(connectors_names))
+        conn_adj_vals = child_obj.assembly_instructions['connectors_adjustments']
+        
+        print("recogs_names:", recogs_names)
+        print("connectors_names:", connectors_names)
+        
+        for i in range(len(connectors_names)):
+            connector_name = connectors_names[i]
             
             # "synth" means that the connector needs to be synthesized, because
             # it was not available in any of the two parents
-            if connector_name[:5] == 'synth':
-                # temporarily commented out code for synthetic connectors
-                
+            if connector_name[:5] == 'synth':                
                 left_idx, right_idx = connector_name.split('_')[1:]
                 
                 # mu and sigma will be estimated for the gap between a left and a
@@ -986,14 +994,33 @@ class OrganismFactory:
             
             # Else, the connector can be grabbed from one of the parents
             else:
-                parent, connector_idx = connector_name.split('_')
+                parent, conn_idx = connector_name.split('_')
+                conn_idx = int(conn_idx)
                 
                 if parent == 'p1':
                     # Re-use connector from parent 1
-                    conn = par1.connectors[int(connector_idx)]
+                    conn = copy.deepcopy(par1.connectors[conn_idx])
                 elif parent == 'p2':
                     # Re-use connector from parent 2
-                    conn = par2.connectors[int(connector_idx)]
+                    conn = copy.deepcopy(par2.connectors[conn_idx])
+                
+                # !!! Work in progress ...
+                
+                # Left and Right recognizers
+                l_rec_name = recogs_names[i]
+                r_rec_name = recogs_names[i + 1]
+                
+                # Apply LEFT adjustment if necessary
+                if l_rec_name.split("_")[0] != parent:
+                    left_adj, right_adj = conn_adj_vals[parent][conn_idx]
+                    print("L adjustments:", left_adj, ",", right_adj)
+                    conn._mu += left_adj
+                # Apply RIGHT adjustment if necessary
+                if r_rec_name.split("_")[0] != parent:
+                    left_adj, right_adj = conn_adj_vals[parent][conn_idx]
+                    print("R adjustments:", left_adj, ",", right_adj)
+                    conn._mu += right_adj
+                
             
             # Add connector to organism
             child_obj.append_connector(conn)
