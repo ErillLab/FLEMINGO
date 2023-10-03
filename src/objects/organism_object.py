@@ -72,43 +72,59 @@ class OrganismObject:
         # Dictionary storing information about how the organism has to be
         # assembled by the recombination process. All the values are
         # initialized as None.
+        # The "p1" and "p2" keys map to the ID number of parent 1 and parent 2.
         # The "recognizers" key maps to the list of required recognizers, from
-        # left to right. Same thing for the "connectors" key. The "p1" and "p2"
-        # keys map to the ID number of parent 1 and parent 2, respectively.
+        # left to right. Same for the "connectors" key. The "connectors_adjustments"
+        # key stores the values that will be used to adjust connectors' mu values
+        # when swapping overlaying recognizers that overlap with some offset.
         self.assembly_instructions = {'p1': None,  # ID number of the first parent
                                       'p2': None,  # ID number of the second parent
                                       'recognizers': None,
-                                      'connectors': None}
+                                      'connectors': None,
+                                      'connectors_adjustments': None}
         
         self.fitness = None
     
-    def set_assembly_instructions(self, aligned_repres, connectors_table, p1_id, p2_id):
+    def set_assembly_instructions(self, aligned_repres, organism_tag):
         '''
-        Sets the self.assembly_instructions attribute.
+        Sets the self.assembly_instructions attribute. It is a dictionary with
+        5 keys:
+            "p1", "p2", "recognizers", "connectors", "connectors_adjustments"
         '''
-        self.assembly_instructions['p1'] = p1_id
-        self.assembly_instructions['p2'] = p2_id
-        self.set_recogs_assembly_instructions(aligned_repres)
-        self.set_connectors_assembly_instructions(aligned_repres, connectors_table)
+        # Parent IDs
+        self.assembly_instructions['p1'] = aligned_repres.parents_ids[0]
+        self.assembly_instructions['p2'] = aligned_repres.parents_ids[1]
+        
+        # Child representation
+        if organism_tag == 'org1':
+            child_repres = aligned_repres.organism1
+        elif organism_tag == 'org2':
+            child_repres = aligned_repres.organism2
+        else:
+            raise ValueError("Unknown organism_tag. It should be 'org1' or 'org2'.")
+        
+        self.set_recogs_assembly_instructions(child_repres)
+        self.set_connectors_assembly_instructions(child_repres, aligned_repres.connectors_table)
+        self.set_connectors_adjustments(aligned_repres)
     
-    def set_recogs_assembly_instructions(self, aligned_repres):
+    def set_recogs_assembly_instructions(self, child_repres):
         '''
         Compiles the list of recognizers in the self.assembly_instructions
-        attribute.
+        attribute (it sets the "recognizers" key of the dictionary).
         '''
-        child_recog_names = [item for item in aligned_repres if item != '-']
+        child_recog_names = [item for item in child_repres if item != '-']
         recogs_list = []
         for item in child_recog_names:
             if item not in recogs_list:
                 recogs_list.append(item)
         self.assembly_instructions['recognizers'] = recogs_list
     
-    def set_connectors_assembly_instructions(self, aligned_repres, connectors_table):
+    def set_connectors_assembly_instructions(self, child_repres, connectors_table):
         '''
         Compiles the list of connectors in the self.assembly_instructions
-        attribute.
+        attribute (it sets the "connectors" key of the dictionary).
         '''
-        required_connectors = self.annotate_required_connectors(aligned_repres)
+        required_connectors = self.annotate_required_connectors(child_repres)
         connectors_list = []
         for (left, right) in required_connectors:
             # What suitable connectors are available to cover that span
@@ -128,6 +144,15 @@ class OrganismObject:
             
             connectors_list.append(connector_name)
         self.assembly_instructions['connectors'] = connectors_list
+    
+    def set_connectors_adjustments(self, aligned_repres):
+        '''
+        Compiles the list of connector-adjustments in the self.assembly_instructions
+        attribute (it sets the "connectors_adjustments" key of the dictionary)
+        '''
+        self.assembly_instructions['connectors_adjustments'] = {
+            'p1': aligned_repres.org1_connectors_adjustments,
+            'p2': aligned_repres.org2_connectors_adjustments}
     
     def get_parent1_parent2_ratio(self):
         '''
@@ -223,19 +248,20 @@ class OrganismObject:
         return required_connectors
     
     def set_row_to_pssm(self):
-        """row_to_pssm is an attribute that maps each row of the alignment
-           matrix to the index (within org) of the pssm recognizer, and the
-           column of the pssm that applies to that row.
-           In the alignment matrix, the rows correspond all consecutively to 
-           pssm positions (i.e. columns).
-           This attribute allows to go from row directly to a pair of indices
-           denoting the pssm number and the position within the pssm that maps
-           to it.
-           
-           Call by factory upon generation of organism, and also after any
-           mutations that might change the size of the pssm, or the column order,
-           or their number.
-        """
+        '''
+        The `row_to_pssm` attribute maps each row of the alignment
+        matrix to the index (within org) of the pssm recognizer, and the
+        column of the pssm that applies to that row.
+        In the alignment matrix, the rows correspond all consecutively to 
+        pssm positions (i.e. columns).
+        This attribute allows to go from row directly to a pair of indices
+        denoting the pssm number and the position within the pssm that maps
+        to it.
+        
+        Call by factory upon generation of organism, and also after any
+        mutations that might change the size of the pssm, or the column order,
+        or their number.
+        '''
         
         pssm_list = self.recognizers
         
@@ -962,100 +988,98 @@ class OrganismObject:
             sum_lengths += pssm.length
         return sum_lengths
     
-    def get_gap_score(self, connector_idx, d, s_dna_len):
-        """Calls the appropriate connector, with the given distance and length of the DNA sequence to
-		   obtain the energy of the connector.
-		"""
-        if d < s_dna_len:
-            # !!! New input param for connector.get_score: the list of the lengths of the recognizers
-            recog_lengths = [recog.length for recog in self.recognizers]
-            gap_score = self.connectors[connector_idx].get_score(d, s_dna_len, recog_lengths)
-            return gap_score
-        else:
-            return -1 * np.inf
+#     def get_gap_score(self, connector_idx, d, s_dna_len):
+#         """Calls the appropriate connector, with the given distance and length of the DNA sequence to
+# 		   obtain the energy of the connector.
+# 		"""
+#         if d < s_dna_len:
+#             recog_lengths = [recog.length for recog in self.recognizers]
+#             gap_score = self.connectors[connector_idx].get_score(d, s_dna_len, recog_lengths)
+#             return gap_score
+#         else:
+#             return -1 * np.inf
     
-    def get_score_from_pssm(self, row_idx_from_placement_matrix, nucleotide):
-        """Calls the appropriate PSSM (and column) to obtain the score, given a nucleotide
-		"""
-        pssm_index = self.row_to_pssm[row_idx_from_placement_matrix][0]
-        pssm_column = self.row_to_pssm[row_idx_from_placement_matrix][1]
-        pssm_object = self.recognizers[pssm_index]
-        score = pssm_object.pssm[pssm_column][nucleotide]
-        return score
+#     def get_score_from_pssm(self, row_idx_from_placement_matrix, nucleotide):
+#         """Calls the appropriate PSSM (and column) to obtain the score, given a nucleotide
+# 		"""
+#         pssm_index = self.row_to_pssm[row_idx_from_placement_matrix][0]
+#         pssm_column = self.row_to_pssm[row_idx_from_placement_matrix][1]
+#         pssm_object = self.recognizers[pssm_index]
+#         score = pssm_object.pssm[pssm_column][nucleotide]
+#         return score
     
-    def get_diag_score(self, pointers_mat, row_idx, col_idx, dna_sequence):
-        """Evaluates and returns a substitution score (diagonal move), using
-		   get_score_from_pssm and taking into account several special cases.
-		   row_idx and col_idx identify the "destination" cell [the cell being
-		   evaluated]
-		"""
+#     def get_diag_score(self, pointers_mat, row_idx, col_idx, dna_sequence):
+#         """Evaluates and returns a substitution score (diagonal move), using
+# 		   get_score_from_pssm and taking into account several special cases.
+# 		   row_idx and col_idx identify the "destination" cell [the cell being
+# 		   evaluated]
+# 		"""
     
-        diag_score = 0
+#         diag_score = 0
         
-        # Check if it is a gap of zero bp
-		# This means two PSSMs back to back, which then must incorporate a zero
-		# gap score
-        if self.is_a_0_bp_gap(pointers_mat, row_idx, col_idx):
-            # Call connector, for a zero bp gap evaluation, add it to the
-			# diagonal score [connector needs to the length of the DNA seq]
-            pssm_idx = self.row_to_pssm[row_idx][0]
-            connector = self.connectors[pssm_idx - 1]
+#         # Check if it is a gap of zero bp
+# 		# This means two PSSMs back to back, which then must incorporate a zero
+# 		# gap score
+#         if self.is_a_0_bp_gap(pointers_mat, row_idx, col_idx):
+#             # Call connector, for a zero bp gap evaluation, add it to the
+# 			# diagonal score [connector needs to the length of the DNA seq]
+#             pssm_idx = self.row_to_pssm[row_idx][0]
+#             connector = self.connectors[pssm_idx - 1]
             
-            # !!! New input param for connector.get_score: the list of the lengths of the recognizers
-            recog_lengths = [recog.length for recog in self.recognizers]
+#             recog_lengths = [recog.length for recog in self.recognizers]
             
-            zero_gap_score = connector.get_score(0, len(dna_sequence), recog_lengths)
-            diag_score += zero_gap_score
+#             zero_gap_score = connector.get_score(0, len(dna_sequence), recog_lengths)
+#             diag_score += zero_gap_score
         
-		# get nucleotide and compute PSSM score for it
-        nucleotide = dna_sequence[col_idx - 1] 
-        pssm_score = self.get_score_from_pssm(row_idx, nucleotide)
-        diag_score += pssm_score
+# 		# get nucleotide and compute PSSM score for it
+#         nucleotide = dna_sequence[col_idx - 1] 
+#         pssm_score = self.get_score_from_pssm(row_idx, nucleotide)
+#         diag_score += pssm_score
         
-        return diag_score
+#         return diag_score
     
-    def is_first(self, row_idx_from_placement_matrix):
-        """Returns True if we are on the first element of a PSSM recognizer
-		"""
-        pssm_col = self.row_to_pssm[row_idx_from_placement_matrix][1]
-        if pssm_col == 0:
-            return True
-        else:
-            return False
+#     def is_first(self, row_idx_from_placement_matrix):
+#         """Returns True if we are on the first element of a PSSM recognizer
+# 		"""
+#         pssm_col = self.row_to_pssm[row_idx_from_placement_matrix][1]
+#         if pssm_col == 0:
+#             return True
+#         else:
+#             return False
     
-    def is_last(self, row_idx_from_placement_matrix): 
-        """Returns true if we are on the last element of a PSSM recognizer
-		"""
-		# if next one is a first, then we are at a last ;-)
-        if self.is_first(row_idx_from_placement_matrix + 1):
-            return True
-        else:
-            return False
+#     def is_last(self, row_idx_from_placement_matrix): 
+#         """Returns true if we are on the last element of a PSSM recognizer
+# 		"""
+# 		# if next one is a first, then we are at a last ;-)
+#         if self.is_first(row_idx_from_placement_matrix + 1):
+#             return True
+#         else:
+#             return False
     
-    def is_a_0_bp_gap(self, pointers_mat, row_idx, col_idx):
-        """Tells whether the cell defines a contiguous diagonal
-		   run between two PSSMs
-		"""
+#     def is_a_0_bp_gap(self, pointers_mat, row_idx, col_idx):
+#         """Tells whether the cell defines a contiguous diagonal
+# 		   run between two PSSMs
+# 		"""
 
-		# if the row does not correspond to the first column of a PSSM
-        if self.is_first(row_idx)==False:
-            return False
+# 		# if the row does not correspond to the first column of a PSSM
+#         if self.is_first(row_idx)==False:
+#             return False
         
-		# if the row IS a first column of a PSSM
-		# get row index of diagonal-up-left cell
-		# this should be the row of the cell pointing to the
-		# end of the previous PSSM
-        pointer_row_idx = pointers_mat[0][row_idx-1, col_idx-1]
+# 		# if the row IS a first column of a PSSM
+# 		# get row index of diagonal-up-left cell
+# 		# this should be the row of the cell pointing to the
+# 		# end of the previous PSSM
+#         pointer_row_idx = pointers_mat[0][row_idx-1, col_idx-1]
         
-		# the equality below, will only be true, if there was
-		# a diagonal move. this, combined with the fact that we know
-		# that this was a PSSM last row, identifies that the diagonal
-		# up-left element comes from a PSSM diagonal score
-		# (so you really have a back-to-back PSSM situation)
-        if pointer_row_idx == row_idx-2:
-            return True
-        else:
-            return False
+# 		# the equality below, will only be true, if there was
+# 		# a diagonal move. this, combined with the fact that we know
+# 		# that this was a PSSM last row, identifies that the diagonal
+# 		# up-left element comes from a PSSM diagonal score
+# 		# (so you really have a back-to-back PSSM situation)
+#         if pointer_row_idx == row_idx-2:
+#             return True
+#         else:
+#             return False
     
     def get_random_connector(self) -> int:
         """Returns the index of a random connector of the organism
@@ -1299,9 +1323,6 @@ class OrganismObject:
                         # then 2 more indices for the current mu and sigma
                         offset = sum([(self.connectors[i].max_seq_length * 2 + 2) for i in range(0, i)]) + 2
                         self.connectors[i].adjust_scores(c_scores[offset:], len(sequence), self.sum_recognizer_lengths)
-                        print("rescaling...")
-                        print(len(c_scores))
-                        #self.adjust_connector_scores(i, c_scores, len(sequence))
 
         _multiplacement.calculate(bytes(sequence, "ASCII"), bytes(self.recognizer_types, "ASCII"), \
             self.recognizers_flat, self.recognizer_lengths,  c_scores, recognizer_scores, gap_scores, \

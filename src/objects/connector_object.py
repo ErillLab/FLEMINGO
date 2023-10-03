@@ -136,11 +136,13 @@ class ConnectorObject():
         '''
         Chooses a random value for mu during Connector object initialization.
         
-        # The value is chosen uniformly from the range [0, max_seq_length-2]. Under no
-        # circumnstance is a larger mu ever required to model the target signal,
-        # since max_seq_length is the length of the longest sequence in the
-        # datasets, and the largest gap observable on that sequence is
-        # max_seq_length-2.
+        !!! Update docstring
+        
+            # The value is chosen uniformly from the range [0, max_seq_length-2]. Under no
+            # circumnstance is a larger mu ever required to model the target signal,
+            # since max_seq_length is the length of the longest sequence in the
+            # datasets, and the largest gap observable on that sequence is
+            # max_seq_length-2.
         
         This function is called by the __init__ function.
         '''
@@ -408,7 +410,6 @@ class ConnectorObject():
         """Prints the connector mu and sigma values
         """
         print(" m: {} s: {}".format(self._mu, self._sigma))
-        # XXX Remove when done with debugging
         if debug:
             print(" adjust_score_threshold: {}".format(self.adjust_score_threshold))
 
@@ -429,7 +430,27 @@ class ConnectorObject():
     
     def is_shape(self) -> bool:
         return False
-
+    
+    def apply_mu_bounds(self):
+        '''
+        The minimum value for mu is 0. The maximum value corresponds to the
+        largest gap ever observable, which is max_seq_length - 2.
+        `max_seq_length` is the length of the longest sequence in the datasets.
+        We subtract 2 because that's the gap between two 1-bp recognizers placed
+        on the first and on the last bases of the sequence.
+        This function forces mu to be within those bounds.
+        '''
+        changed = False
+        if self._mu < 0:
+            self.set_mu(0)
+            changed = True
+        elif self._mu > self.max_seq_length - 2:
+            self.set_mu(self.max_seq_length - 2)
+            changed = True
+        # If mu was adjusted, recompute the scores of PDF and CDF values
+        if changed:
+            self.set_precomputed_pdfs_cdfs()
+    
     def adjust_scores(self, c_scores, sequence_length, sum_recognizer_lengths):
                 
         sigma = min(self._sigma, 1E-100)
