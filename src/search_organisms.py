@@ -170,9 +170,6 @@ def main():
                     parent1.fitness = None
                     parent2.fitness = None
             
-            pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
-            ref_seq = pos_set_sample[0]
-            
             # =======================
             # MLE-based memetic drive
             # =======================
@@ -195,18 +192,16 @@ def main():
                 # Decide if the parents will do sexual or clonal reproduction (recombination VS mutation)
                 if random.random() < organism_factory.probability_recombination:
                     # Recombination case; no mutation
+                    pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
+                    ref_seq = pos_set_sample[0]
                     child1, child2 = organism_factory.get_children(
                         parent1, parent2, ref_seq, pos_set_sample)
                 
                 # MUTATION
                 else:
                     # Non-recomination case; the children are mutated
-                    
-                    # XXX New approach
-                    # child1, child2 = organism_factory.clone_parents(parent1, parent2)
                     child1 = organism_factory.clone_organism(parent1)
                     child2 = organism_factory.clone_organism(parent2)
-                    
                     # The children in this non-recombination scenario are just
                     # mutated versions of the parents
                     child1.mutate(organism_factory)
