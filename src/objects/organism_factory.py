@@ -724,6 +724,8 @@ class OrganismFactory:
                 elif parent == 'p2':
                     # Re-use connector from parent 2
                     conn = copy.deepcopy(par2.connectors[conn_idx])
+                
+                # Apply left/right adjustments to the value of mu
                 adjusted = False
                 
                 # Left and Right recognizers
@@ -733,16 +735,16 @@ class OrganismFactory:
                 # Apply LEFT adjustment if necessary
                 if l_rec_name.split("_")[0] != parent:
                     left_adj, right_adj = conn_adj_vals[parent][conn_idx]
-                    conn._mu += left_adj
-                    conn.apply_mu_bounds()  # Avoide negative mu or too large mu
                     if left_adj != 0:
+                        conn._mu += left_adj
+                        conn.apply_mu_bounds()  # Avoide negative mu or too large mu
                         adjusted = True
                 # Apply RIGHT adjustment if necessary
                 if r_rec_name.split("_")[0] != parent:
                     left_adj, right_adj = conn_adj_vals[parent][conn_idx]
-                    conn._mu += right_adj
-                    conn.apply_mu_bounds()  # Avoide negative mu or too large mu
                     if right_adj != 0:
+                        conn._mu += right_adj
+                        conn.apply_mu_bounds()  # Avoide negative mu or too large mu
                         adjusted = True
                 # If mu was adjusted, recompute the scores of PDF and CDF values
                 if adjusted:
