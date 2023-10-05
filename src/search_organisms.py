@@ -196,6 +196,8 @@ def main():
                     ref_seq = pos_set_sample[0]
                     child1, child2 = organism_factory.get_children(
                         parent1, parent2, ref_seq, pos_set_sample)
+                    # Pair parents and offspring
+                    two_parent_child_pairs = pair_parents_and_children(parent1, parent2, child1, child2)
                 
                 # MUTATION
                 else:
@@ -206,13 +208,18 @@ def main():
                     # mutated versions of the parents
                     child1.mutate(organism_factory)
                     child2.mutate(organism_factory)
+                    # Pair parents and offspring
+                    two_parent_child_pairs = [(parent1, child1), (parent2, child2)]
                 
                 # Check that new organisms comply with size contraints (modify them if necessary)
                 child1.check_size(organism_factory)
                 child2.check_size(organism_factory)
             
-            # Pair parents and offspring
-            two_parent_child_pairs = pair_parents_and_children(parent1, parent2, child1, child2)
+            # !!!
+            # # Pair parents and offspring
+            # two_parent_child_pairs = pair_parents_and_children(parent1, parent2, child1, child2)
+            
+            # print("two_parent_child_pairs:", two_parent_child_pairs)
             
             # Make the two organisms in each pair compete
             # j index is used to re insert winning organism into the population

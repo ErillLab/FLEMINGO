@@ -172,6 +172,10 @@ class OrganismObject:
                 from_p1 += 1
             elif node_name[:3] == 'p2_':
                 from_p2 += 1
+            # !!!
+            else:
+                print("recog_name:", node_name)
+                raise ValueError('Unknown parent')
                 
         # Count connectors from each parent
         for node_name in self.assembly_instructions['connectors']:
