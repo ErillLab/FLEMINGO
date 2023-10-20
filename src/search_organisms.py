@@ -153,7 +153,7 @@ def main():
         max_score = float("-inf")
         initial = time.time()
         
-        pop_id_list = []
+        #pop_id_list = []
         pop_fitness_list = []
         pop_n_recogs_list = []
         
@@ -169,7 +169,7 @@ def main():
                 if RANDOM_SHUFFLE_SAMPLING_POS or RANDOM_SHUFFLE_SAMPLING_NEG:
                     parent1.fitness = None
                     parent2.fitness = None
-            
+                        
             # =======================
             # MLE-based memetic drive
             # =======================
@@ -181,6 +181,8 @@ def main():
                 # Child 2
                 placements = [parent2.get_placement(seq) for seq in positive_dataset]
                 child2 = organism_factory.mle_org(parent2, placements)
+                # Pair parents and offspring
+                two_parent_child_pairs = [(parent1, child1), (parent2, child2)]
             
             # ======================
             # MUTATION/RECOMBINATION
@@ -215,11 +217,6 @@ def main():
                 child1.check_size(organism_factory)
                 child2.check_size(organism_factory)
             
-            # !!!
-            # # Pair parents and offspring
-            # two_parent_child_pairs = pair_parents_and_children(parent1, parent2, child1, child2)
-            
-            # print("two_parent_child_pairs:", two_parent_child_pairs)
             
             # Make the two organisms in each pair compete
             # j index is used to re insert winning organism into the population
@@ -249,14 +246,14 @@ def main():
                 if parent.fitness > child.fitness:
                     # The parent wins
                     organism_population[i + j] = parent
-                    pop_id_list.append(parent)
+                    #pop_id_list.append(parent)
                     pop_fitness_list.append(parent.fitness)
                     pop_n_recogs_list.append(parent.count_recognizers())
                 
                 else:
                     # The child wins
                     organism_population[i + j] = child
-                    pop_id_list.append(child)
+                    #pop_id_list.append(child)
                     pop_fitness_list.append(child.fitness)
                     pop_n_recogs_list.append(child.count_recognizers())
                 
@@ -275,8 +272,8 @@ def main():
             pop_n_recogs_list = comm.gather(pop_n_recogs_list,   root=0)
             pop_n_recogs_list = flatten_population(pop_n_recogs_list)
             
-            pop_id_list = comm.gather(pop_id_list, root=0)
-            pop_id_list = flatten_population(pop_id_list)
+            # pop_id_list = comm.gather(pop_id_list, root=0)
+            # pop_id_list = flatten_population(pop_id_list)
         
         if i_am_main_process():
             # Mean fitness in the population
