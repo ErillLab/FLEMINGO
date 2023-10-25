@@ -176,10 +176,10 @@ def main():
             if (generation + 1) % organism_factory.periodic_mle == 0:
                 
                 # Child 1
-                placements = [parent1.get_placement(seq) for seq in positive_dataset]
+                placements = [parent1.get_placement(seq) for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]]
                 child1 = organism_factory.mle_org(parent1, placements)
                 # Child 2
-                placements = [parent2.get_placement(seq) for seq in positive_dataset]
+                placements = [parent2.get_placement(seq) for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]]
                 child2 = organism_factory.mle_org(parent2, placements)
                 # Pair parents and offspring
                 two_parent_child_pairs = [(parent1, child1), (parent2, child2)]
