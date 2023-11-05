@@ -299,7 +299,7 @@ def main():
             _m, _s = divmod((time.time() - initial), 60)
             _h, _m = divmod(_m, 60)
             s_time = "{}h:{}m:{:.2f}s".format(int(_h), int(_m), _s)
-            print("\n" + "_" * max_seq_length)
+            print_ln("\n" + "_" * max_seq_length, filepath=None, to_stdout=GEN_INFO_TO_STDOUT)
             print_ln(
                 (
                     "Generation {}" +
@@ -321,15 +321,16 @@ def main():
                     s_time,  # Time
                 ),
                 RESULT_BASE_PATH_DIR + OUTPUT_FILENAME,
+                to_stdout=GEN_INFO_TO_STDOUT
             )
             
             # Print against a random positive sequence
             placement = max_org.get_placement(random.choice(positive_dataset))
-            placement.print_placement(stdout = True)
+            placement.print_placement(stdout=GEN_INFO_TO_STDOUT)
             
             # Print against a random negative sequence
             placement = max_org.get_placement(random.choice(negative_dataset))
-            placement.print_placement(stdout = True)
+            placement.print_placement(stdout=GEN_INFO_TO_STDOUT)
             
             if RANDOM_SHUFFLE_SAMPLING_POS:
                 # If the dataset is shuffled, prepare a sorted version for the
@@ -768,6 +769,7 @@ def set_up():
     global OUTPUT_FILENAME
     global PERIODIC_ORG_EXPORT
     global PERIODIC_POP_EXPORT
+    global GEN_INFO_TO_STDOUT
 
     # Config data
     global configOrganism
@@ -832,6 +834,7 @@ def set_up():
     OUTPUT_FILENAME = config["main"]["OUTPUT_FILENAME"]
     PERIODIC_ORG_EXPORT = config["main"]["PERIODIC_ORG_EXPORT"]
     PERIODIC_POP_EXPORT = config["main"]["PERIODIC_POP_EXPORT"]
+    GEN_INFO_TO_STDOUT = config["main"]["GEN_INFO_TO_STDOUT"]
     
     # Create directory where the output and results will be stored
     if i_am_main_process():
@@ -1010,21 +1013,23 @@ def print_config_json(config: dict, name: str, path: str) -> None:
     print_ln("\n", path)
 
 
-def print_ln(string: str, name_file: str) -> None:
+def print_ln(string, filepath, to_stdout=True):
     """Shows the string on stdout and write it to a file
     (like the python's logging modules does)
 
     Args:
         string: Information to print on stdout and file
-        name_file: path to the file to export the string
+        filepath: path to the file to export the string
     """
-
-    print(string)
-
-    # Here we are sure file exists
-    _f = open(name_file, "a+")
-    _f.write(string + "\n")
-    _f.close()
+    
+    if to_stdout:
+        print(string)
+    
+    if filepath != None:
+        # Here we are sure file exists
+        _f = open(filepath, "a+")
+        _f.write(string + "\n")
+        _f.close()
 
 
 def gini_RSV(values_for_each_class):

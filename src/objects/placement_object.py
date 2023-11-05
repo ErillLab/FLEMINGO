@@ -142,6 +142,10 @@ class PlacementObject:
             is not written to file. Otherwise, it specifies the name of the
             outfile. The default is None.
         '''
+        
+        if not stdout and not outfile:
+            return
+        
         n = len(self.dna_sequence)
         recog_positions_line = [" "] * n
         recog_scores_line = [" "] * n
