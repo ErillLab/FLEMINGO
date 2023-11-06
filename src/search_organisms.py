@@ -14,6 +14,7 @@ import random
 import copy
 import json
 import os
+import shutil
 # import cProfile
 # import pstats
 # import io
@@ -851,11 +852,11 @@ def set_up():
 
     # Throw config on a file
     if i_am_main_process():
+        # Save the settings from the config file as a TXT file
         parameters_path = RESULT_BASE_PATH_DIR + "parameters.txt"
         print_ln("-" * 50, parameters_path)
         print_ln(" " * 20 + "PARAMETERS", parameters_path)
         print_ln("-" * 50, parameters_path)
-    
         print_config_json(config["main"], "Main Config", parameters_path)
         print_config_json(configOrganism, "Organism Config", parameters_path)
         print_config_json(
@@ -864,8 +865,10 @@ def set_up():
         print_config_json(configConnector, "Connector Config", parameters_path)
         print_config_json(configPssm, "PSSM Config", parameters_path)
         print_config_json(configShape, "Shape Config", parameters_path)
-    
         print_ln("-" * 50, parameters_path)
+        
+        # Also save a copy of the config file as a JSON file
+        shutil.copy(JSON_CONFIG_FILENAME, RESULT_BASE_PATH_DIR + "parameters.json")
 
 
 def read_fasta_file(filename: str) -> list:
