@@ -404,11 +404,24 @@ class OrganismFactory:
         
         for org_idx, org in enumerate(imported_organisms):
             for rec_idx, rec in enumerate(org.recognizers):
-                if rec.type != 'p':
+                if rec.type != 'pssm':
                     continue
                 for pos in range(rec.length):
                     for b in ['a','c','g','t']:
                         freq = rec.pwm[pos][b]
+                        
+                        if freq == 0:
+                            raise Exception(
+                                ("Imported organism has a PWM frequency = 0. The problem "
+                                  "occurred for the frequency of base " + b.upper() +
+                                  " at position " + str(pos) + " of the recognizer with "
+                                  "index " + str(rec_idx) + " of the organism with "
+                                  "index " + str(org_idx) + " in the list of organisms "
+                                  "to be imported from the json file. "
+                                  "The minimum frequency allowed is 1/N, where "
+                                  "N is the parameter 'PSSM_NUM_OF_BINDING_SITES' "
+                                  "in the 'config.json' file.")
+                            )
                         if dec.Decimal(str(freq)) % smallest_freq != 0:
                             raise Exception(
                                 ("Imported organism has PWM frequencies that are not "
