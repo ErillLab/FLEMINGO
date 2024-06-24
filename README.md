@@ -1,4 +1,4 @@
-![FLEMINGO Logo](https://github.com/ErillLab/FLEMINGO/images/FLEMINGO_logo.jpg)
+![FLEMINGO Logo](https://github.com/ErillLab/FLEMINGO/blob/main/images/FLEMINGO_logo.jpg)
 ## bacterial promoter modeling with chain-mode genetic programming
 
 The idea of this project is to "learn" regulated promoter models, based on a set of user-provided sequences (referred to as the positive set), using a restricted Genetic Programming framework. The _restriction_ in this setup is that the models to be evolved are not open tree topologies (see [previous iteration](https://github.com/ErillLab/TF_GA) of the project), but chains connecting _recognizers_ via binary _connectors_.
