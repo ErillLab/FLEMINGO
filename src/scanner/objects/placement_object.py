@@ -219,6 +219,11 @@ class PlacementObject:
         self.recognizer_types = rec_types
 
     def add_offset(self, offset):
+        ''' Takes coordinates returned by C placement function, which
+            are relative to the start of the provided sequence (scanned window), and
+            adds the genomic start position of the window, so that they are now
+            absolute coordinates within the genome.
+        '''
         for i in range(len(self.recognizers_positions)):
             self.recognizers_positions[i][0] += offset
             self.recognizers_positions[i][1] += offset
