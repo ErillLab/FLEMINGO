@@ -12,6 +12,9 @@ from FMS.objects.exporters.exporter import Exporter
 class Scanner:
 
     def __init__(self, threshold_p_value=0.005, sample_size=10000):
+        """Initalizes the scanner class, which contains all the methods for 
+           performing genomic scans with composite motifs.
+        """
         # self.placements_forw = []
         # self.placements_back = []
         self.placements = []
@@ -23,110 +26,126 @@ class Scanner:
         self.M = 1.5
 
     def set_up(self, cfg_file):
+        """ Reads in the config file and establishes global variables
+        """
         config.set_up(cfg_file=cfg_file)
 
     def load(self):
-        self.genome = Genome(config.INPUT_GENOME_FILE, format=config.INPUT_TYPE)
+        """ Initalizes the scanner:
+            - Loads up genome
+            - Loads up model
+            - Computes window size for scanning
+            - Determines score threshold
+        """
 
+        # genome and model loading
+        self.genome = Genome(config.INPUT_GENOME_FILE, format=config.INPUT_TYPE)
         self.model = ChainModel.import_model(config.INPUT_ORGANISM_FILE)
+        
         if config.VERBOSE:
             self.model.print()
 
+        # determine window size, using the method from the chain model to estimate its
+        # placement length within a confidence interval
         self.WS = self.model.get_max_length(config.LENGTH_CI)
         print(self.WS)
 
+        # determine threshold by generating N random sequences of length equal to window and
+        # and evaluating the model placement in them, then using the significance value to determine the
+        # threshold
         self.threshold_p_value = config.THRESHOLD_P_VALUE
         self.sample_size = config.SAMPLE_SIZE
         self.threshold = self.get_threshold_score(self.WS, N=self.sample_size, p_value=self.threshold_p_value)
- 
+
     def scan(self):
+        """ Implements the main scan process
+        """
+
+        # Determine the regions to be scanned. Region defined as [START, END]
+        # whether we only scan intergenic regions (INTERGENIC)
+        # scan gene upstream regions (UPSTREAM_REGIONS) [both of these apply to GenBank files]
+        # or scan ALL the genome [typically used for FASTA files]
         if config.SCAN_MODE == "INTERGENIC":
-            regions = self.genome.inter_regions
+            regions = self.genome.inter_regions        #list of regions
         
         elif config.SCAN_MODE == "UPSTREAM_REGIONS":
-            regions = self.genome.upstream_regions
+            regions = self.genome.upstream_regions     #list of regions
         else:
-            regions = [[0, self.genome.length]]
+            regions = [[0, self.genome.length]]        #only one region
 
-        # prev_pos_score = 0
-        # prev_pos_loc = 0
-        # prev_neg_score = 0
-        # prev_neg_loc = 0
+        # variables to prevent adding multiple times same placement
+        # across overlapping windows
         prev_score = -1
         prev_loc = -1
 
+        # for each region to scan
         for reg in regions:
-
+            # determine length of current region
+            # ex: intergenic region has 700 bp
             size = reg[1]-reg[0]
+
+            # obtain total size to be scanned, as the 
+            # number of windows to be used (size // self.WS)+1)
+            # times the length of the window
+            # ex: the 700 bp will be encased in a segment made by a multiple of WS
+            # ex: for WS = 500; 700 // 500 = 1 [1.4] + 1 => 2 --> 2*500 = 1000
+            # ex: we would be scanning 1000 bp
             aux_N = ((size // self.WS)+1)*self.WS
+
+            # start position for scan (offset) is obtained as the
+            # center of the region (reg[0] + size//2), minus half
+            # the length of the scanned region, ensuring that the
+            # scanned segment encases the window in the middle
+            # ex: assume region starts at genomic position 900
+            # ex: 900 + 700//2 = 900 + 350 = 1250
+            # ex: 1250 - 1000//2 = 750 <-- our offset starts 150 (300//2) upstream of region
             offset = reg[0] + size//2 - aux_N//2
 
-            if offset < 0:
+            #out of bounds checks
+            if offset < 0:    
                 offset = 0
             if aux_N > self.genome.length:
                 aux_N = self.genome.length
-            for n in range(0, aux_N - (self.WS >> 1), self.WS>>1):
+
+            # scanning loop, using WS fragments and a step size WS // 2
+            for n in range(0, aux_N - (self.WS // 2), self.WS // 2):
                 window = str(self.genome.seq[n+offset:n+offset+self.WS])
-                if len(window) < self.WS>>1:
+                if len(window) < self.WS // 2:
                     break
+                # get optimal placement in both strands (if required)
                 for_placement = self.model.get_placement(window)
                 if config.SCAN_REVERSE:
                     window = str(Seq(window).reverse_complement())
                     rev_placement = self.model.get_placement(window)
 
+                #pick optimal placement (for both strands)
                 if not config.SCAN_REVERSE or for_placement.energy >= rev_placement.energy:
                     placement = for_placement
                     placement.strand = "+"
                 else:
                     placement = rev_placement
                     placement.strand = "-"
-                    # prev_neg_loc = offset + n + self.WS - rev_placement.recognizers_positions[0][0] 
-                    # prev_neg_score = rev_placement.energy
+                    # update coordinates for placement on the reverse strand
                     placement = utils.reverse_placement(placement, len(window))
 
+                # if placement does not make the cut or it is the same placement as in previous window
                 if placement.energy < self.threshold or (prev_score == placement.energy and prev_loc == offset + n + for_placement.recognizers_positions[0][0]):
                     continue
                         
 
-                
-                # if for_placement.energy >= self.threshold and (prev_pos_loc != offset + n + for_placement.recognizers_positions[0][0] or prev_pos_score != for_placement.energy):
-                #     prev_pos_loc = offset + n + for_placement.recognizers_positions[0][0]
-                #     prev_pos_score = for_placement.energy
-                    # l_gene, r_gene = self.genome.get_nearest_genes(offset + n + for_placement.recognizers_positions[0][0], offset + n + for_placement.recognizers_positions[-1][1])
-                    # for_placement.r_gene = r_gene
-                    # for_placement.l_gene = l_gene
-                    # if config.VERBOSE:
-                    #     utils.print_placement_info(for_placement, l_gene, r_gene, n + offset)
-                    # for_placement.add_offset(n + offset)
-                    # for_placement.window=[n+offset, n+offset+self.WS]
-                    # for_placement.p_value = self.compute_p_value(for_placement.energy)
-                    # for_placement.strand = "+"
-                    # self.placements_forw.append(for_placement)
-
-                # if config.SCAN_REVERSE:
-                    # window = str(Seq(window).reverse_complement())
-                    # rev_placement = self.model.get_placement(window)
-                    # if rev_placement.energy >= self.threshold and (prev_neg_loc != offset + n + self.WS - rev_placement.recognizers_positions[0][0] or prev_neg_score != rev_placement.energy):
-                    #     prev_neg_loc = offset + n + self.WS - rev_placement.recognizers_positions[0][0] 
-                    #     prev_neg_score = rev_placement.energy
-                        # rev_placement = utils.reverse_placement(rev_placement, len(window))
-                        # l_gene, r_gene = self.genome.get_nearest_genes(offset + n + rev_placement.recognizers_positions[0][0], offset + n + rev_placement.recognizers_positions[-1][1], strand="-")
-                        # rev_placement.r_gene = r_gene
-                        # rev_placement.l_gene = l_gene
-                        # if config.VERBOSE:
-                        #     utils.print_placement_info(rev_placement, l_gene, r_gene, n + offset)
-                        # rev_placement.add_offset(n + offset)
-                        # rev_placement.window=[n+offset, n+offset+self.WS]
-                        # rev_placement.p_value = self.compute_p_value(rev_placement.energy)
-                        # rev_placement.strand = "-"
-                        # self.placements_back.append(rev_placement)
+                # if placement is above the threshold
+                # identify nearest genes and associate to placement
                 l_gene, r_gene = self.genome.get_nearest_genes(offset + n + placement.recognizers_positions[0][0], offset + n + placement.recognizers_positions[-1][1], strand=placement.strand)
                 placement.r_gene = r_gene
                 placement.l_gene = l_gene
                 if config.VERBOSE:
                     utils.print_placement_info(placement, l_gene, r_gene, n + offset)
+                
+                # obtain genomic location for placement    
                 placement.add_offset(n + offset)
+                # define window coordinates that generated the placement
                 placement.window=[n+offset, n+offset+self.WS]
+                # compute the p-value for the placement
                 placement.p_value = self.compute_p_value(rev_placement.energy)
                 self.placements.append(placement)
         return 0
@@ -186,72 +205,82 @@ class Scanner:
             print("Tag", "Name", "Start", "End", "Strand", "Score", "p-value", "Protein_Accession", "Product", sep=",", file=f)
             for gene in genes:
                 print(gene.tag, gene.name, gene.location.start, gene.location.end, gene.strand, gene.score, gene.p_value, gene.protein_id, '"'+str(gene.product)+'"', sep=",", file=f)
-            
+
+    
     def refinment_it(self, p_value, k, N):
+        """ Performs a p-value refinement iteration
+            using a MM of order k, and a sampling size of N            
+        """
+        #instantiate MM generator
         generator = Generator(Generator.MCM)
+        #number of pseudoreplicates with score > observed to reach p-value
         threshold = math.ceil(p_value * N)
         print(threshold)
 
         new_placements = []
-        # new_placements_forw = []
-        # new_placements_back = []
 
+        # for each window with a significant placement
         for placement in self.placements:
+            # obtain the sequence (window) that generated the placement
             seq = placement.dna_sequence
+            # generate N pseudoreplicates of the window sequence
             aux_seqs = (generator.generate(N, seq=seq, k=k))
             scores = []
+            # perform placements on all pseudoreplicates
             for seq in aux_seqs:
                 aux_placement = self.model.get_placement(seq)
                 scores.append(aux_placement.energy)
+            # sort scores and determine if placement score is above threshold
             scores.sort()
             score = scores[-threshold]
             if placement.energy >= score:
                 new_placements.append(placement)
 
-
-        # for placement in self.placements_back:
-        #     seq = placement.dna_sequence[::-1]
-        #     aux_seqs = (generator.generate(N, seq=seq, k=k))
-        #     scores = []
-        #     for seq in aux_seqs:
-        #         aux_placement = self.model.get_placement(seq)
-        #         scores.append(aux_placement.energy)
-        #     scores.sort()
-        #     score = scores[-threshold]
-        #     if placement.energy >= score:
-        #         new_placements_back.append(placement)
+        #update list of placements with the ones making the cut
         self.placements = new_placements
-        # self.placements_forw = new_placements_forw
-        # self.placements_back = new_placements_back
 
+    
     def refine(self, n=1, p_value=0.05, k=2):
+        """ Performs iterative refinement of the p-value estimated for a placement
+            using a sampling size of n (number of pseudosequences)
+            a terminal p-value to be reached (p_value) and a Markov Model order (k).
+        """
+        # estimate the best MM order (k) to used based on user preference
+        # and length of the sequence it is trained on [shorter sequences lead to
+        # lower order Markov Models]
         aux_k = self.infer_k(self.placements[0].dna_sequence)
-        # aux_k = self.infer_k(self.placements_forw[0].dna_sequence)
         k = min(k, aux_k)
-        print("Refinment k", k)
-        N = 10
-        i=1
-        while N <= n:
+        print("Refinement k", k)
+        
+        N = 10    # initial sampling size
+        i=1       # iteration
+        while N <= n:    # while not reaching terminal sampling size
             if config.VERBOSE:
-                print("Refinment iteration", i)
-                self.refinment_it(p_value, k, N)
+                print("Refinement iteration", i)
+            self.refinment_it(p_value, k, N)        #make refinement iteration
             if config.VERBOSE:
                 print("Remaining placements:", len(self.placements))
-                # print("Remaining placements:", len(self.placements_forw) + len(self.placements_back))
             N*=10
             i+=1
 
+    
     def get_threshold_score(self, WS, p_value=0.05, N=100):
+        """ Computes initial score threshold for a given model.
+            Estimates placement score on N random sequences and computes
+            p-value from this, then determines
+        """
         score = 0
         threshold = int(N*p_value)
         scores = []
         generator = Generator(Generator.RANDOM)
-        seqs = generator.generate(N, n=WS)
+        seqs = generator.generate(N, n=WS)        # generate N random sequences
 
+        # for each sequence, obtain optimal placement
         for seq in seqs:
             placement = self.model.get_placement(seq)
             scores.append(placement.energy)
-        
+
+        # sort scores and grab the score that corresponds to p-value limit
         scores.sort()
         self.threshold_scores = scores
         score = scores[-threshold]
