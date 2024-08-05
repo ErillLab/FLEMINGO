@@ -1,7 +1,6 @@
 from objects.scanner import Scanner
 import argparse
-import FMS.config as config
-from Bio import SeqIO
+import objects.config as config
 from Markov_DNA import MCM
 
 # Main program for command line call
@@ -9,7 +8,7 @@ if __name__ == "__main__":
 
     # Parse command line arguments (only config file name expected)
     parser = argparse.ArgumentParser(
-                            prog='main.py',
+                            prog='scanner.py',
                             description='Runs the FLEMINGO scanner to detect instances of composite motifs in genome sequences',
                             epilog='Specify the config file name (default: python main.py -c scanner_config.json')
     parser.add_argument("-c", "--config", type=str, default="scanner_config.json")
@@ -40,7 +39,7 @@ if __name__ == "__main__":
     # For each significant placement, generate N pseudoreplicates with k-order Markov Model to estimate p-value
     scanner.refine(p_value=config.THRESHOLD_P_VALUE, n=1000, k=7)    # <-- make this dependent on user input (n=1000, k=7 )
     # Export scan results after refinement, appending relevant suffixes
-    scanner.export()
+    scanner.export_JSON(config.OUTPUT_FILE)
     scanner.export_BED(config.OUTPUT_FILE.replace(".json", ".bed"))
     scanner.export_genes(config.OUTPUT_FILE.replace(".json", "_genes.csv"))
     scanner.export_GFF3(config.OUTPUT_FILE.replace(".json", ".gff3"))

@@ -1,6 +1,6 @@
 from Bio import SeqIO
-from FMS.objects.genbank.genbank_gene import GenBankGene
-from FMS.objects.genbank.genbank_cds_object import GenBankCDS
+from .genbank_gene_object import GenBankGene
+from .genbank_cds_object import GenBankCDS
 
 class GenBankSeq:
 

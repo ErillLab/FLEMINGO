@@ -75,8 +75,58 @@ class ConnectorObject():
     """Connector Object is a node that connects two recognizer objects
     """
     
-    def __init__(self, config, max_seq_length, mu=None, sigma=None):
-        """Connector constructor: 
+    def __init__(self, max_seq_length, mode="SCANNER", mu=None, sigma=None, config=None):
+        """ Connector constructor: 
+            - gets/sets mu and sigma
+            - sets all connector-specific configuration items
+
+        Args:
+            _mu: Mean distance between node1 and node2
+            _sigma: Variance of distance between node 1 and node2
+            config: Node-level configuration specs as loaded from config.json (MOTIF_DISCOVERY mode only)
+            mode: execution mode -> MOTIF_DISCOVERY | SCANNER
+
+        """
+        if mode == "SCANNER":
+            self.constructor_scanner(max_seq_length, mu=mu, sigma=sigma)
+        elif mode == "MOTIF_DISCOVERY":
+            self.constructor_motif_discovery(config, max_seq_length, mu=mu, sigma=sigma)
+        else:
+            raise Exception("Invalid execution mode.")
+
+    def constructor_scanner(self, max_seq_length, mu=None, sigma=None):
+        """Connector constructor (SCANNER mode): 
+            - gets/sets mu and sigma
+            - sets all connector-specific configuration items
+
+        Args:
+            _mu: Mean distance between node1 and node2
+            _sigma: Variance of distance between node 1 and node2
+
+        """
+        
+        # set connector-specific configuration parameters
+        self.max_seq_length = max_seq_length
+        self.pseudo_count = 1e-15
+        
+        # set mu and sigma
+        self._mu = mu  # Mean discance between the connected nodes
+        self._sigma = sigma  # Standard deviation of the distance
+        
+        if mu == None:
+            self._set_random_mu()
+        if sigma == None:
+            self._set_random_sigma()
+        
+        # precompute connector energies for expected length range
+        self.stored_pdfs = []
+        self.stored_cdfs = []
+        self.set_precomputed_pdfs_cdfs()
+
+        self.adjust_score_threshold = 0
+
+    def constructor_motif_discovery(self, config, max_seq_length, mu=None, sigma=None):
+        """Connector constructor (MOTIF_DISCOVERY mode): 
             - gets/sets mu and sigma
             - sets all connector-specific configuration items
 
@@ -486,3 +536,15 @@ class ConnectorObject():
             c_scores[i] = np.log(p_list[i])
             c_scores[self.max_seq_length + i] = np.log(prob_sum)
             
+    def to_json(self) -> dict:
+        """Transform PSSM to JSON format
+
+        Returns:
+            Connector in JSON format
+        """
+        connector = {}
+        connector["objectType"] = "connector"
+        connector["mu"] = self._mu
+        connector["sigma"] = self._sigma
+
+        return connector
