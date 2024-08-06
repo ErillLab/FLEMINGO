@@ -6,6 +6,8 @@ class Exporter:
     E_CSV = "CSV"
 
     def __new__(cls, filename: str, format: int = 0) -> None:
+        """ Initializes the exporter of the specified format.
+        """
         if cls == Exporter:
             if format == Exporter.E_JSON:
                 instance = super().__new__(JSON_Exporter)
@@ -22,6 +24,9 @@ class Exporter:
         return instance
     
     def __init__(self, filename: str, format: int = 0):
+        """ Initializes the filename of the output file to 
+            which export the results
+        """
         self.filename = filename
 
     

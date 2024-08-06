@@ -182,19 +182,23 @@ class Scanner:
         genes = []
         # gets the nearest genes from each placement and appends them to a list
         for placement in self.placements:
-            # Gets the information of the left gene
+            # gets the information of the left gene
             gene = placement.l_gene
             if gene != None:
-                gene.score = placement.energy
-                gene.p_value = placement.p_value
-                genes.append(gene)
+                if gene.score == None:
+                    genes.append(gene)
+                if gene.score == None or gene.score < placement.energy:
+                    gene.score = placement.energy
+                    gene.p_value = placement.p_value
 
             # gets the information of the left gene
             gene = placement.r_gene
             if gene != None:
-                gene.score = placement.energy
-                gene.p_value = placement.p_value
-                genes.append(gene)
+                if gene.score == None:
+                    genes.append(gene)
+                if gene.score == None or gene.score < placement.energy:
+                    gene.score = placement.energy
+                    gene.p_value = placement.p_value
 
         # writes CSV file with genes information
         with open(filename, 'w') as f:

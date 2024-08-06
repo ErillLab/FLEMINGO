@@ -1,6 +1,6 @@
 from . import utils
 
-JSON_CONFIG_FILENAME = "scanner.json"
+JSON_CONFIG_FILENAME = "scanner_config.json"
 
 def set_up(cfg_file=JSON_CONFIG_FILENAME):
     """ Reads configuration file and sets up all program variables
@@ -35,6 +35,8 @@ def set_up(cfg_file=JSON_CONFIG_FILENAME):
     global REFINEMENT
     # Markov Model order for pseudo-replicates generation in refinement phase
     global REFINEMENT_K
+    # Output file formats
+    global OUTPUT_FORMATS
 
     config = utils.read_json_file(cfg_file)
 
@@ -54,3 +56,4 @@ def set_up(cfg_file=JSON_CONFIG_FILENAME):
     REFINEMENT = config["main"]["REFINEMENT"]
     if REFINEMENT:
         REFINEMENT_K = config["main"]["REFINEMENT_K"]
+    OUTPUT_FORMATS = config["main"]["OUTPUT_FORMATS"]
