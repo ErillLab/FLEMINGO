@@ -176,7 +176,7 @@ class OrganismFactory:
         '''
         
         # instantiates organism with organism configuration and pssm columns
-        new_organism = OrganismObject(self.get_id(), self.conf_org)
+        new_organism = OrganismObject(self.get_id(), config=self.conf_org, mode="MOTIF_DISCOVERY")
         
         '''
         The number of recognizer for the new organism is drawn from a Poisson
@@ -590,10 +590,10 @@ class OrganismFactory:
         '''
         
         # Initialize child 1 as an empty organism
-        child1 = OrganismObject(self.get_id(), self.conf_org)
+        child1 = OrganismObject(self.get_id(), config=self.conf_org, mode="MOTIF_DISCOVERY")
         
         # Initialize child 2 as an empty organism
-        child2 = OrganismObject(self.get_id(), self.conf_org)
+        child2 = OrganismObject(self.get_id(), config=self.conf_org, mode="MOTIF_DISCOVERY")
         
         # Place the parents on all the sequences in the sample of the positive set
         par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample)
@@ -856,7 +856,7 @@ class OrganismFactory:
         mu = max(0, mu)
         
         # Return the synthetic connector
-        return ConnectorObject(self.conf_con, self.max_seq_length, mu, sigma)
+        return ConnectorObject(self.max_seq_length, mu=mu, sigma=sigma, config=self.conf_con, mode="MOTIF_DISCOVERY")
     
     def get_recog_pos_on_DNA_seq(self, org_placement, recog_idx):
         '''

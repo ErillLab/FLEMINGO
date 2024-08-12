@@ -36,7 +36,7 @@ def norm_pf(x, y, mu, sigma):
 
 class ShapeObject:
 
-    def __init__(elf, rec_type, rec_size, mode="SCANNER", config=None, mu = None, sigma = None) -> None:
+    def __init__(self, rec_type, rec_size, mode="SCANNER", config=None, mu = None, sigma = None) -> None:
         """ShapeObject: recognizers a specific DNA-shape {mgw, prot, roll, 
         or helt}
 
