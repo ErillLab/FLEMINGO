@@ -51,9 +51,10 @@ class CSV_Exporter(Exporter):
             i+=1
         f.close()
 
-    def _report_placement(self, placement) -> list:
-        """ Returns the sequence of the placement and a coma separated
-            list with the subsequence of each model element 
+    def _report_placement(self, placement) -> tuple:
+        """ Returns two strings:
+            - a concatenation of all the nucleotides bound by the chain structure
+            - same but with a comma to separate between the subsequences bound by different recognizers
         """
 
         seq = placement.dna_sequence
