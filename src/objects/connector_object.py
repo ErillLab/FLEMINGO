@@ -537,7 +537,7 @@ class ConnectorObject():
             c_scores[self.max_seq_length + i] = np.log(prob_sum)
             
     def to_json(self) -> dict:
-        """Transform PSSM to JSON format
+        """ Turns Connector object into a dictionary.
 
         Returns:
             Connector in JSON format
