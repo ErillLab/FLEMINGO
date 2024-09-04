@@ -1552,7 +1552,9 @@ class OrganismObject:
         mu = 0
         var = 0
 
-        # agregates the length distribution parameters from the connectors
+        # Agregates the length distribution parameters from the connectors.
+        # Under the assumption that the connectors are independent Gaussians,
+        # the means and the variances are additive.
         for connector in self.connectors:
             mu += connector._mu
             var += connector._sigma**2
