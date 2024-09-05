@@ -1,7 +1,6 @@
 import random
 import numpy as np
 import math
-import copy
 global null_models
 null_models = {}
 
@@ -35,10 +34,103 @@ def norm_pf(x, y, mu, sigma):
             p = 0
     return p
 
-
 class ShapeObject:
+
+    def __init__(self, rec_type, rec_size, mode="SCANNER", config=None, mu = None, sigma = None) -> None:
+        """ShapeObject: recognizers a specific DNA-shape {mgw, prot, roll, 
+        or helt}
+
+        All null models ever computed are stored in the global null_models 
+        variable. Each shape has exactly one null model corresponding to 
+        the DNA-shape feature that it recognizers and its length.
+
+        Each shape has exactly one alternative model represented by a 
+        normal distribution following a mean, mu, and standard deviation, sigma. 
+        It's representation distribution is calculated of the same intervals 
+        that the null models are.
+
+        Shape features can be mutated by either increasing or decreasing its mu, 
+        its sigma, and/or its length. mu is bounded by the min and max obseved
+        scores in the null model, sigma is any non-negative number, and length is
+        bounded by the config file.
+
+        Note: minimum length can be modified but can NOT be less than 5.
+
+        Args:
+            rec_type: kind of shape feature
+            rec_size: length of the recognizer
+            mu: mean for distribution
+            sigma: standard deviation for distribution
+            config: shape recognizer config parameters (MOTIF_DISCOVERY mode only)
+            mode: execution mode -> MOTIF_DISCOVERY | SCANNER
+
+        Returns:
+            Fully operational shape object ready to be placed
+        """
+        if mode == "SCANNER":
+            self.constructor_scanner(rec_type, rec_size, mu=mu, sigma=sigma)
+        elif mode == "MOTIF_DISCOVERY":
+            self.constructor_motif_discovery(rec_type, rec_size, config, mu, sigma)
+        else:
+            raise Exception("Wrong ShapeObject constructor arguments.")
+
+    def constructor_scanner(self, rec_type, rec_size, mu = None, sigma = None):
+        """ShapeObject: recognizers a specific DNA-shape {mgw, prot, roll, 
+        or helt}
+
+        All null models ever computed are stored in the global null_models 
+        variable. Each shape has exactly one null model corresponding to 
+        the DNA-shape feature that it recognizers and its length.
+
+        Each shape has exactly one alternative model represented by a 
+        normal distribution following a mean, mu, and standard deviation, sigma. 
+        It's representation distribution is calculated of the same intervals 
+        that the null models are.
+
+        Shape features can be mutated by either increasing or decreasing its mu, 
+        its sigma, and/or its length. mu is bounded by the min and max obseved
+        scores in the null model, sigma is any non-negative number, and length is
+        bounded by the config file.
+
+        Note: minimum length can be modified but can NOT be less than 5.
+
+        Args:
+            rec_type: kind of shape feature
+            rec_size: length of the recognizer
+            mu: mean for distribution
+            sigma: standard deviation for distribution
+
+        Returns:
+            Fully operational shape object ready to be placed
+        """
+        self.type = rec_type
+        self.length = rec_size
+        
+        # The following attributes are set by set_null_model()
+        self.null_model = []
+        self.edges = []
+        self.min_mu = None
+        self.max_mu = None
+        self.set_null_model()  # Sets attributes above
+        
+        # Set mu and sigma
+        self._mu = mu
+        self._sigma = sigma
+        
+        if mu == None:
+            self._set_random_mu()
+        if sigma == None:
+            self._set_random_sigma()
+        
+        ## config file params
+        self.pseudo_count = 1e-100
+
+        self.alt_model = []
+        # array for alt model must be filled prior to placement
+        self.set_alt_model()
+
     
-    def __init__(self, rec_type, rec_size, config, mu = None, sigma = None):
+    def constructor_motif_discovery(self, rec_type, rec_size, config, mu = None, sigma = None):
         """ShapeObject: recognizers a specific DNA-shape {mgw, prot, roll, 
         or helt}
 
@@ -106,7 +198,7 @@ class ShapeObject:
         self.alt_model = []
         # array for alt model must be filled prior to placement
         self.set_alt_model()
-    
+
     def _set_random_mu(self):
         '''
         Chooses a random value for mu during Shape object initialization. The
@@ -405,7 +497,7 @@ class ShapeObject:
         return True
 
     def get_type(self):
-        """Returns the one character definiton of a recognizers type
+        """Returns the one character definition of a recognizers type
         used for generating string of recognizer types.
         """
         if self.type == "mgw":
@@ -416,3 +508,24 @@ class ShapeObject:
             return 'h'
         if self.type == "roll":
             return 'r'
+
+    def to_json(self) -> dict:
+        """ Get Shape object in JSON format
+
+        Returns:
+            shape in JSON format (dictionary)
+            {
+                "objecType": Model element type, in this case "shape"
+                "recType": Recognizer type, in this case shape type
+                "mu": 
+                "sigma":
+                "length": Length of the shape
+            }
+        """
+        shape = {}
+        shape["objectType"] = "shape"
+        shape["recType"] = self.type
+        shape["mu"] = self._mu
+        shape["sigma"] = self._sigma
+        shape["length"] = self.length
+        return shape

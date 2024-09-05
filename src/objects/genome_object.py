@@ -1,15 +1,13 @@
-import FMS.utils as utils
-from FMS.objects.genbank.genbank_object import GenBank
-import FMS.config as config
+from . import utils
+from .genbank.genbank_object import GenBank
+from . import config
 
 class Genome:
 
-    def __init__(self, filename, format="fasta"):
+    def __init__(self, filename: str, format: str = "fasta") -> None:
         self.genes = []
         self.inter_regions = []
         self.upstream_regions = []
-        # self.cds_forw = []
-        # self.cds_back = []
         self.cds = []
         self.filename = filename
 
@@ -20,17 +18,15 @@ class Genome:
 
         self.length = len(self.seq)
         if config.SCAN_MODE == "INTERGENIC":
-            self.inter_regions = self._calc_intergenic_regions(self.cds, self.length)
+            self.inter_regions = self._calc_intergenic_regions()
         elif config.SCAN_MODE == "UPSTREAM_REGIONS":
             self.upstream_regions = self._calc_upstream_regions(self.genes, config.UPSTREAM_REGION_SIZE)
-        # self.inter_regions_forw = self._calc_intergenic_regions(self.cds_forw, self.length)
-        # self.inter_regions_back = self._calc_intergenic_regions(self.cds_back, self.length)
 
-    def _fasta_genome(self):
+    def _fasta_genome(self) -> None:
         self.seq, self.name = utils.read_fasta_file(self.filename)[0]
 
 
-    def _genbank_genome(self):
+    def _genbank_genome(self) -> None:
         genbank = GenBank(self.filename)
         self.seq = genbank.seqs[0].seq
         self.genes = genbank.seqs[0].genes
@@ -39,9 +35,9 @@ class Genome:
         self.cds_back = genbank.seqs[0].cds_back
         self.name = (genbank.seqs[0].name)
 
-    def _calc_intergenic_regions(self, cds_a, N):
-        res = [[0, N]]
-        for cds in cds_a:
+    def _calc_intergenic_regions(self) -> list:
+        res = [[0, self.length]]
+        for cds in self.cds:
             ini = int(cds.location.start)
             end = int(cds.location.end)
             for pos in res:
@@ -58,9 +54,10 @@ class Genome:
                     break
         return res
     
-    def _calc_upstream_regions(self, genes, N):
+    def _calc_upstream_regions(self) -> list:
+        N = config.UPSTREAM_REGION_SIZE
         ups_regs = []
-        for gene in genes:
+        for gene in self.genes:
             ini = int(gene.location.start)
             end = int(gene.location.end)
             if gene.strand == "+":
@@ -81,14 +78,12 @@ class Genome:
         res.append(aux)
         return res
 
-    def get_nearest_genes(self, start, end, strand="+"):
+    def get_nearest_genes(self, start: int, end: int) -> list:
         ln_gene_diff = self.length
         rn_gene_diff = self.length
         ln_gene = None
         rn_gene = None
         for gene in self.genes:
-            # if gene.strand != strand:
-            #     continue
             if gene.location.start - start < rn_gene_diff and gene.location.start - start > 0:
                 rn_gene_diff = gene.location.start - start
                 rn_gene = gene

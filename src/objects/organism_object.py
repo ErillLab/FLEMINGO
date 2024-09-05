@@ -5,14 +5,12 @@ It allocates the full data structure
 """
 import math
 import random
-import time
 import numpy as np
 import copy
 from .placement_object import PlacementObject
-from .shape_object import ShapeObject
-from .connector_object import norm_cdf
 from .connector_object import g
 import _multiplacement
+import scipy
 
 class OrganismObject:
     """
@@ -24,7 +22,49 @@ class OrganismObject:
     connections between the elements.
     """
     
-    def __init__(self, _id: str, conf: dict) -> None:
+    def __init__(self, _id: str, config: dict = None, mode: str = "SCANNER") -> None:
+        """Organism constructor
+
+        Args:
+            _id: Organism identifier (assigned by factory)
+            conf: Organism-specific configuration values from JSON file (MOTIF_DISCOVERY mode only)
+        """
+        if mode == "SCANNER":
+            self.constructor_scanner(_id)
+        elif mode == "MOTIF_DISCOVERY":
+            self.constructor_motif_discovery(_id, config)
+        else:
+            raise Exception("Wrong ShapeObject constructor arguments.")
+        
+    def constructor_scanner(self, _id: str) -> None:
+        """Organism constructor
+
+        Args:
+            _id: Organism identifier (assigned by factory)
+            conf: Organism-specific configuration values from JSON file
+        """
+        self._id = _id
+
+        # Instantiate recognizer and connector vectors
+        self.recognizers = []
+        self.connectors = []
+        self.recognizers_flat = []
+        self.connectors_scores_flat = []
+        self.recognizer_lengths = []
+        self.recognizer_types = ""
+        self.recognizer_models = []
+        self.recognizer_bin_edges = []
+        self.recognizer_bin_nums = []
+        self.sum_recognizer_lengths = 0
+        self.is_precomputed = True
+
+
+        # Map used by the placement algorithm
+        # The list maps each row of the matrix of the placement scores onto a
+        # column of a PSSM: each row is assigned a [pssm_idx, column_idx]
+        self.row_to_pssm = []
+
+    def constructor_motif_discovery(self, _id: str, conf: dict) -> None:
         """Organism constructor
 
         Args:
@@ -1482,7 +1522,6 @@ class OrganismObject:
         # or changed size
         self.set_sum_recognizer_lengths()
 
-
         if self.is_precomputed == True:
 
             #here we get the mu, sigma, pfs, and aucs for each connector and concatenate them all
@@ -1502,3 +1541,35 @@ class OrganismObject:
                 con_mu_sigma.append(connector._sigma)
 
             self.connectors_scores_flat = np.array(con_mu_sigma, dtype=np.dtype('d'))
+
+    def get_max_length(self, alpha: float) -> int:
+        """ Computes the upper bound of the confidence interval of chain 
+            model lengths distribution based in the alpha parameter (alpha CI)
+        """
+
+        # obtains the sum of the lengths of the recognizers
+        length = self.sum_recognizer_lengths
+        mu = 0
+        var = 0
+
+        # Agregates the length distribution parameters from the connectors.
+        # Under the assumption that the connectors are independent Gaussians,
+        # the means and the variances are additive.
+        for connector in self.connectors:
+            mu += connector._mu
+            var += connector._sigma**2
+        
+        # computes the upper length of the CI and add the recognizers length
+        length += scipy.stats.norm(loc=mu, scale=var**0.5).ppf(alpha+(1-alpha)/2)
+        return int(2*length)
+
+    def to_json(self) -> list:
+        """ Get the chain model in JSON format
+        """
+
+        model = []
+        for i in range(self.count_recognizers() - 1):
+            model.append((self.recognizers[i]).to_json())
+            model.append((self.connectors[i]).to_json())
+        model.append((self.recognizers[-1]).to_json())
+        return model
