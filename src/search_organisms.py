@@ -11,6 +11,7 @@ This program searches for models that fit a specific motif.
 
 import time
 import random
+import math
 import copy
 import json
 import os
@@ -22,6 +23,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from objects.organism_factory import OrganismFactory
 from Bio import SeqIO
+
+from Markov_DNA import MCM
 
 
 # Variable definition
@@ -532,13 +535,15 @@ def get_k_sampled_sequence(seq: str, kmer_len: int) -> str:
 def generate_negative_set(positive_set, negative_set_size, k):
     '''
     Generates a negative set made of pseudosequences that resemble the positive
-    set in terms of k-mer frequencies. The size of the negative set is specified
-    by `negative_set_size`. If `negative_set_size` is None, the negative set
-    will be the same size as the positive set. If the size is specified and it's
-    n*len(positive_set) where n is an integer, every sequence in the positive
-    set contributes exactly to n sequences in the negative set. If instead the
-    required size is not a multiple of len(positive_set), the remaining number
-    of sequences (as many as the remainder of the division) are selected
+    set in terms of k-mer frequencies (k specified by the `k` parameter).
+    They are generated using a sequence-specific Markov Model.
+    The size of the negative set is specified by `negative_set_size`.
+    If `negative_set_size` is None, the negative set will be the same size as
+    the positive set. If the size is specified and it's n*len(positive_set)
+    where n is an integer, every sequence in the positive set contributes
+    exactly to n sequences in the negative set. If instead the required size is
+    not a multiple of len(positive_set), the remaining number of sequences to
+    be simulated (as many as the remainder of the division) are selected
     randomly from the positive set.
     '''
     # If size of neg set isn't specified, make it the same length as the pos set
@@ -546,16 +551,68 @@ def generate_negative_set(positive_set, negative_set_size, k):
         negative_set_size = len(positive_set)
     # Size of neg set may not be a multiple of the size of pos set
     q, r = divmod(negative_set_size, len(positive_set))
+    
     # Generate neg set
     negative_set = []
-    for i in range(q):
-        for seq in positive_set:
-            negseq = get_k_sampled_sequence(seq, k)
-            negative_set.append(negseq.lower())
+    
+    # ------------------------------------------------
+    ### k-mer sampling approach:
+    # !!! OBSOLETE : TO BE REMOVED < < < < < < < < < <
+    
+    # for i in range(q):
+    #     for seq in positive_set:
+    #         negseq = get_k_sampled_sequence(seq, k)
+    #         negative_set.append(negseq.lower())
+    # for seq in random.sample(positive_set, r):
+    #     negseq = get_k_sampled_sequence(seq, k)
+    #     negative_set.append(negseq.lower())
+    # ------------------------------------------------
+    
+    for seq in positive_set:
+        MM_order = choose_MM_order(len(seq), k)
+        mcm = MCM(MM_order)
+        mcm.train(seq)
+        seqs = mcm.generate(size=len(seq), N=q)
+        negative_set = negative_set + seqs
+    
     for seq in random.sample(positive_set, r):
-        negseq = get_k_sampled_sequence(seq, k)
-        negative_set.append(negseq.lower())
-    return negative_set
+        MM_order = choose_MM_order(len(seq), k)
+        mcm = MCM(MM_order)
+        mcm.train(seq)
+        seqs = mcm.generate(size=len(seq), N=1)
+        negative_set = negative_set + seqs
+    
+    return [seq.lower() for seq in negative_set]
+
+
+def choose_MM_order(L, k, M=2):
+    '''
+    Chooses the Markov Model order. The order is k-1, where k is the length of
+    the longest k-mers whose frequencies should be preserved [e.g., when k=3,
+    the generative model tends to preserve 3-mer frequencies by using a Markov
+    Model of order 2]. However, if the sequence is too short, this approach
+    is prone to sequence memorization (there's the risk of rigurgitating the
+    input sequence). Thus, if the sequence is too short, the effective value of
+    k to be used is adjusted so that each k-mer is expected to appear (by chance)
+    at least M times in a sequence of length L. The default value of M we propose
+    is 2.
+    
+    Parameters:
+        L : length of the sequence
+        k : the frequency of n-mers of length up to k will be preserved
+        M : lower bound to the expected number of occurrences per k-mer in a
+            sequence of length L. It imposes an upper bound on k. If not met,
+            k is decreased as much as necessary, to avoid memorization of the
+            input sequence.
+    '''    
+    #L = L - k + 1  # more accurate
+    # Upper bound for k
+    k_max = math.floor(math.log(L/M, 4))
+    # Final value of k to be used
+    final_k = min(k, k_max)
+    # Markov Model order to be used
+    MM_order = final_k-1
+    return max(0, MM_order)
 
 
 def is_finished(method: str, generation: int, max_score: float) -> bool:
