@@ -1,0 +1,22 @@
+{
+    "main": {
+        "INPUT_GENOME_FILE": "AP014800.1.gb",
+        "INPUT_MODEL_FILE": "model.json",
+        "LENGTH_CI": 0.95,
+        "OUTPUT_FILE": "output",
+        "VERBOSE": true,
+        "SCAN_MODE": "INTERGENIC",
+        "UPSTREAM_REGION_SIZE": 1000,
+        "SCAN_REVERSE": true,
+        "THRESHOLD_P_VALUE": 0.0001,
+        "SAMPLE_SIZE": 100000,
+        "REFINEMENT": false,
+        "REFINEMENT_K": 3,
+        "OUTPUT_FORMATS": [
+            "JSON",
+            "CSV",
+            "BED",
+            "GFF3"
+        ]
+    }
+}

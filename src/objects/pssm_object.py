@@ -15,13 +15,55 @@ import random
 import numpy as np
 import decimal as dec
 
-
 class PssmObject():
     """PSSM object is a type of recognizer object
     """
 
-    def __init__(self, pwm, config: dict) -> None:
+    def __init__(self, pwm, mode: str="SCANNER", config: dict=None) -> None:
         """PSSM constructor:
+            - Gets/sets:
+                - the length of the PSSM
+                - the frequency matrix
+                - all the PSSM-specific config parameters
+
+        Args:
+            pwm (numpy.array): PWM
+            config: configuration from JSON file (MOTIF_DISCOVERY mode only)
+            mode: execution mode -> MOTIF_DISCOVERY | SCANNER
+        """
+        if mode == "SCANNER":
+            self.constructor_scanner(pwm)
+        elif mode == "MOTIF_DISCOVERY":
+            self.constructor_motif_discovery(pwm, config)
+        else:
+            raise Exception("Invalid execution mode.")
+
+
+    def constructor_scanner(self, pwm) -> None:
+        """PSSM constructor (SCANNER mode):
+            - Gets/sets:
+                - the length of the PSSM
+                - the frequency matrix
+
+        Args:
+            pwm (numpy.array): PWM
+        """
+        
+        # set PSSM length and position weight matrix
+        self.length = len(pwm)  # length of the numpy array
+        self.pwm = pwm  # numpy array of dictionaries
+        self.pssm = None # scoring matrix
+        self.type = 'pssm'
+
+        ## Necessary config parameters
+        self.pseudo_count = 1e-10
+        self.upper_print_probability = 0.75
+        
+        # Compute PSSM Matrix based on PWM
+        self.recalculate_pssm()
+
+    def constructor_motif_discovery(self, pwm, config: dict) -> None:
+        """PSSM constructor (MOTIF_DISCOVERY mode):
             - Gets/sets:
                 - the length of the PSSM
                 - the frequency matrix
@@ -59,7 +101,6 @@ class PssmObject():
         
         # Compute PSSM Matrix based on PWM
         self.recalculate_pssm()
-
 
     def update_length(self):
         """Updates the length attribute.
@@ -496,3 +537,14 @@ class PssmObject():
             for base in ['a', 'g', 'c', 't']:
                 flat_pssm.append(self.pssm[i][base])
         return flat_pssm
+
+    def to_json(self) -> dict:
+        """ Get PSSM object in JSON format
+
+        Returns:
+            pssm in JSON format
+        """
+        pssm = {}
+        pssm["objectType"] = "pssm"
+        pssm["pwm"] = self.pwm.tolist()
+        return pssm

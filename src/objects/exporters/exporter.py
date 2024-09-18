@@ -5,7 +5,9 @@ class Exporter:
     E_GFF3 = "GFF3"
     E_CSV = "CSV"
 
-    def __new__(cls, filename, format=0):
+    def __new__(cls, filename: str, format: int = 0) -> None:
+        """ Initializes the exporter of the specified format.
+        """
         if cls == Exporter:
             if format == Exporter.E_JSON:
                 instance = super().__new__(JSON_Exporter)
@@ -21,11 +23,14 @@ class Exporter:
             instance = super().__new__(cls)
         return instance
     
-    def __init__(self, filename, format=0):
+    def __init__(self, filename: str, format: int = 0):
+        """ Initializes the filename of the output file to 
+            which export the results
+        """
         self.filename = filename
 
     
-from FMS.objects.exporters.json_exporter import JSON_Exporter
-from FMS.objects.exporters.bed_exporter import BED_Exporter
-from FMS.objects.exporters.gff3_exporter import GFF3_Exporter
-from FMS.objects.exporters.csv_exporter import CSV_Exporter
+from .json_exporter import JSON_Exporter
+from .bed_exporter import BED_Exporter
+from .gff3_exporter import GFF3_Exporter
+from .csv_exporter import CSV_Exporter

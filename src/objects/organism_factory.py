@@ -23,6 +23,9 @@ class OrganismFactory:
     """Factory class
     """
 
+    # Counter used to assign IDs to new organisms
+    _organism_counter = 0
+
     def __init__(self, conf_org, conf_org_fac, conf_con, conf_pssm, p_rank,
                  conf_shape, min_seq_length, max_seq_length) -> None:
         """
@@ -33,8 +36,6 @@ class OrganismFactory:
         the program is run in parallel mode.
         """
         
-        # Counter used to assign IDs to new organisms
-        self._organism_counter = 0
         # Process rank (used to esure unique organism IDs when running in parallel mode)
         self._process_rank = p_rank
         # Length of shortest and longest DNA sequence
@@ -77,11 +78,12 @@ class OrganismFactory:
         self.conf_con = conf_con
         self.conf_pssm = conf_pssm
         self.conf_shape = conf_shape
-        self.load_shape_null_models()
-        self.check_shape_null_models(conf_shape["NUM_BINS"])
+        OrganismFactory.load_shape_null_models()
+        OrganismFactory.check_shape_null_models(conf_shape["NUM_BINS"], conf_shape["MAX_LENGTH"])
         shape_object.null_models = shape_object.null_models[conf_shape["NUM_BINS"]]
 
-    def load_shape_null_models(self):
+    @staticmethod
+    def load_shape_null_models():
         """loads the serialzed null model dictionary into shape_object.null_models
         shape_object.null_models is a global variable that holds all null models for
         all shape recognizers for a given number of bins (specified by "NUM_BINS" 
@@ -106,47 +108,44 @@ class OrganismFactory:
                 shape_object.null_models = pickle.load(infile)
             except:
                 shape_object.null_models = {}
-
             return
 
-        return
-
-    def check_shape_null_models(self, n_bins):
+    @staticmethod
+    def check_shape_null_models(n_bins: int, shape_max_length: int = 9) -> None:
         """Determines if null models must be computed or not, and calls 
         computing function if necessary.
 
-        generates models for all shapes for lengths [5, MAX_LENGTH] if
+        generates models for all shapes for lengths [5, shape_max_length] if
         shape_object.null_models is empty, or empty for the specified number
         of intervals. If it isn't empty for the specified number of bins,
         and the maximum length that has been computed already is less than
-        MAX_LENGTH, then it will compute the remaining null models and adds
+        shape_max_length, then it will compute the remaining null models and adds
         them to the dictionary. If all of the required null models have been
         computed already, it will do nothing and return None.
 
         Args:
             n_bins: the number of intervals in the null models for each shape
+            shape_max_length: maximum shape length
 
         Returns:
             None
         """
 
         if shape_object.null_models == {}:
-            null.generate_range(5, self.conf_shape["MAX_LENGTH"] + 1,
+            null.generate_range(5, shape_max_length + 1,
                                 shape_object.null_models, n_bins)
             return
 
         if n_bins not in shape_object.null_models.keys():
-            null.generate_range(5, self.conf_shape["MAX_LENGTH"] + 1,
+            null.generate_range(5, shape_max_length + 1,
                                 shape_object.null_models, n_bins)
             return
 
-        if max(shape_object.null_models[n_bins]["mgw"].keys()) < self.conf_shape["MAX_LENGTH"]:
+        if max(shape_object.null_models[n_bins]["mgw"].keys()) < shape_max_length:
             null.generate_range(max(shape_object.null_models[n_bins]["mgw"].keys()) + 1,
-                                self.conf_shape["MAX_LENGTH"] + 1,
+                                shape_max_length + 1,
                                 shape_object.null_models, n_bins)
             return
-
-        return
 
     def get_id(self) -> str:
         """ Returns a new unique organism ID (as a string). If the program is
@@ -157,11 +156,11 @@ class OrganismFactory:
         If the program is run in serial mode, the organism ID is simply the
         organism counter (as a string). For example, '21' would be the ID of the
         21th generated organism. """
-        self._organism_counter += 1
+        OrganismFactory._organism_counter += 1
         if self._process_rank is None:
-            return str(self._organism_counter)
+            return str(OrganismFactory._organism_counter)
         else:
-            return str(self._process_rank) + "_" + str(self._organism_counter)
+            return str(self._process_rank) + "_" + str(OrganismFactory._organism_counter)
 
     def get_organism(self) -> OrganismObject:
         '''
@@ -177,7 +176,7 @@ class OrganismFactory:
         '''
         
         # instantiates organism with organism configuration and pssm columns
-        new_organism = OrganismObject(self.get_id(), self.conf_org)
+        new_organism = OrganismObject(self.get_id(), config=self.conf_org, mode="MOTIF_DISCOVERY")
         
         '''
         The number of recognizer for the new organism is drawn from a Poisson
@@ -238,7 +237,7 @@ class OrganismFactory:
         It returns a connector object with its internal parameters (mu, sigma)
         assigned.
         '''
-        return ConnectorObject(self.conf_con, self.max_seq_length)
+        return ConnectorObject(self.max_seq_length, config=self.conf_con, mode="MOTIF_DISCOVERY")
 
     def create_recognizer(self, length=None):
         '''
@@ -282,7 +281,7 @@ class OrganismFactory:
         for _ in range(length):
             pwm.append(self.get_pwm_column())
 
-        return PssmObject(np.array(pwm), self.conf_pssm)
+        return PssmObject(np.array(pwm), config=self.conf_pssm, mode="MOTIF_DISCOVERY")
     
     def create_shape(self, length=None, rec_type=None) -> ShapeObject:
         '''
@@ -307,7 +306,7 @@ class OrganismFactory:
         
         if rec_type == None:
             rec_type = random.choice(['mgw', 'prot', 'roll', 'helt'])
-        return ShapeObject(rec_type, length, self.conf_shape)
+        return ShapeObject(rec_type, length, config=self.conf_shape, mode="MOTIF_DISCOVERY")
     
     def get_pwm_column(self) -> dict:
         """Generates a single column for a PWM
@@ -450,7 +449,7 @@ class OrganismFactory:
         Returns:
             Connector object from given connector dictionary
         """
-        return ConnectorObject(self.conf_con, self.max_seq_length, connector["mu"], connector["sigma"])
+        return ConnectorObject(self.max_seq_length, config=self.conf_con, mu=connector["mu"], sigma=connector["sigma"], mode="MOTIF_DISCOVERY")
 
 
     def import_pssm(self, pssm: dict) -> PssmObject:
@@ -462,7 +461,7 @@ class OrganismFactory:
         Returns:
             PSSM Object from given  pssm dictionary
         """
-        return PssmObject(np.array(pssm["pwm"]), self.conf_pssm)
+        return PssmObject(np.array(pssm["pwm"]), config=self.conf_pssm, mode="MOTIF_DISCOVERY")
 
     def import_shape(self, shape: dict) -> ShapeObject:
         """Import shape recognizer from JSON object
@@ -473,7 +472,7 @@ class OrganismFactory:
         Returns:
             Shape Object from given shape dictionary
         """
-        return ShapeObject(shape["recType"], shape["length"], self.conf_shape, shape["mu"], shape["sigma"])
+        return ShapeObject(shape["recType"], shape["length"], config=self.conf_shape, mu=shape["mu"], sigma=shape["sigma"], mode="MOTIF_DISCOVERY")
 
     def export_organisms(self, a_organisms: list, filename: str) -> None:
         """Export a list of organisms to JSON format
@@ -591,10 +590,10 @@ class OrganismFactory:
         '''
         
         # Initialize child 1 as an empty organism
-        child1 = OrganismObject(self.get_id(), self.conf_org)
+        child1 = OrganismObject(self.get_id(), config=self.conf_org, mode="MOTIF_DISCOVERY")
         
         # Initialize child 2 as an empty organism
-        child2 = OrganismObject(self.get_id(), self.conf_org)
+        child2 = OrganismObject(self.get_id(), config=self.conf_org, mode="MOTIF_DISCOVERY")
         
         # Place the parents on all the sequences in the sample of the positive set
         par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample)
@@ -857,7 +856,7 @@ class OrganismFactory:
         mu = max(0, mu)
         
         # Return the synthetic connector
-        return ConnectorObject(self.conf_con, self.max_seq_length, mu, sigma)
+        return ConnectorObject(self.max_seq_length, mu=mu, sigma=sigma, config=self.conf_con, mode="MOTIF_DISCOVERY")
     
     def get_recog_pos_on_DNA_seq(self, org_placement, recog_idx):
         '''
@@ -1008,7 +1007,7 @@ class OrganismFactory:
             pwm.append(column_dict)
         
         # return PSSM object
-        return PssmObject(np.array(pwm), self.conf_pssm)
+        return PssmObject(np.array(pwm), config=self.conf_pssm, mode="MOTIF_DISCOVERY")
     
     def get_compatible_freqs(self, column_freqs):
         '''
@@ -1278,11 +1277,48 @@ class OrganismFactory:
         org.flatten()
         return org
 
+    @staticmethod
+    def import_scanner_model(file_name: str) -> OrganismObject:
+        """ Import Chain Model from file
 
+        Args:
+            file_name: Name of the file with the chain model to read as an input
 
+        Returns:
+            a chain model objects read from the file
+        """
 
+        with open(file_name) as json_file:
+            organism_json = json.load(json_file)[0]
 
+        new_model = OrganismObject(str(OrganismFactory._organism_counter), mode="SCANNER")
 
+        OrganismFactory.load_shape_null_models()
+        num_bins = 25
+        OrganismFactory.check_shape_null_models(num_bins)
+        print(shape_object.null_models)
+        shape_object.null_models = shape_object.null_models[num_bins]
+        print(shape_object.null_models.keys())
+        print(shape_object.null_models["helt"])
 
+        new_org_recognizers = []  # The recognizers are collected here
+        new_org_connectors = []  # The connectors are collected here
 
+        for element in organism_json:
+            if element["objectType"] == "pssm":
+                new_org_recognizers.append(PssmObject(np.array(element["pwm"]), mode="SCANNER"))
+            if element["objectType"] == "shape":
+                new_org_recognizers.append(ShapeObject(element["recType"], element["length"], mu=element["mu"], sigma=element["sigma"], mode="SCANNER"))
+            elif element["objectType"] == "connector":
+                new_org_connectors.append(ConnectorObject(500, mu=element["mu"], sigma=element["sigma"], mode="SCANNER"))
 
+        # Set recognizers and connectors of the organism
+        new_model.set_recognizers(new_org_recognizers)
+        new_model.set_connectors(new_org_connectors)
+        new_model.set_row_to_pssm()
+
+        new_model.flatten()
+
+        OrganismFactory._organism_counter+=1
+
+        return new_model
