@@ -1,0 +1,14 @@
+/extensions/multiplacement
+/src/__pycache__
+/src/datasets
+/src/datasets_for_taki
+/src/models/__pycache__
+/src/objects/__pycache__
+/src/results
+/src/test_motifs
+src/Test_organism_RmgR_Bacillus.json
+src/test_MLE_code.py
+src/sigma_sampler.ipynb
+src/organism.json
+/src/models
+src/from_five_islands.json
