@@ -12,3 +12,10 @@ src/sigma_sampler.ipynb
 src/organism.json
 /src/models
 src/from_five_islands.json
+/src/.ipynb_checkpoints
+src/generate_biological_datasets_from_Jaspar.py
+src/generate_biological_datasets_from_RegulonDB.py
+src/generate_biological_datasets_from_RegulonDB_config.json
+src/generate_mdgp_datasets.py
+src/generate_mdgp_datasets_config.json
+src/generate_mdgp_datasets_tutorial.ipynb
