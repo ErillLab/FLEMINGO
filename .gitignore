@@ -19,3 +19,4 @@ src/generate_biological_datasets_from_RegulonDB_config.json
 src/generate_mdgp_datasets.py
 src/generate_mdgp_datasets_config.json
 src/generate_mdgp_datasets_tutorial.ipynb
+src/randomize_lowercase.py
