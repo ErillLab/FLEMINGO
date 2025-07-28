@@ -1,9 +1,9 @@
 {
   "main": {
-    "RUN_MODE": "parallel",
+    "RUN_MODE": "serial",
     "POPULATION_SIZE": 128,
     "POPULATION_ORIGIN": "random",
-    "POPULATION_FILL_TYPE": "random",
+    "POPULATION_FILL_TYPE": "uniform",
     "DATASET_BASE_PATH_DIR": "datasets/",
     "RESULT_BASE_PATH_DIR": "results/",
     "RESULT_TEST_BASE_PATH_DIR": "resultsTEST/",
@@ -11,7 +11,7 @@
     "NEGATIVE_FILENAME": null,
     "GENERATED_NEG_SET_SIZE": 100,
     "GENERATED_NEG_SET_KMER_LEN": 4,
-    "INPUT_FILENAME": "solution_to_blind_test_1b.json",
+    "INPUT_FILENAME": "ArgR_alpha_org.json",
     "OUTPUT_FILENAME": "output.txt",
     "MAX_SEQUENCES_TO_FIT_POS": 100,
     "MAX_SEQUENCES_TO_FIT_NEG": 100,
