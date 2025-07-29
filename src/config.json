@@ -1,7 +1,7 @@
 {
   "main": {
     "RUN_MODE": "serial",
-    "POPULATION_SIZE": 32,
+    "POPULATION_SIZE": 128,
     "POPULATION_ORIGIN": "random",
     "POPULATION_FILL_TYPE": "uniform",
     "DATASET_BASE_PATH_DIR": "datasets/",
@@ -41,7 +41,7 @@
   },
   "organismFactory": {
     "PROBABILITY_RECOMBINATION": 0.05,
-    "PERIODIC_MLE": 50,
+    "PERIODIC_MLE": 100,
     "PROBABILITY_MLE_CONNECTOR": 1.0,
     "PROBABILITY_MLE_PSSM": 0.95,
     "PROBABILITY_MLE_PSSM_TO_SHAPE": 0.05,
@@ -54,7 +54,7 @@
     "CONNECTOR_MAX_SIGMA": 3,
     "RECOGNIZER_AVG_LENGTH": 4,
     "PSSM_NUM_OF_BINDING_SITES": 100,
-    "PSSM_VS_SHAPE_PROBABILITY": 0.2
+    "PSSM_VS_SHAPE_PROBABILITY": 0.5
   },
   "connector": {
     "AVG_MU": 25,

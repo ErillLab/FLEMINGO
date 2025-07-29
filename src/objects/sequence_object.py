@@ -1,5 +1,5 @@
 """
-Sequence object stores a DNA sequence, it has two strands and a length.
+SeqObject class: it stores a DNA sequence, it has two strands and a length.
 It can return the reverse complement of the DNA sequence.
 """
 
@@ -8,6 +8,9 @@ from Bio.Seq import Seq
 
 
 class SeqObject():
+    '''
+    Class for storing DNA sequences.
+    '''
     
     def __init__(self, sequence: str):
         

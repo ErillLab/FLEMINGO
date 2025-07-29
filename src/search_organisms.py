@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 
-"""Main execution
+"""
+Main execution
 
 This program searches for models that fit a specific motif.
-
-+ MEMETIC
-+ NEW RECOMBINATION
 
 """
 
@@ -21,11 +19,11 @@ import shutil
 # import io
 import numpy as np
 import matplotlib.pyplot as plt
-from objects.organism_factory import OrganismFactory
 from Bio import SeqIO
+from Markov_DNA import MCM
+from objects.organism_factory import OrganismFactory
 from objects.sequence_object import SeqObject
 
-from Markov_DNA import MCM
 
 
 # Variable definition
@@ -70,7 +68,7 @@ negative_dataset: list = []
 
 def main():
     """
-    Main function for the motif seek
+    Main function for motif discovery.
     """
     
     single_print("Loading parameters...")
@@ -128,9 +126,7 @@ def main():
     
     single_print("Starting execution...")
     
-    # Main loop, it iterates until organisms do not get a significant change
-    # or MIN_ITERATIONS or MIN_FITNESS is reached.
-    
+    # Main loop (each iteration is a generation of the evolutionary algorithm)
     while not is_finished(END_WHILE_METHOD, generation, max_score):
         
         if i_am_main_process():
@@ -170,59 +166,21 @@ def main():
                 if RANDOM_SHUFFLE_SAMPLING_POS or RANDOM_SHUFFLE_SAMPLING_NEG:
                     parent1.fitness = None
                     parent2.fitness = None
-                        
+            
             # =======================
             # MLE-based memetic drive
             # =======================
             if (generation + 1) % organism_factory.periodic_mle == 0:
-                
                 # Child 1
                 placements = []
                 for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]:
                     placements.append(parent1.best_placement(seq, BOTH_STRANDS))
                 child1 = organism_factory.mle_org(parent1, placements)
-                
                 # Child 2
                 placements = []
                 for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]:
                     placements.append(parent2.best_placement(seq, BOTH_STRANDS))
                 child2 = organism_factory.mle_org(parent2, placements)
-                
-                # =============================================================
-                # !!!
-                # =============================================================
-                
-                '''
-                # Child 1
-                placements = []
-                for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]:
-                    pl_f = parent1.get_placement(seq, 'f')
-                    if BOTH_STRANDS:
-                        pl_r = parent1.get_placement(seq, 'r')
-                        if pl_r.energy > pl_f.energy:
-                            placements.append(pl_r)
-                        else:
-                            placements.append(pl_f)
-                    else:
-                        placements.append(pl_f)
-                # !!! placements = [parent1.get_placement(seq) for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]]
-                child1 = organism_factory.mle_org(parent1, placements)
-                
-                # Child 2
-                placements = []
-                for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]:
-                    pl_f = parent2.get_placement(seq, 'f')
-                    if BOTH_STRANDS:
-                        pl_r = parent2.get_placement(seq, 'r')
-                        if pl_r.energy > pl_f.energy:
-                            placements.append(pl_r)
-                        else:
-                            placements.append(pl_f)
-                    else:
-                        placements.append(pl_f)
-                # !!! placements = [parent2.get_placement(seq) for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]]
-                child2 = organism_factory.mle_org(parent2, placements)
-                '''
                 # Pair parents and offspring
                 two_parent_child_pairs = [(parent1, child1), (parent2, child2)]
             
@@ -288,14 +246,12 @@ def main():
                 if parent.fitness > child.fitness:
                     # The parent wins
                     organism_population[i + j] = parent
-                    #pop_id_list.append(parent)
                     pop_fitness_list.append(parent.fitness)
                     pop_n_recogs_list.append(parent.count_recognizers())
                 
                 else:
                     # The child wins
                     organism_population[i + j] = child
-                    #pop_id_list.append(child)
                     pop_fitness_list.append(child.fitness)
                     pop_n_recogs_list.append(child.count_recognizers())
                 
@@ -313,9 +269,6 @@ def main():
             
             pop_n_recogs_list = comm.gather(pop_n_recogs_list,   root=0)
             pop_n_recogs_list = flatten_population(pop_n_recogs_list)
-            
-            # pop_id_list = comm.gather(pop_id_list, root=0)
-            # pop_id_list = flatten_population(pop_id_list)
         
         if i_am_main_process():
             # Mean fitness in the population
@@ -367,40 +320,12 @@ def main():
             )
             
             # Print against a random positive sequence
-            placement = max_org.best_placement(random.choice(positive_dataset), BOTH_STRANDS)
-            
-            # =============================================================
-            # !!!
-            # =============================================================
-            
-            '''
-            rnd_pos_seq = random.choice(positive_dataset)
-            plcm_f = max_org.get_placement(rnd_pos_seq, 'f')
-            plcm_r = max_org.get_placement(rnd_pos_seq, 'r')
-            if plcm_r.energy > plcm_f.energy:
-                placement = plcm_r
-            else:
-                placement = plcm_f
-            '''
-            placement.print_placement(stdout=GEN_INFO_TO_STDOUT)
+            plcm = max_org.best_placement(random.choice(positive_dataset), BOTH_STRANDS)
+            plcm.print_placement(stdout=GEN_INFO_TO_STDOUT)
             
             # Print against a random negative sequence
-            placement = max_org.best_placement(random.choice(negative_dataset), BOTH_STRANDS)
-            
-            # =============================================================
-            # !!!
-            # =============================================================
-            
-            '''
-            rnd_neg_seq = random.choice(negative_dataset)
-            plcm_f = max_org.get_placement(rnd_neg_seq, 'f')
-            plcm_r = max_org.get_placement(rnd_neg_seq, 'r')
-            if plcm_r.energy > plcm_f.energy:
-                placement = plcm_r
-            else:
-                placement = plcm_f
-            '''
-            placement.print_placement(stdout=GEN_INFO_TO_STDOUT)
+            plcm = max_org.best_placement(random.choice(negative_dataset), BOTH_STRANDS)
+            plcm.print_placement(stdout=GEN_INFO_TO_STDOUT)
             
             if RANDOM_SHUFFLE_SAMPLING_POS:
                 # If the dataset is shuffled, prepare a sorted version for the
@@ -582,7 +507,6 @@ def get_k_sampled_sequence(seq: str, kmer_len: int) -> str:
     because of overlap between k-mers that are then randomly sampled.
     The length of the sequence is preserved.
     '''
-    
     if kmer_len > 1:
         n_kmers = len(seq) // kmer_len
         n_nuclotides_rem = len(seq) % kmer_len
@@ -620,19 +544,6 @@ def generate_negative_set(positive_set, negative_set_size, k):
     
     # Generate neg set
     negative_set = []
-    
-    # ------------------------------------------------
-    ### k-mer sampling approach:
-    # !!! OBSOLETE : TO BE REMOVED < < < < < < < < < <
-    
-    # for i in range(q):
-    #     for seq in positive_set:
-    #         negseq = get_k_sampled_sequence(seq, k)
-    #         negative_set.append(negseq.lower())
-    # for seq in random.sample(positive_set, r):
-    #     negseq = get_k_sampled_sequence(seq, k)
-    #     negative_set.append(negseq.lower())
-    # ------------------------------------------------
     
     for seq in positive_set:
         seq_f = seq.f.lower()
@@ -839,9 +750,11 @@ def i_am_main_process():
 
 
 def check_mpi_settings(p, config):
-    ''' If the number of processes exceeds the number of pairs of organisms in
+    '''
+    If the number of processes exceeds the number of pairs of organisms in
     the population, some processes will be left with an empty population. In
-    that case, to avoid wasting computing power, an error is raised. '''
+    that case, to avoid wasting computing power, an error is raised.
+    '''
     if p > int(config["main"]["POPULATION_SIZE"] / 2):
         raise ValueError("The minimum number of organisms assigned to each " +
                          "process is 2 (you need a pair for recombination events " +
@@ -864,13 +777,12 @@ def check_dir(dir_path):
 
 
 def set_up():
-    """Reads configuration file and sets up all program variables
-
-    """
-
-    # specify as global variable so it can be accesed in local
-    # contexts outside setUp
-
+    '''
+    Reads configuration file and sets up all program variables
+    '''
+    
+    # specify as global variable so it can be accesed in local contexts outside setUp
+    
     global RUN_MODE
     global END_WHILE_METHOD
     global POPULATION_SIZE
@@ -1001,35 +913,23 @@ def set_up():
 
 
 def read_fasta_file(filename: str) -> list:
-    """Reads a fasta file and returns an array of DNA sequences (strings)
-
-    TODO: probably it can be useful to create our own Sequence object that
-    creates the string and stores some properties from fasta format. Also
-    we can adapt the current program to use Biopythons's Seq object.
-
+    '''
+    Reads a fasta file and returns an list of DNA sequences (SeqObject).
+    
     Args:
         filename: Name of the file that contains FASTA format sequences to read
-
-    Returns:
-        The set of sequences in string format
-
-    """
+    '''
     dataset = []
     fasta_sequences = SeqIO.parse(open(filename), "fasta")
     for fasta in fasta_sequences:
         dataset.append(SeqObject(str(fasta.seq)))
-        # !!! dataset.append(str(fasta.seq))
     return dataset
 
 
 def read_json_file(filename: str) -> dict:
-    """Reads a JSON file and returns a dictionary with the content.
-    
-    Args:
-        filename: Name of the json file to read
-    Returns:
-        Dictionary with the json file info
-    """
+    '''
+    Reads a JSON file and returns a dictionary with the content.
+    '''
     with open(filename) as json_content:
         return json.load(json_content)
 
@@ -1038,7 +938,6 @@ def check_config_settings(config):
     '''
     Checks that the input parameters set in the config file are valid.
     '''
-    
     confOrgFact = config["organismFactory"]
     
     # Check that the population size is an even number
@@ -1131,14 +1030,15 @@ def check_config_settings(config):
 
 
 def print_config_json(config: dict, name: str, path: str) -> None:
-    """Print the config file on std out and send it to a file.
-    It is useful so we can know which was the configuration on every run
+    '''
+    Print the config file on std out and send it to a file.
+    It is useful so we can know which settings were used for each run.
 
     Args:
-        config: Configuration file to print
+        config: Configuration dictionary
         name: Title for the configuration file
         path: File to export the configuration info
-    """
+    '''
     print_ln("{}:".format(name), path)
 
     for key in config.keys():
@@ -1147,13 +1047,13 @@ def print_config_json(config: dict, name: str, path: str) -> None:
 
 
 def print_ln(string, filepath, to_stdout=True):
-    """Shows the string on stdout and write it to a file
-    (like the python's logging modules does)
+    '''
+    Shows the string on stdout and write it to a file.
 
     Args:
         string: Information to print on stdout and file
         filepath: path to the file to export the string
-    """
+    '''
     
     if to_stdout:
         print(string)
@@ -1182,7 +1082,6 @@ def gini_RSV(values_for_each_class):
     -------
     giniRSV : float
         Ranges from 0 (perfect equality) to 1 (maximal inequality).
-
     '''
     
     N = len(values_for_each_class)

@@ -7,10 +7,9 @@ Aligned organisms representation object
 import copy
 
 class AlignedOrganismsRepresentation:
-    """
+    '''
     Aligned organisms representation object
-    
-    """
+    '''
     
     def __init__(self, organism1, organism2, dna_seq, both_strands):
         
@@ -99,25 +98,6 @@ class AlignedOrganismsRepresentation:
         # Place the two organisms on the same DNA sequence
         placement1 = parent1.best_placement(dna_seq, both_strands)
         placement2 = parent2.best_placement(dna_seq, both_strands)
-        
-        # !!!
-        # =====================================================================
-        
-        # p1_plcm_f = parent1.get_placement(dna_seq, 'f')
-        # p1_plcm_r = parent1.get_placement(dna_seq, 'r')
-        # if p1_plcm_r.energy > p1_plcm_f.energy:
-        #     placement1 = p1_plcm_f
-        # else:
-        #     placement1 = p1_plcm_r
-        
-        # p2_plcm_f = parent2.get_placement(dna_seq, 'f')
-        # p2_plcm_r = parent2.get_placement(dna_seq, 'r')
-        # if p2_plcm_r.energy > p2_plcm_f.energy:
-        #     placement2 = p2_plcm_f
-        # else:
-        #     placement2 = p2_plcm_r
-        
-        # =====================================================================
         
         # These dictionaries say which recognizer of an organism is occupying a
         # certain DNA position

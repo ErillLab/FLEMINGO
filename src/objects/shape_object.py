@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import math
-import copy
+#import copy
 global null_models
 null_models = {}
 
@@ -80,8 +80,6 @@ class ShapeObject:
         self.set_null_model()  # Sets attributes above
         
         # Set mu and sigma
-        # self.min_mu = self.edges[0]  # !!! redundant code (happens in set_null_model)
-        # self.max_mu = self.edges[-1]  # !!! redundant code (happens in set_null_model)
         self._mu = mu
         self._sigma = sigma
         
