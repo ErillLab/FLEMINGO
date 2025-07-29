@@ -1,13 +1,13 @@
 {
   "main": {
     "RUN_MODE": "serial",
-    "POPULATION_SIZE": 128,
+    "POPULATION_SIZE": 32,
     "POPULATION_ORIGIN": "random",
     "POPULATION_FILL_TYPE": "uniform",
     "DATASET_BASE_PATH_DIR": "datasets/",
     "RESULT_BASE_PATH_DIR": "results/",
     "RESULT_TEST_BASE_PATH_DIR": "resultsTEST/",
-    "POSITIVE_FILENAME": "DNA_shape_biological_datasets/ArgR/ArgR_all_Promoters.fas",
+    "POSITIVE_FILENAME": "test_pos_set_dilution/0pc_false_pos.fas",
     "NEGATIVE_FILENAME": null,
     "GENERATED_NEG_SET_SIZE": 100,
     "GENERATED_NEG_SET_KMER_LEN": 4,
@@ -20,6 +20,7 @@
     "PERIODIC_DATASETS_SHUFFLE": 10,
     "FITNESS_FUNCTION": "Welch",
     "GAMMA": 0.2,
+    "BOTH_STRANDS": true,
     "END_WHILE_METHOD": "iterations",
     "MIN_ITERATIONS": 100000,
     "MIN_FITNESS": 100,
@@ -40,7 +41,7 @@
   },
   "organismFactory": {
     "PROBABILITY_RECOMBINATION": 0.05,
-    "PERIODIC_MLE": 100,
+    "PERIODIC_MLE": 50,
     "PROBABILITY_MLE_CONNECTOR": 1.0,
     "PROBABILITY_MLE_PSSM": 0.95,
     "PROBABILITY_MLE_PSSM_TO_SHAPE": 0.05,

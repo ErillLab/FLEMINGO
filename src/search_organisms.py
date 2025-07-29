@@ -23,6 +23,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from objects.organism_factory import OrganismFactory
 from Bio import SeqIO
+from objects.sequence_object import SeqObject
 
 from Markov_DNA import MCM
 
@@ -87,7 +88,7 @@ def main():
             print("Generateing negative set...")
             negative_dataset = generate_negative_set(
                 positive_dataset, GENERATED_NEG_SET_SIZE, GENERATED_NEG_SET_KMER_LEN)
-            
+        
         else:
             negative_dataset = None  # this will only happen in parallel runs
         if RUN_MODE == 'parallel':
@@ -103,8 +104,8 @@ def main():
     Generate initial population
     """
     # Instantiate organism Factory object with object configurations
-    min_seq_length = min([len(i) for i in (positive_dataset + negative_dataset)])
-    max_seq_length = max([len(i) for i in (positive_dataset + negative_dataset)])
+    min_seq_length = min([s.len for s in (positive_dataset + negative_dataset)])
+    max_seq_length = max([s.len for s in (positive_dataset + negative_dataset)])
     single_print("min_seq_length =", min_seq_length)
     single_print("max_seq_length =", max_seq_length)
     organism_factory = OrganismFactory(
@@ -141,10 +142,6 @@ def main():
             # FRAGMENT AND SCATTER THE POPULATION
             organism_population = fragment_population(organism_population)
             organism_population = comm.scatter(organism_population, root=0)
-            
-            # print to check that the sub-populations are correct
-            # my_ids = [org._id for org in organism_population]
-            # print("From process " + str(rank) + ": loc pop is " + str(my_ids))
         
         # Shuffle datasets (if required)
         if generation % PERIODIC_DATASETS_SHUFFLE == 0:
@@ -180,11 +177,52 @@ def main():
             if (generation + 1) % organism_factory.periodic_mle == 0:
                 
                 # Child 1
-                placements = [parent1.get_placement(seq) for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]]
+                placements = []
+                for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]:
+                    placements.append(parent1.best_placement(seq, BOTH_STRANDS))
                 child1 = organism_factory.mle_org(parent1, placements)
+                
                 # Child 2
-                placements = [parent2.get_placement(seq) for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]]
+                placements = []
+                for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]:
+                    placements.append(parent2.best_placement(seq, BOTH_STRANDS))
                 child2 = organism_factory.mle_org(parent2, placements)
+                
+                # =============================================================
+                # !!!
+                # =============================================================
+                
+                '''
+                # Child 1
+                placements = []
+                for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]:
+                    pl_f = parent1.get_placement(seq, 'f')
+                    if BOTH_STRANDS:
+                        pl_r = parent1.get_placement(seq, 'r')
+                        if pl_r.energy > pl_f.energy:
+                            placements.append(pl_r)
+                        else:
+                            placements.append(pl_f)
+                    else:
+                        placements.append(pl_f)
+                # !!! placements = [parent1.get_placement(seq) for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]]
+                child1 = organism_factory.mle_org(parent1, placements)
+                
+                # Child 2
+                placements = []
+                for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]:
+                    pl_f = parent2.get_placement(seq, 'f')
+                    if BOTH_STRANDS:
+                        pl_r = parent2.get_placement(seq, 'r')
+                        if pl_r.energy > pl_f.energy:
+                            placements.append(pl_r)
+                        else:
+                            placements.append(pl_f)
+                    else:
+                        placements.append(pl_f)
+                # !!! placements = [parent2.get_placement(seq) for seq in positive_dataset[:MAX_SEQUENCES_TO_FIT_POS]]
+                child2 = organism_factory.mle_org(parent2, placements)
+                '''
                 # Pair parents and offspring
                 two_parent_child_pairs = [(parent1, child1), (parent2, child2)]
             
@@ -201,7 +239,7 @@ def main():
                     pos_set_sample = random.sample(positive_dataset, 3)  # !!! Temporarily hardcoded number of sequences
                     ref_seq = pos_set_sample[0]
                     child1, child2 = organism_factory.get_children(
-                        parent1, parent2, ref_seq, pos_set_sample)
+                        parent1, parent2, ref_seq, pos_set_sample, BOTH_STRANDS)
                     # Pair parents and offspring
                     two_parent_child_pairs = pair_parents_and_children(parent1, parent2, child1, child2)
                 
@@ -239,12 +277,12 @@ def main():
                 if parent.fitness == None:
                     parent.set_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
                                        negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                       FITNESS_FUNCTION, GAMMA)
+                                       FITNESS_FUNCTION, GAMMA, BOTH_STRANDS)
                 
                 # Child fitness
                 child.set_fitness(positive_dataset[:MAX_SEQUENCES_TO_FIT_POS],
                                   negative_dataset[:MAX_SEQUENCES_TO_FIT_NEG],
-                                  FITNESS_FUNCTION, GAMMA)
+                                  FITNESS_FUNCTION, GAMMA, BOTH_STRANDS)
                 
                 # Competition
                 if parent.fitness > child.fitness:
@@ -329,11 +367,39 @@ def main():
             )
             
             # Print against a random positive sequence
-            placement = max_org.get_placement(random.choice(positive_dataset))
+            placement = max_org.best_placement(random.choice(positive_dataset), BOTH_STRANDS)
+            
+            # =============================================================
+            # !!!
+            # =============================================================
+            
+            '''
+            rnd_pos_seq = random.choice(positive_dataset)
+            plcm_f = max_org.get_placement(rnd_pos_seq, 'f')
+            plcm_r = max_org.get_placement(rnd_pos_seq, 'r')
+            if plcm_r.energy > plcm_f.energy:
+                placement = plcm_r
+            else:
+                placement = plcm_f
+            '''
             placement.print_placement(stdout=GEN_INFO_TO_STDOUT)
             
             # Print against a random negative sequence
-            placement = max_org.get_placement(random.choice(negative_dataset))
+            placement = max_org.best_placement(random.choice(negative_dataset), BOTH_STRANDS)
+            
+            # =============================================================
+            # !!!
+            # =============================================================
+            
+            '''
+            rnd_neg_seq = random.choice(negative_dataset)
+            plcm_f = max_org.get_placement(rnd_neg_seq, 'f')
+            plcm_r = max_org.get_placement(rnd_neg_seq, 'r')
+            if plcm_r.energy > plcm_f.energy:
+                placement = plcm_r
+            else:
+                placement = plcm_f
+            '''
             placement.print_placement(stdout=GEN_INFO_TO_STDOUT)
             
             if RANDOM_SHUFFLE_SAMPLING_POS:
@@ -534,7 +600,7 @@ def get_k_sampled_sequence(seq: str, kmer_len: int) -> str:
 
 def generate_negative_set(positive_set, negative_set_size, k):
     '''
-    Generates a negative set made of pseudosequences that resemble the positive
+    Generates a negative set made of control sequences that resemble the positive
     set in terms of k-mer frequencies (k specified by the `k` parameter).
     They are generated using a sequence-specific Markov Model.
     The size of the negative set is specified by `negative_set_size`.
@@ -550,7 +616,7 @@ def generate_negative_set(positive_set, negative_set_size, k):
     if negative_set_size == None:
         negative_set_size = len(positive_set)
     # Size of neg set may not be a multiple of the size of pos set
-    q, r = divmod(negative_set_size, len(positive_set))
+    q, remainder = divmod(negative_set_size, len(positive_set))
     
     # Generate neg set
     negative_set = []
@@ -569,20 +635,24 @@ def generate_negative_set(positive_set, negative_set_size, k):
     # ------------------------------------------------
     
     for seq in positive_set:
-        MM_order = choose_MM_order(len(seq), k)
+        seq_f = seq.f.lower()
+        MM_order = choose_MM_order(len(seq_f), k)
         mcm = MCM(MM_order)
-        mcm.train(seq)
-        seqs = mcm.generate(size=len(seq), N=q)
+        mcm.train(seq_f)
+        seqs = mcm.generate(size=len(seq_f), N=q)
+        seqs = [SeqObject(s.lower()) for s in seqs]
         negative_set = negative_set + seqs
     
-    for seq in random.sample(positive_set, r):
-        MM_order = choose_MM_order(len(seq), k)
+    for seq in random.sample(positive_set, remainder):
+        seq_f = seq.f.lower()
+        MM_order = choose_MM_order(len(seq_f), k)
         mcm = MCM(MM_order)
-        mcm.train(seq)
-        seqs = mcm.generate(size=len(seq), N=1)
+        mcm.train(seq_f)
+        seqs = mcm.generate(size=len(seq_f), N=1)
+        seqs = [SeqObject(s.lower()) for s in seqs]
         negative_set = negative_set + seqs
     
-    return [seq.lower() for seq in negative_set]
+    return negative_set
 
 
 def choose_MM_order(L, k, M=2):
@@ -656,7 +726,7 @@ def export_organism(organism, dataset, filename, factory) -> None:
     results_file = "{}{}_results.txt".format(RESULT_BASE_PATH_DIR, filename)
     organism_file_json = "{}{}_organism.json".format(RESULT_BASE_PATH_DIR, filename)
     organism.export(organism_file)
-    organism.export_results(dataset, results_file)
+    organism.export_results(dataset, results_file, BOTH_STRANDS)
     factory.export_organisms([organism], organism_file_json)
 
 
@@ -711,7 +781,7 @@ def export_population(
         placements_file.write("\n")
         placements_file.close()
         # Write organism placement on a single positive sequence
-        organism.export_results([dataset[dna_seq_idx]], population_placements_file)
+        organism.export_results([dataset[dna_seq_idx]], population_placements_file, BOTH_STRANDS)
     
     # Make a file with all the organisms exported in json format
     factory.export_organisms(population, population_json_file)
@@ -818,6 +888,7 @@ def set_up():
     global PERIODIC_DATASETS_SHUFFLE
     global FITNESS_FUNCTION
     global GAMMA
+    global BOTH_STRANDS
     global MIN_ITERATIONS
     global MIN_FITNESS
     global THRESHOLD
@@ -882,6 +953,7 @@ def set_up():
     PERIODIC_DATASETS_SHUFFLE = config["main"]["PERIODIC_DATASETS_SHUFFLE"]
     FITNESS_FUNCTION = config["main"]["FITNESS_FUNCTION"]
     GAMMA = config["main"]["GAMMA"]
+    BOTH_STRANDS = config["main"]["BOTH_STRANDS"]
     MIN_ITERATIONS = config["main"]["MIN_ITERATIONS"]
     MIN_FITNESS = config["main"]["MIN_FITNESS"]
     THRESHOLD = config["main"]["THRESHOLD"]
@@ -945,7 +1017,8 @@ def read_fasta_file(filename: str) -> list:
     dataset = []
     fasta_sequences = SeqIO.parse(open(filename), "fasta")
     for fasta in fasta_sequences:
-        dataset.append(str(fasta.seq))
+        dataset.append(SeqObject(str(fasta.seq)))
+        # !!! dataset.append(str(fasta.seq))
     return dataset
 
 

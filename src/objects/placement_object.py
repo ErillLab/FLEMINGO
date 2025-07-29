@@ -12,7 +12,7 @@ class PlacementObject:
     
     """
     
-    def __init__(self, organism_id, dna_sequence):
+    def __init__(self, organism_id, dna_sequence, strand):
         """
         PlacementObject object constructor.
 
@@ -23,6 +23,7 @@ class PlacementObject:
         
         self.organism_id = organism_id
         self.dna_sequence = dna_sequence
+        self.strand = strand
         
         # Initialize placement features
         
@@ -44,11 +45,26 @@ class PlacementObject:
     def set_connectors_scores(self, conn_scores):
         self.connectors_scores = conn_scores
     
+    # -------------------------------------------------------------------------
+    
     def append_recognizer_position(self, recog_position):
         self.recognizers_positions.append(recog_position)
     
     def append_connector_position(self, connector_position):
         self.connectors_positions.append(connector_position)
+    
+    # -------------------------------------------------------------------------
+    # !!! Alternative mode
+    # -------------------------------------------------------------------------
+    
+    def set_recognizers_positions(self, recog_positions):
+        self.recognizers_positions = recog_positions
+    
+    def set_connectors_positions(self, conn_positions):
+        self.connectors_positions = conn_positions
+    
+    # -------------------------------------------------------------------------
+    
     
     # Print placement (to standard output or to file)
     

@@ -39,7 +39,8 @@ def norm_pf(x, y, mu, sigma):
 class ShapeObject:
     
     def __init__(self, rec_type, rec_size, config, mu = None, sigma = None):
-        """ShapeObject: recognizers a specific DNA-shape {mgw, prot, roll, 
+        """
+        ShapeObject: recognizers a specific DNA-shape {mgw, prot, roll, 
         or helt}
 
         All null models ever computed are stored in the global null_models 

@@ -558,7 +558,7 @@ class OrganismFactory:
         shape["length"] = o_shape.length
         return shape
 
-    def get_children(self, par1, par2, reference_dna_seq, pos_dna_sample):
+    def get_children(self, par1, par2, reference_dna_seq, pos_dna_sample, both_strands):
         '''
         Implements the recombination operator.
         Fisrt, an abstract representation of the aligned parents is produced.
@@ -597,10 +597,10 @@ class OrganismFactory:
         child2 = OrganismObject(self.get_id(), self.conf_org)
         
         # Place the parents on all the sequences in the sample of the positive set
-        par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample)
+        par1_placements, par2_placements = self.store_parents_placemnts(par1, par2, pos_dna_sample, both_strands)
         
         # Representation of the two parents aligned
-        parents_repres = AlignedOrganismsRepresentation(par1, par2, reference_dna_seq)
+        parents_repres = AlignedOrganismsRepresentation(par1, par2, reference_dna_seq, both_strands)
         # Table storing info about what connectors are available to cover the possible spans
         parents_repres.annotate_available_connectors()
         
@@ -628,7 +628,7 @@ class OrganismFactory:
         child2.flatten()
         return child1, child2
     
-    def store_parents_placemnts(self, parent1, parent2, dna_seq_set):
+    def store_parents_placemnts(self, parent1, parent2, dna_seq_set, both_strands):
         '''
         Places each parent on each DNA sequence in the given list of sequences.
         Returns all the placements in a list, for each organism.
@@ -637,8 +637,23 @@ class OrganismFactory:
         p2_placements = []
         
         for dna_seq in dna_seq_set:
-            p1_placements.append(parent1.get_placement(dna_seq))
-            p2_placements.append(parent2.get_placement(dna_seq))
+            p1_placements.append(parent1.best_placement(dna_seq, both_strands))
+            
+            # p1_plcm_f = parent1.get_placement(dna_seq, 'f')
+            # p1_plcm_r = parent1.get_placement(dna_seq, 'r')
+            # if p1_plcm_r.energy > p1_plcm_f.energy:
+            #     p1_placements.append(p1_plcm_r)
+            # else:
+            #     p1_placements.append(p1_plcm_f)
+            
+            p2_placements.append(parent2.best_placement(dna_seq, both_strands))
+            
+            # p2_plcm_f = parent2.get_placement(dna_seq, 'f')
+            # p2_plcm_r = parent2.get_placement(dna_seq, 'r')
+            # if p2_plcm_r.energy > p2_plcm_f.energy:
+            #     p2_placements.append(p2_plcm_r)
+            # else:
+            #     p2_placements.append(p2_plcm_f)
         
         return p1_placements, p2_placements
     
@@ -950,7 +965,7 @@ class OrganismFactory:
     
     def mle_pssm(self, recog_idx, placements):
         '''
-        Given an organism that shows the placements specified by the parameter
+        Given an organism that has the placements specified by the parameter
         `placements`, it analyses the placements of the PSSM-recognizer
         specified by the index `recog_idx`.
         It returns a new PSSM whose parameters are obtained through maximum
@@ -974,7 +989,7 @@ class OrganismFactory:
             positive set and were found based on MLE.
         '''
         
-        # Recognized k-mers from the positive set
+        # Recognized L-mers from the positive set
         instances = []
         for plc in placements:
             start, stop = plc.recognizers_positions[recog_idx]
@@ -1176,7 +1191,7 @@ class OrganismFactory:
         are obtained through maximum likelihood estimation (MLE). Each type of
         node has a certain probability of being optimized through MLE, which
         means that its binding instances are collected and the parameters are
-        firectly inferred from that collection.
+        directly inferred from that collection.
         For recognizers, there's also the possibility of using the observed
         instances of a PSSM to obtain an MLE-optimized Shape recognizer (of any
         type), or using the observed instances of a Shape recognizer to obtain

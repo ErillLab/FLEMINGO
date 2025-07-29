@@ -845,7 +845,7 @@ class OrganismObject:
             self.set_row_to_pssm()
             self.flatten()
     
-    def get_M_and_SE_on_DNA_set(self, dna_set, method, gamma):
+    def get_M_and_SE_on_DNA_set(self, dna_set, method, gamma, both_strands):
         '''
         Returns the mean and standard error to be used as input for the
         statistical test that we use as fitness function. Several variants of
@@ -888,7 +888,7 @@ class OrganismObject:
         gamma : float
             Number between 0 and 0.5.
         '''
-        energy_scores = self.get_binding_energies(dna_set)
+        energy_scores = self.get_binding_energies(dna_set, both_strands)
         n_to_trim = round(gamma * len(energy_scores))  # defalut gamma: 0.2
         
         if n_to_trim == 0 or method == "Welch":
@@ -935,7 +935,7 @@ class OrganismObject:
                              'the FITNESS_FUNCTION paramter in the config file.')
         return mean, sterr
     
-    def set_fitness(self, pos_set, neg_set, method, gamma=0.2):
+    def set_fitness(self, pos_set, neg_set, method, gamma=0.2, both_strands=True):
         '''
         Sets the fitness of the organism.
 
@@ -951,19 +951,48 @@ class OrganismObject:
             Number between 0 and 0.5, used for trimming (used if required by
             the fitness function). The default is 0.2.
         '''
-        M_p, SE_p = self.get_M_and_SE_on_DNA_set(pos_set, method, gamma)
-        M_n, SE_n = self.get_M_and_SE_on_DNA_set(neg_set, method, gamma)
+        M_p, SE_p = self.get_M_and_SE_on_DNA_set(pos_set, method, gamma, both_strands)
+        M_n, SE_n = self.get_M_and_SE_on_DNA_set(neg_set, method, gamma, both_strands)
         self.fitness = (M_p - M_n) / (SE_p**2 + SE_n**2)**(1/2)
     
-    def get_binding_energies(self, dna_set):
+    # !!!
+    # def get_binding_energies(self, dna_set, both_strands=True):
+    #     '''
+    #     Returns a list of binding energies for all the sequences in `dna_set`.
+    #     '''
+    #     binding_energies = []
+    #     for seq in dna_set:
+    #         placement_f = self.get_placement(seq, 'f')
+    #         if both_strands:
+    #             placement_r = self.get_placement(seq, 'r')
+    #             binding_energies.append(max(placement_f.energy, placement_r.energy))
+    #         else:
+    #             binding_energies.append(placement_f.energy)
+    #     return binding_energies
+    
+    def get_binding_energies(self, dna_set, both_strands=True):
         '''
         Returns a list of binding energies for all the sequences in `dna_set`.
         '''
         binding_energies = []
         for seq in dna_set:
-            placement = self.get_placement(seq)
+            placement = self.best_placement(seq, both_strands)
             binding_energies.append(placement.energy)
         return binding_energies
+    
+    def best_placement(self, seq_obj, both_strands=True):
+        '''
+        !!! Docstring here ...
+        '''
+        pl_f = self.get_placement(seq_obj, 'f')
+        if both_strands:
+            pl_r = self.get_placement(seq_obj, 'r')
+            if pl_r.energy > pl_f.energy:
+                return pl_r
+            else:
+                return pl_f
+        else:
+            return pl_f
 
     def count_nodes(self) -> int:
         '''
@@ -1166,7 +1195,7 @@ class OrganismObject:
         organism_file.write("\n\n")
         organism_file.close()
 
-    def export_results(self, a_dna: list, filename: str) -> None:
+    def export_results(self, a_dna, filename, both_strands) -> None:
         """Exports the binding profile of the organism against each of the 
            DNA sequences provided as a list
 
@@ -1178,23 +1207,40 @@ class OrganismObject:
         
         ofile = open(filename, "a+")
         # for each DNA sequence
-        for s_dna in a_dna:
-            placement = self.get_placement(s_dna)
+        for seq in a_dna:
+            placement = self.best_placement(seq, both_strands)
             placement.print_placement(outfile = ofile)
+            
+            # !!!
+            # placement_f = self.get_placement(seq, 'f')
+            
+            # # Both strands are possible
+            # if both_strands:
+            #     placement_r = self.get_placement(seq, 'r')
+            #     if placement_r.energy > placement_f.energy:
+            #         placement_r.print_placement(outfile = ofile)
+            #     else:
+            #         placement_f.print_placement(outfile = ofile)
+            
+            # # Only "forward" strand is possible
+            # else:
+            #     placement_f.print_placement(outfile = ofile)
         ofile.close()
 
-    def print_result(self, s_dna: str) -> None:
-        """Prints the binding profile of the organism against the 
-           provided DNA sequence 
-           
-        Args:
-            s_dna: DNA sequence to export
 
-        Returns:
-            DNA sequence and binding sites of the organisms recognizer
-        """
-        placement = self.get_placement(s_dna)
-        placement.print_placement(stdout = True)
+
+    # def print_result(self, s_dna: str) -> None:
+    #     """Prints the binding profile of the organism against the 
+    #        provided DNA sequence 
+           
+    #     Args:
+    #         s_dna: DNA sequence to export
+
+    #     Returns:
+    #         DNA sequence and binding sites of the organisms recognizer
+    #     """
+    #     placement = self.get_placement(s_dna)
+    #     placement.print_placement(stdout = True)
 
     def adjust_connector_scores(self, c_idx, c_scores, sequence_length):
         #####DEPRECATED####
@@ -1260,7 +1306,7 @@ class OrganismObject:
             c_scores[offset + con.max_seq_length + i] = np.log(prob_sum)
 
 
-    def get_placement(self, sequence: str) -> PlacementObject:
+    def get_placement(self, seq_obj, strand) -> PlacementObject:
         """
         Calculates a placement for a given organism for a given sequence using
         the _multiplacement.calculate function.
@@ -1274,6 +1320,14 @@ class OrganismObject:
         Returns:
             PlacementObject containing information of optimal placement
         """
+        
+        if strand == 'f':
+            sequence = seq_obj.f
+        elif strand == 'r':
+            sequence = seq_obj.r
+        else:
+            raise ValueError("strand should be 'f' or 'r'.")
+        
         # if the organism cannot be placed on the sequence, then it recieves a very low score
         # and is not attempted to be placed
         if self.sum_recognizer_lengths > len(sequence):
@@ -1334,25 +1388,49 @@ class OrganismObject:
         
         # parsing of the data from our placement function is done here
         # a placement object is instantiated and stores all of the scores that we obtained
-        placement = PlacementObject(self._id, sequence)
+        placement = PlacementObject(self._id, sequence, strand)
         placement.set_energy(float(recognizer_scores[-1]))
         placement.set_recognizer_scores([float(score) for score in recognizer_scores[:-1]])
         placement.set_connectors_scores([float(score) for score in gap_scores])
+        
+        # Record the positions (DNA coordinates) of each element's placement
         
         # the starting and ending positions for each recognizer and connector are calculated
         # using the starting position, lengths of each recognizer, and size of each gap
         current_position = gaps[0]
         placement.set_recognizer_types(self.recognizer_types)
+        recog_positions = []
+        conn_positions = []
         for i in range(num_recognizers):
             
             stop = current_position + self.recognizer_lengths[i]
-            placement.append_recognizer_position([int(current_position), int(stop)])
+            # !!! placement.append_recognizer_position([int(current_position), int(stop)])
+            recog_positions.append([int(current_position), int(stop)])
             current_position += self.recognizer_lengths[i]
             
             if i < num_recognizers - 1:
                 stop = current_position + gaps[i + 1]
-                placement.append_connector_position([int(current_position), int(stop)])
+                # !!! placement.append_connector_position([int(current_position), int(stop)])
+                conn_positions.append([int(current_position), int(stop)])
                 current_position += gaps[i + 1]
+        
+        # If this is a reverse complement DNA sequence:
+        # (*) Map coordinates onto the forward strand
+        # (*) Store the forward strand in the `dna_sequence` attribute, not the rev compl
+        if strand == 'r':
+            L = len(sequence)
+            recog_positions_mapped = [ [L-coord[1],L-coord[0]] for coord in recog_positions]
+            conn_positions_mapped =  [ [L-coord[1],L-coord[0]] for coord in conn_positions]
+            # Set positions
+            placement.set_recognizers_positions(recog_positions_mapped)
+            placement.set_connectors_positions(conn_positions_mapped)
+            # Set forward strand (not reverse complement strand)
+            placement.dna_sequence = seq_obj.f
+        # If this is the forward strand just set the positions as they are
+        else:
+            # Set positions
+            placement.set_recognizers_positions(recog_positions)
+            placement.set_connectors_positions(conn_positions)
         
         return placement
 

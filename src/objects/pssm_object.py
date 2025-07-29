@@ -1,14 +1,14 @@
-"""P object
-   PSSM object is a type of recognizer implementing sequence-specific recognition.
-   The PSSM object stores all PSSM data and its configuration.
-   
-   A PSSM (Position-Specific Scoring Matrix) is a model of the sequence-specific
-   recognition of DNA by a protein. Given a DNA sequence of length L, a PSSM of
-   length L returns a scalar representing the binding energy provided by the
-   recognition. This binding energy is derived from the log-likelihood between
-   the model's preference for the bases in the given sequence (at their given
-   location) and the null hypothesis (here, for generality, that all bases are
-   equally probable).
+"""
+PSSM object is a type of recognizer implementing sequence-specific recognition.
+The PSSM object stores all PSSM data and its configuration.
+
+A PSSM (Position-Specific Scoring Matrix) is a model of the sequence-specific
+recognition of DNA by a protein. Given a DNA sequence of length L, a PSSM of
+length L returns a scalar representing the binding energy provided by the
+recognition. This binding energy is derived from the log-likelihood between
+the model's preference for the bases in the given sequence (at their given
+location) and the null hypothesis (here, for generality, that all bases are
+equally probable).
 """
 
 import random
@@ -17,7 +17,8 @@ import decimal as dec
 
 
 class PssmObject():
-    """PSSM object is a type of recognizer object
+    """
+    PSSM object is a type of recognizer object
     """
 
     def __init__(self, pwm, config: dict) -> None:

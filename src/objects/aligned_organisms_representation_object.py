@@ -12,13 +12,7 @@ class AlignedOrganismsRepresentation:
     
     """
     
-    def __init__(self, organism1, organism2, dna_seq):
-        """
-        AlignedOrganismsRepresentation object constructor.
-
-        Args:
-            XXX
-        """
+    def __init__(self, organism1, organism2, dna_seq, both_strands):
         
         # Initialize organisms representations
         self.organism1 = []
@@ -40,7 +34,7 @@ class AlignedOrganismsRepresentation:
         self.children_ids = [None, None]
         
         # Compile attributes
-        self.get_aligned_representations(organism1, organism2, dna_seq)
+        self.get_aligned_representations(organism1, organism2, dna_seq, both_strands)
     
     def set_organsism1(self, nodes_list):
         self.organism1 = copy.deepcopy(nodes_list)
@@ -70,7 +64,7 @@ class AlignedOrganismsRepresentation:
     def set_children_IDs(self, child1_id, child2_id):
         self.children_ids = [child1_id, child2_id]
     
-    def get_aligned_representations(self, parent1, parent2, dna_seq):
+    def get_aligned_representations(self, parent1, parent2, dna_seq, both_strands):
         '''
         !!! Update docstring ...
         
@@ -103,8 +97,27 @@ class AlignedOrganismsRepresentation:
         '''
         
         # Place the two organisms on the same DNA sequence
-        placement1 = parent1.get_placement(dna_seq)
-        placement2 = parent2.get_placement(dna_seq)
+        placement1 = parent1.best_placement(dna_seq, both_strands)
+        placement2 = parent2.best_placement(dna_seq, both_strands)
+        
+        # !!!
+        # =====================================================================
+        
+        # p1_plcm_f = parent1.get_placement(dna_seq, 'f')
+        # p1_plcm_r = parent1.get_placement(dna_seq, 'r')
+        # if p1_plcm_r.energy > p1_plcm_f.energy:
+        #     placement1 = p1_plcm_f
+        # else:
+        #     placement1 = p1_plcm_r
+        
+        # p2_plcm_f = parent2.get_placement(dna_seq, 'f')
+        # p2_plcm_r = parent2.get_placement(dna_seq, 'r')
+        # if p2_plcm_r.energy > p2_plcm_f.energy:
+        #     placement2 = p2_plcm_f
+        # else:
+        #     placement2 = p2_plcm_r
+        
+        # =====================================================================
         
         # These dictionaries say which recognizer of an organism is occupying a
         # certain DNA position
@@ -119,7 +132,7 @@ class AlignedOrganismsRepresentation:
         # and the other from parent2) are stored in this set
         pairs = set([])
         
-        for i in range(len(dna_seq)):
+        for i in range(len(dna_seq.f)):
             p1, p2 = '-', '-'
             
             if i in pos_to_recog_dict1.keys():
